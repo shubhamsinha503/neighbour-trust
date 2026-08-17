@@ -285,6 +285,63 @@ def latest_envelope(
     ).fetchone()
 
 
+# ---------------------------------------------------------------------------
+# Ingestion run log — see infra/migrations/002_ingest_run.sql
+# ---------------------------------------------------------------------------
+
+
+def start_ingest_run(
+    conn: psycopg.Connection, *, category: str, sources: dict[str, bool]
+) -> int:
+    row = conn.execute(
+        """
+        INSERT INTO ingest_run (category, sources)
+        VALUES (%s::category_t, %s)
+        RETURNING id
+        """,
+        (category, json.dumps(sources)),
+    ).fetchone()
+    return row["id"]
+
+
+def finish_ingest_run(
+    conn: psycopg.Connection,
+    run_id: int,
+    *,
+    status: str,
+    ok: int = 0,
+    skipped: int = 0,
+    error: Optional[str] = None,
+) -> None:
+    conn.execute(
+        """
+        UPDATE ingest_run
+           SET finished_at = now(),
+            status = %s,
+            localities_ok = %s,
+            localities_skipped = %s,
+            error = %s
+        WHERE id = %s
+        """,
+        (status, ok, skipped, error, run_id),
+    )
+
+
+def last_successful_ingest(
+    conn: psycopg.Connection, *, category: str
+) -> Optional[dict[str, Any]]:
+    return conn.execute(
+        """
+        SELECT started_at, finished_at, localities_ok, localities_skipped
+        FROM ingest_run
+        WHERE category = %s::category_t AND status = 'ok'
+        ORDER BY started_at DESC
+        LIMIT 1
+        """,
+        (category,),
+    ).fetchone()
+
+
 def _json_default(value: Any) -> Any:
     if isinstance(value, (datetime, date)):
         return value.isoformat()

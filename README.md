@@ -29,7 +29,16 @@ point of this slice was proving the pipeline once before multiplying it by six.
 | Air quality agent (CPCB / OpenAQ / AQICN) | done, `agents/air_quality/` |
 | FastAPI endpoint | done, `apps/api/` |
 | Next.js card in the mockup's language | done, `apps/web/` |
+| Hourly scheduler + run log + deploy config | done, `agents/scheduler.py`, `infra/DEPLOY.md` |
 | Schools, crime, water, power, infrastructure | not started — Phase 2 |
+
+**Deploying?** Read `infra/DEPLOY.md` first — Railway's default Postgres has no
+PostGIS, and getting that wrong is an afternoon.
+
+**The scheduler is the time-sensitive part.** OpenAQ serves a 90-day history
+window and the other two sources serve none, so every hour it isn't running is an
+hour of trend data that becomes permanently unrecoverable. `aq_observation` is
+the one asset here that compounds.
 
 ## Quickstart
 

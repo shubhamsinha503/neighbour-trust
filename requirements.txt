@@ -9,6 +9,7 @@ httpx==0.28.1
 psycopg[binary]==3.2.3
 h3==4.1.2
 python-dotenv==1.0.1
+apscheduler==3.11.0
 
 # The shared envelope package, installed in editable mode so agents/ and apps/api
 # import the same types rather than each keeping a copy.

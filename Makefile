@@ -3,17 +3,18 @@
 
 PY := .venv/Scripts/python.exe
 
-.PHONY: help setup db migrate seed fetch api web test clean
+.PHONY: help setup db migrate seed fetch schedule api web test clean
 
 help:
-	@echo "setup    - create venv, install Python + web deps"
-	@echo "db       - start Postgres+PostGIS (docker compose)"
-	@echo "migrate  - apply infra/migrations to a running db"
-	@echo "seed     - insert the Bengaluru + Gurugram localities"
-	@echo "fetch    - run the air quality agent once"
-	@echo "api      - run FastAPI on :8000"
-	@echo "web      - run Next.js on :3000"
-	@echo "test     - run the Python test suite"
+	@echo "setup     - create venv, install Python + web deps"
+	@echo "db        - start Postgres+PostGIS (docker compose)"
+	@echo "migrate   - apply infra/migrations to a running db"
+	@echo "seed      - insert the Bengaluru + Gurugram localities"
+	@echo "fetch     - run the air quality agent once"
+	@echo "schedule  - run the hourly scheduler in the foreground"
+	@echo "api       - run FastAPI on :8000"
+	@echo "web       - run Next.js on :3000"
+	@echo "test      - run the Python test suite"
 
 setup:
 	python -m venv .venv
@@ -25,13 +26,16 @@ db:
 	@echo "Postgres on localhost:5433"
 
 migrate:
-	docker exec -i neighbour-trust-db psql -U neighbour -d neighbour_trust < infra/migrations/001_init.sql
+	$(PY) -m infra.migrate
 
 seed:
 	$(PY) -m agents.common.seed_localities
 
 fetch:
 	$(PY) -m agents.air_quality.run
+
+schedule:
+	$(PY) -m agents.scheduler
 
 api:
 	$(PY) -m uvicorn apps.api.app.main:app --reload

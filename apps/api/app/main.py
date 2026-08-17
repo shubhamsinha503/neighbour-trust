@@ -10,6 +10,7 @@ Run from the repo root:
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from dotenv import load_dotenv
@@ -98,14 +99,36 @@ class NoDataResponse(BaseModel):
 
 @app.get("/healthz")
 def healthz() -> dict[str, Any]:
-    """Liveness plus a real database round-trip — a health check that doesn't
-    touch the DB will happily report green while every request 500s."""
+    """Liveness, a real database round-trip, and ingestion freshness.
+
+    The DB round-trip is here because a health check that doesn't touch the
+    database reports green while every request 500s. Ingestion freshness is here
+    for the subtler failure: once the scheduler runs unattended, a dead job is
+    invisible from the outside — stale rows keep serving happily, and "the data
+    looks a bit old" is indistinguishable from "the job has been crashing for
+    nine days". `stale` flips when the last successful run is older than the
+    hourly cadence allows for.
+    """
     try:
         with db.connect() as conn:
             count = conn.execute("SELECT COUNT(*) AS n FROM locality").fetchone()["n"]
-        return {"status": "ok", "localities": count}
+            last = db.last_successful_ingest(conn, category="air_quality")
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"database unavailable: {exc}") from exc
+
+    ingest: dict[str, Any] = {"last_success": None, "age_minutes": None, "stale": True}
+    if last is not None and last["finished_at"] is not None:
+        age = datetime.now(timezone.utc) - last["finished_at"]
+        ingest = {
+            "last_success": last["finished_at"].isoformat(),
+            "age_minutes": round(age.total_seconds() / 60),
+            "localities_ok": last["localities_ok"],
+            "localities_skipped": last["localities_skipped"],
+            # Two missed hourly runs. One is a blip; two is a pattern.
+            "stale": age > timedelta(hours=2, minutes=30),
+        }
+
+    return {"status": "ok", "localities": count, "air_quality_ingest": ingest}
 
 
 @app.get("/api/v1/localities", response_model=list[Locality])
