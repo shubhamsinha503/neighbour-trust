@@ -1,0 +1,27 @@
+# Local dev stack. Postgres+PostGIS only for now — Redis (the hot-path cache in
+# docs/build-roadmap.md) is deliberately not here yet. At Phase 1 volumes there's
+# nothing to cache, and an unused Redis is one more thing to keep running.
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: neighbour-trust-db
+    environment:
+      POSTGRES_USER: neighbour
+      POSTGRES_PASSWORD: neighbour
+      POSTGRES_DB: neighbour_trust
+    ports:
+      - "5433:5432"   # 5433 on the host to avoid colliding with a local Postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # Runs once on first boot of an empty volume. Re-applying after that is
+      # `make migrate`, which is idempotent (every statement is IF NOT EXISTS).
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neighbour -d neighbour_trust"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db_data:

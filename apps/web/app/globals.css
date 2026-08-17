@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/* Design tokens lifted verbatim from design/mockup-v2-psychology.html.
+   Per docs/build-roadmap.md the v2 mockup's visual language is the design system,
+   not a one-off HTML file — so these live here as the single source and the
+   mockup becomes the reference rather than the implementation.
+
+   The status ramp is reserved for status only (AQI bands), never reused as a
+   generic series colour. */
+@theme {
+  --color-surface-1: #fcfcfb;
+  --color-page-plane: #f4f4f1;
+
+  --color-ink-primary: #0b0b0b;
+  --color-ink-secondary: #52514e;
+  --color-ink-muted: #898781;
+
+  --color-gridline: #e1e0d9;
+  --color-baseline: #c3c2b7;
+  --color-hairline: rgba(11, 11, 11, 0.09);
+
+  --color-brand: #147a56;
+  --color-brand-soft: rgba(27, 175, 122, 0.12);
+  --color-brand-deep: #0e5a3f;
+  --color-brand-bright: #1baf7a;
+
+  --color-series-blue: #2a78d6;
+  --color-series-violet: #4a3aa7;
+
+  /* CPCB's six AQI bands mapped onto the mockup's four status steps. Good and
+     Satisfactory share green, Very Poor and Severe share the two worst reds —
+     which matches how CPCB itself colours its bulletins. */
+  --color-status-good: #0ca30c;
+  --color-status-warning: #fab219;
+  --color-status-serious: #ec835a;
+  --color-status-critical: #d03b3b;
+  --color-status-severe: #8b2222;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+html,
+body {
+  background: var(--color-page-plane);
+  color: var(--color-ink-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The chart's hover layer is keyboard reachable; this keeps the focus ring from
+   being clipped by the SVG viewport. */
+.chart-focusable:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

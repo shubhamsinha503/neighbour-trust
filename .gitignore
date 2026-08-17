@@ -1,0 +1,23 @@
+# Secrets — never commit. .env.example is the checked-in template.
+.env
+.env.local
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db

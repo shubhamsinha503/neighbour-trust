@@ -1,0 +1,17 @@
+# Backend + agents. Install with:  pip install -r requirements.txt
+# The web frontend has its own deps in apps/web/package.json.
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+
+httpx==0.28.1
+psycopg[binary]==3.2.3
+h3==4.1.2
+python-dotenv==1.0.1
+
+# The shared envelope package, installed in editable mode so agents/ and apps/api
+# import the same types rather than each keeping a copy.
+-e ./packages/schema/python
+
+pytest==8.3.4

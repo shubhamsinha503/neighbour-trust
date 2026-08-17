@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neighbour-trust-schema"
+version = "0.1.0"
+description = "Shared agent envelope types for Neighbour Trust."
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.9"]
+
+[tool.setuptools]
+packages = ["neighbour_trust_schema"]

@@ -1,0 +1,195 @@
+"""Shared data envelope every category agent returns.
+
+Mirrors the agent specification in docs/strategy.md ("Agent specification, per
+category"). Every agent — schools, crime, air_quality, water, power,
+infrastructure — returns a DataEnvelope wrapping its category-specific payload,
+so the orchestrator can merge outputs from six different sources uniformly
+regardless of how different their underlying data looks.
+
+Phase 1 status: the envelope core (category, source_name, source_url,
+fetched_at, data_vintage, h3_cell, confidence, payload) is unchanged from the
+Phase 0 starting point and is now backed by a real Postgres table
+(infra/migrations/001_init.sql). The category payloads other than
+AirQualityPayload have not yet been tested against live responses — only
+air_quality has, so only it has been adjusted.
+"""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+from enum import Enum
+from typing import Any, Optional
+
+from pydantic import BaseModel, Field
+
+
+class Confidence(str, Enum):
+    """How much weight the UI and the orchestrator should give this data point.
+
+    HIGH / MEDIUM / LOW describe official-data quality (recency + granularity).
+    COMMUNITY_ESTIMATED means there's no reliable official source yet and the
+    value leans on resident reports and/or the news-monitoring agent instead.
+    Never silently upgrade a community-estimated value to look like official data.
+    """
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    COMMUNITY_ESTIMATED = "community_estimated"
+
+
+class Category(str, Enum):
+    SCHOOLS = "schools"
+    CRIME = "crime"
+    AIR_QUALITY = "air_quality"
+    WATER = "water"
+    POWER = "power"
+    INFRASTRUCTURE = "infrastructure"
+
+
+class DataEnvelope(BaseModel):
+    """Common wrapper returned by every category agent."""
+
+    category: Category
+    source_name: str
+    source_url: Optional[str] = None
+    fetched_at: datetime = Field(..., description="When the agent last pulled this data.")
+    data_vintage: datetime = Field(
+        ..., description="How old the underlying data actually is — not when it was fetched. "
+        "A UDISE+ record fetched today might still be 18 months stale; that staleness is what "
+        "the confidence tag and the UI's 'last updated' line should reflect."
+    )
+    h3_cell: str = Field(..., description="H3 index (resolution 9) this data point is keyed to.")
+    confidence: Confidence
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Category-specific fields — validate against the matching *Payload model below "
+        "before writing to Postgres.",
+    )
+
+
+# ---- Category-specific payloads (see docs/strategy.md for source lists per category) ----
+
+
+class SchoolsPayload(BaseModel):
+    name: str
+    board: Optional[str] = None
+    distance_km: Optional[float] = None
+    pupil_teacher_ratio: Optional[float] = None
+    infra_score: Optional[float] = None
+    pass_rate: Optional[float] = None
+
+
+class CrimePayload(BaseModel):
+    official_crime_rate_district: Optional[float] = Field(
+        None, description="Always district-level per NCRB — never present as locality-specific."
+    )
+    resident_reports_90d_count: int = 0
+    blended_safety_perception_score: Optional[float] = None
+
+
+class AqiBand(str, Enum):
+    """CPCB National AQI bands. Deliberately CPCB's six-band scale, not the US EPA's —
+    the same PM2.5 concentration lands in a different band under each, and an Indian
+    buyer cross-checking against a CPCB bulletin must see the same word we do."""
+
+    GOOD = "good"
+    SATISFACTORY = "satisfactory"
+    MODERATE = "moderate"
+    POOR = "poor"
+    VERY_POOR = "very_poor"
+    SEVERE = "severe"
+
+
+class TrendPoint(BaseModel):
+    """One day of the 30-day trend.
+
+    Adjusted from the Phase 0 `trend_30d: list[float]` once real data was in hand:
+    station history has gaps (stations go offline for days at a time), so a bare
+    list of floats silently misaligns the chart's x-axis the first time a day is
+    missing. Carrying the date on each point makes a gap render as a gap.
+    """
+
+    day: date
+    aqi: float
+    observation_count: int = Field(
+        1, description="Hourly observations this daily value was averaged from. "
+        "Low counts mean a thin day, which the chart dims rather than hides."
+    )
+
+
+class AirQualityPayload(BaseModel):
+    """Air quality output. See agents/air_quality/ for how each field is derived.
+
+    Field-name changes from the Phase 0 draft, all driven by live responses:
+      - `pm2_5` kept as-is (CPCB returns pollutant_id "PM2.5"; we normalize).
+      - `trend_30d` is now list[TrendPoint] rather than list[float] — see TrendPoint.
+      - added `aqi_band`, `dominant_pollutant`, `station_name`, `observed_at`,
+        `sources_used`, and the remaining CPCB pollutants, all of which the real
+        payloads carry and the UI needs to avoid re-deriving on the client.
+    """
+
+    current_aqi: float = Field(
+        ..., description="CPCB National AQI computed from 24-hour mean concentrations, "
+        "which is how CPCB defines it. Not the latest single hour — see latest_hour_aqi."
+    )
+    aqi_band: AqiBand
+    aqi_basis: str = Field(
+        "24h_rolling",
+        description="Averaging window behind current_aqi. Recorded rather than assumed "
+        "because indexing a single hour against CPCB's 24-hour breakpoints inflates the "
+        "number substantially, and a stored value should say which method produced it.",
+    )
+    latest_hour_aqi: Optional[float] = Field(
+        None, description="AQI of the most recent single hour. Context beside the headline "
+        "— it moves far more than the 24-hour figure and is never the headline itself."
+    )
+    dominant_pollutant: Optional[str] = Field(
+        None, description="Pollutant whose sub-index set the AQI — CPCB AQI is a max, not an average."
+    )
+
+    pm2_5: Optional[float] = None
+    pm10: Optional[float] = None
+    no2: Optional[float] = None
+    so2: Optional[float] = None
+    co: Optional[float] = Field(None, description="mg/m³ — CPCB reports CO in mg/m³, not µg/m³.")
+    o3: Optional[float] = None
+    nh3: Optional[float] = None
+
+    station_name: Optional[str] = None
+    nearest_station_km: Optional[float] = None
+    observed_at: Optional[datetime] = Field(
+        None, description="When the station actually measured this — distinct from envelope.fetched_at."
+    )
+
+    trend_30d: list[TrendPoint] = Field(default_factory=list)
+    sources_used: list[str] = Field(
+        default_factory=list,
+        description="Every upstream that contributed, e.g. ['CPCB via data.gov.in', 'OpenAQ']. "
+        "Drives the source strip in the UI, which per docs/strategy.md is the credibility engine.",
+    )
+
+
+class WaterPayload(BaseModel):
+    reported_supply_frequency: Optional[str] = None
+    groundwater_trend: Optional[str] = None
+    tanker_dependency_pct: Optional[float] = None
+
+
+class PowerPayload(BaseModel):
+    avg_outage_hours_per_week_reported: Optional[float] = None
+    official_data_available: bool = False
+
+
+class InfraProject(BaseModel):
+    name: str
+    type: str
+    expected_completion: Optional[str] = None
+    source: str
+    confidence: Confidence
+
+
+class InfrastructurePayload(BaseModel):
+    nearby_rera_projects: list[InfraProject] = Field(default_factory=list)
+    upcoming_infra_within_5km: list[InfraProject] = Field(default_factory=list)
+    builder_track_record_score: Optional[float] = None
