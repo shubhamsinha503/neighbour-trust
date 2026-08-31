@@ -43,7 +43,13 @@ def main(argv: Optional[list[str]] = None) -> int:
         format="%(levelname)-7s %(message)s",
     )
     if not args.verbose:
-        logging.getLogger("httpx").setLevel(logging.WARNING)
+        # Both spellings matter. Our own source clients use httpx; the Anthropic
+        # SDK v1.x is built on httpx2 and logs through a logger of that name, so
+        # silencing "httpx" alone left one INFO line per classification — 1,012
+        # of them in a real run, burying the summary this command exists to
+        # print.
+        for noisy in ("httpx", "httpx2"):
+            logging.getLogger(noisy).setLevel(logging.WARNING)
 
     has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
     using_claude = has_key and not args.no_claude

@@ -145,9 +145,11 @@ def main() -> int:
         level=os.environ.get("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)-7s %(name)s %(message)s",
     )
-    # httpx logs a line per request at INFO; at ~80 requests a run that buries
-    # everything else.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    # One INFO line per HTTP request buries everything else — a news run makes
+    # over a thousand. Both spellings: our source clients use httpx, the
+    # Anthropic SDK v1.x is built on httpx2 and logs under that name.
+    for noisy in ("httpx", "httpx2"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
     scheduler = BlockingScheduler(timezone="UTC")
 
