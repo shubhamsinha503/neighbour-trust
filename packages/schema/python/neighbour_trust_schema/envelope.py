@@ -6,12 +6,12 @@ infrastructure — returns a DataEnvelope wrapping its category-specific payload
 so the orchestrator can merge outputs from six different sources uniformly
 regardless of how different their underlying data looks.
 
-Phase 1 status: the envelope core (category, source_name, source_url,
-fetched_at, data_vintage, h3_cell, confidence, payload) is unchanged from the
-Phase 0 starting point and is now backed by a real Postgres table
-(infra/migrations/001_init.sql). The category payloads other than
-AirQualityPayload have not yet been tested against live responses — only
-air_quality has, so only it has been adjusted.
+Status: the envelope core (category, source_name, source_url, fetched_at,
+data_vintage, h3_cell, confidence, payload) is unchanged from the Phase 0
+starting point and is backed by a real Postgres table
+(infra/migrations/001_init.sql). Only the payloads of categories with a live
+agent have been adjusted against real responses — air_quality and schools.
+crime, water, power and infrastructure are still untested drafts.
 """
 
 from __future__ import annotations
@@ -72,12 +72,56 @@ class DataEnvelope(BaseModel):
 
 
 class SchoolsPayload(BaseModel):
+    """One school. Unchanged from the Phase 0 draft — the fields UDISE actually
+    provides line up with it, with the single exception noted on pass_rate."""
+
     name: str
     board: Optional[str] = None
     distance_km: Optional[float] = None
     pupil_teacher_ratio: Optional[float] = None
     infra_score: Optional[float] = None
-    pass_rate: Optional[float] = None
+    pass_rate: Optional[float] = Field(
+        None,
+        description="Board pass rate. Always None from UDISE — the dataset carries no "
+        "exam outcomes at all, so this stays unpopulated until a state-board source is "
+        "added. Kept in the model rather than deleted because its absence is exactly "
+        "what caps schools confidence below High.",
+    )
+
+    # Added once real UDISE records were in hand — all present in the source and
+    # all things a buyer asks about a school before anything else.
+    udise_code: Optional[str] = None
+    management: Optional[str] = Field(
+        None, description="Government / private / aided. The single field buyers filter on hardest."
+    )
+    school_category: Optional[str] = None
+    total_students: Optional[int] = None
+    total_teachers: Optional[int] = None
+    proxy_score: Optional[float] = Field(
+        None, description="0-100 composite of pupil-teacher ratio and classroom adequacy. "
+        "Explicitly NOT a quality ranking — see agents/schools/scoring.py."
+    )
+
+
+class SchoolsAreaPayload(BaseModel):
+    """Schools *around a locality* — the envelope payload for the schools category.
+
+    Air quality is one measurement per locality; schools is many records per
+    locality, so the envelope carries an aggregate plus the nearest few rather
+    than a single reading. SchoolsPayload above still describes one school and is
+    what the `schools` list is made of.
+    """
+
+    schools_within_2km: int = 0
+    schools_within_5km: int = 0
+    median_pupil_teacher_ratio: Optional[float] = None
+    median_proxy_score: Optional[float] = None
+    government_share_pct: Optional[float] = Field(
+        None, description="Share of nearby schools that are government-run."
+    )
+    boards_available: list[str] = Field(default_factory=list)
+    nearest_schools: list[SchoolsPayload] = Field(default_factory=list)
+    sources_used: list[str] = Field(default_factory=list)
 
 
 class CrimePayload(BaseModel):

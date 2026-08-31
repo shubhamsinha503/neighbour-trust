@@ -37,13 +37,43 @@ export interface DataEnvelope<TPayload = Record<string, unknown>> {
 
 // ---- Category-specific payloads (see docs/strategy.md for source lists per category) ----
 
+/** One school. */
 export interface SchoolsPayload {
   name: string;
   board?: string;
   distanceKm?: number;
   pupilTeacherRatio?: number;
   infraScore?: number;
+  /**
+   * Always undefined from UDISE — the dataset carries no exam outcomes at all.
+   * Its absence is what caps schools confidence below High.
+   */
   passRate?: number;
+
+  udiseCode?: string;
+  /** Government / private / aided — the field buyers filter on hardest. */
+  management?: string;
+  schoolCategory?: string;
+  totalStudents?: number;
+  totalTeachers?: number;
+  /** 0-100 from pupil-teacher ratio and classroom adequacy. NOT a quality ranking. */
+  proxyScore?: number;
+}
+
+/**
+ * Schools *around a locality* — the envelope payload for the schools category.
+ * Air quality is one measurement per locality; schools is many records, so the
+ * envelope carries an aggregate plus the nearest few.
+ */
+export interface SchoolsAreaPayload {
+  schoolsWithin2km: number;
+  schoolsWithin5km: number;
+  medianPupilTeacherRatio?: number;
+  medianProxyScore?: number;
+  governmentSharePct?: number;
+  boardsAvailable: string[];
+  nearestSchools: SchoolsPayload[];
+  sourcesUsed: string[];
 }
 
 export interface CrimePayload {
