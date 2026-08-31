@@ -76,9 +76,17 @@ def get_locality(conn: psycopg.Connection, slug: str) -> Optional[dict[str, Any]
 
 
 def list_localities(conn: psycopg.Connection) -> list[dict[str, Any]]:
+    """Every locality.
+
+    Returns the same columns as get_locality, `id` included. They diverged once —
+    list_localities omitted `id` — and the news agent, which needs it as a
+    foreign key, raised KeyError('id') only on the all-localities path. A
+    single-locality run went through get_locality and passed, so the bug reached
+    CI. Keep the two column lists identical.
+    """
     return conn.execute(
         """
-        SELECT slug, name, city, state, pincode, h3_cell,
+        SELECT id, slug, name, city, state, pincode, h3_cell,
                ST_Y(centroid::geometry) AS lat,
                ST_X(centroid::geometry) AS lon
         FROM locality ORDER BY city, name
