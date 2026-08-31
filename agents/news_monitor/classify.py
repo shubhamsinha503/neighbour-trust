@@ -188,7 +188,15 @@ class ClaudeClassifier:
             )
 
         self._model = model or os.environ.get("NEWS_CLASSIFIER_MODEL", "claude-opus-5")
-        self._client = anthropic.Anthropic()
+
+        # Identity-linked API keys (the kind issued to a user rather than to an
+        # organisation) must name the workspace each request acts in, otherwise
+        # the API returns 400 before doing any work. Plain org keys ignore the
+        # header, so sending it when present is safe either way.
+        workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID", "").strip()
+        headers = {"anthropic-workspace-id": workspace} if workspace else None
+
+        self._client = anthropic.Anthropic(default_headers=headers)
         self.name = f"claude:{self._model}"
 
     def classify(

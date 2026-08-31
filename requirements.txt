@@ -13,7 +13,7 @@ apscheduler==3.11.0
 
 # Only needed for the news-monitoring agent's classifier. Without it (and
 # without ANTHROPIC_API_KEY) that agent falls back to a keyword heuristic.
-anthropic==0.69.0
+anthropic==1.2.0
 
 # The shared envelope package, installed in editable mode so agents/ and apps/api
 # import the same types rather than each keeping a copy.
