@@ -55,6 +55,11 @@ jobs:
       DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+      # Optional. Unset means the classifier's own default (claude-opus-5).
+      # Worth setting deliberately: a full first pass is ~800 headlines, which
+      # is a few dollars on Opus and a fraction of that on Haiku, and short
+      # headline classification is a task Haiku handles well.
+      NEWS_CLASSIFIER_MODEL: ${{ secrets.NEWS_CLASSIFIER_MODEL }}
 
     steps:
       - uses: actions/checkout@v4
