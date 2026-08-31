@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
 from agents.common import db  # noqa: E402
+from apps.api.app.schools_verdict import build_verdict as build_schools_verdict  # noqa: E402
 from apps.api.app.verdict import build_verdict  # noqa: E402
 
 app = FastAPI(
@@ -179,4 +180,71 @@ def get_air_quality(slug: str) -> dict[str, Any]:
         "confidence": envelope["confidence"],
         "payload": payload,
         "verdict": build_verdict(payload, envelope["confidence"]),
+    }
+
+
+class SchoolsVerdict(BaseModel):
+    headline: str
+    eyebrow: str
+    score: int = Field(..., ge=0, le=100)
+    caveat: str
+    quality_disclaimer: str
+
+
+class SchoolsResponse(BaseModel):
+    locality: Locality
+    category: str
+    source_name: str
+    source_url: Optional[str] = None
+    fetched_at: str
+    data_vintage: str
+    h3_cell: str
+    confidence: str
+    payload: dict[str, Any]
+    verdict: SchoolsVerdict
+
+
+@app.get(
+    "/api/v1/localities/{slug}/schools",
+    response_model=SchoolsResponse,
+    responses={404: {"model": NoDataResponse}},
+)
+def get_schools(slug: str) -> dict[str, Any]:
+    with db.connect() as conn:
+        locality = db.get_locality(conn, slug)
+        if locality is None:
+            raise HTTPException(status_code=404, detail=f"unknown locality: {slug}")
+
+        envelope = db.latest_envelope(conn, category="schools", h3_cell=locality["h3_cell"])
+
+    if envelope is None:
+        # As with air quality, a 404 carrying an explanation rather than an empty
+        # 200. For schools this is load-bearing: a locality can legitimately have
+        # no publishable figure because coverage was measured to be unreliable
+        # there, and that is a finding to state rather than an absence to hide.
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "locality": locality,
+                "category": "schools",
+                "available": False,
+                "reason": (
+                    "No schools data stored for this locality yet. "
+                    "Run: python -m agents.schools.run"
+                ),
+            },
+        )
+
+    payload = envelope["payload"]
+    return {
+        "locality": locality,
+        "category": envelope["category"],
+        "source_name": envelope["source_name"],
+        "source_url": envelope["source_url"],
+        "fetched_at": envelope["fetched_at"].isoformat(),
+        "data_vintage": envelope["data_vintage"].isoformat(),
+        "h3_cell": envelope["h3_cell"],
+        "confidence": envelope["confidence"],
+        "payload": payload,
+        "verdict": build_schools_verdict(payload, envelope["confidence"]),
     }

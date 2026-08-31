@@ -16,10 +16,14 @@ The planning context lives in `docs/` and is *decided*, not up for re-derivation
 
 ## Where the build is
 
-**Phase 0 (foundation) and the first slice of Phase 1 (one real agent) are
-done.** Air quality is live end-to-end for both cities: fetch → normalize →
-store → serve → render. The other five agents are deliberately not built — the
-point of this slice was proving the pipeline once before multiplying it by six.
+**Phase 0, Phase 1, and the first agent of Phase 2 are done.** Air quality and
+schools are both live end-to-end for both cities: fetch → normalize → store →
+serve → render, on a scheduler.
+
+Air quality went first because its data is genuinely good, so any failure would
+be a pipeline bug. That worked. Schools is the first category where the *data* is
+the hard part — see "What live testing changed" below — and it is the real test
+of whether "we show our work" survives a weak source.
 
 | Piece | State |
 |---|---|
@@ -30,7 +34,8 @@ point of this slice was proving the pipeline once before multiplying it by six.
 | FastAPI endpoint | done, `apps/api/` |
 | Next.js card in the mockup's language | done, `apps/web/` |
 | Hourly scheduler + run log + deploy config | done, `agents/scheduler.py`, `infra/DEPLOY.md` |
-| Schools, crime, water, power, infrastructure | not started — Phase 2 |
+| Schools agent (UDISE + OpenStreetMap) | done, `agents/schools/` |
+| Crime, water, power, infrastructure | not started — Phase 2 |
 
 **Deploying?** Read `infra/DEPLOY.md` first — Railway's default Postgres has no
 PostGIS, and getting that wrong is an afternoon.
@@ -121,6 +126,44 @@ different number and a different word under each scale. AQICN is therefore store
 as its own clearly-labelled envelope and never contributes to the displayed
 number — an Indian buyer cross-checks against CPCB bulletins, so everything shown
 is CPCB.
+
+## The schools problem, in one table
+
+Measured on 2026-08-17, schools within 2 km:
+
+| Locality | OpenStreetMap | UDISE |
+|---|---|---|
+| Indiranagar | 61 | **0** |
+| Jayanagar | 76 | 27 |
+| Sector 14, Gurugram | — | 90 |
+
+UDISE's Bengaluru records are not merely stale, they are **spatially
+incomplete**: schools are recorded for the district but their coordinates do not
+put them where the schools are. Gurugram is healthy. So the agent uses two
+sources that answer different questions and never blends them:
+
+- **OpenStreetMap** answers *what schools are here* — counts, names, distances.
+  Current, ODbL-licensed, no API key.
+- **UDISE** answers *how well staffed is it* — pupil-teacher ratio, enrolment,
+  classrooms. It is the only source with those numbers, and it is from
+  January 2022.
+
+The card therefore says "61 schools within 2 km; staffing known for 1 of them, as
+of 2022" rather than implying we know 61 schools' worth of detail. Everything
+schools ships at **Low** confidence, and it cannot reach High at any age because
+no open dataset publishes exam results for these schools — so the score measures
+access and capacity, never teaching quality.
+
+Two guards exist because of this:
+
+- `agents/schools/coverage.py` refuses to publish counts measured to be wrong.
+  "0 schools near Indiranagar" is not a cautious number, it is a false one.
+- No median is published from fewer than three schools. A "median pupil-teacher
+  ratio" from one school is not a median.
+
+**Google Places was considered and rejected** as a source: its terms forbid
+retaining content beyond ~30 days and forbid building a derived database, which
+is exactly what this pipeline is. OSM has no such restriction.
 
 ## Layout
 

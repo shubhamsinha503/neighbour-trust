@@ -114,11 +114,31 @@ class SchoolsAreaPayload(BaseModel):
 
     schools_within_2km: int = 0
     schools_within_5km: int = 0
+    presence_source: Optional[str] = Field(
+        None,
+        description="Which source the counts above came from. Recorded rather than "
+        "assumed because they may come from OpenStreetMap while the staffing figures "
+        "below come from UDISE — the card has to be able to say which is which.",
+    )
+
+    schools_with_staffing_data: int = Field(
+        0,
+        description="How many nearby schools have staffing/enrolment figures at all. "
+        "Usually far fewer than the school count, since only UDISE carries those and "
+        "its coverage is patchy. Showing the gap is the point.",
+    )
     median_pupil_teacher_ratio: Optional[float] = None
     median_proxy_score: Optional[float] = None
     government_share_pct: Optional[float] = Field(
         None, description="Share of nearby schools that are government-run."
     )
+    staffing_vintage: Optional[datetime] = Field(
+        None,
+        description="Vintage of the staffing figures specifically. Distinct from the "
+        "envelope's data_vintage, which covers the payload as a whole: school presence "
+        "may be current while the staffing numbers behind it are years old.",
+    )
+
     boards_available: list[str] = Field(default_factory=list)
     nearest_schools: list[SchoolsPayload] = Field(default_factory=list)
     sources_used: list[str] = Field(default_factory=list)

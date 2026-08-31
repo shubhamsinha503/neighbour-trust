@@ -44,6 +44,7 @@ from neighbour_trust_schema.envelope import (
 from agents.common import db
 from agents.common.geo import cell_for
 from agents.schools import coverage, scoring
+from agents.schools.sources import osm as osm_src
 from agents.schools.sources import udise as udise_src
 
 log = logging.getLogger(__name__)
@@ -56,6 +57,12 @@ WIDE_RADIUS_KM = 5.0
 # How many individual schools the card lists. Enough to be useful, few enough
 # that nobody mistakes it for a directory.
 NEAREST_COUNT = 6
+
+# Below this many schools with staffing figures, no median is published. A
+# "median pupil-teacher ratio" derived from one school is not a median, and
+# printing it next to a count of 61 nearby schools implies we know far more than
+# we do. The count itself is still shown, so the sparseness stays visible.
+MIN_STAFFING_SAMPLE = 3
 
 # Past this, UDISE data is too old to call anything but Low — see the module
 # docstring. Kept as a named constant so the rule is visible rather than implied.
@@ -124,6 +131,8 @@ def ingest_city(conn, client: udise_src.UdiseClient, *, city: str) -> IngestResu
             conn,
             {
                 **record,
+                "source": "udise",
+                "external_id": record["udise_code"],
                 "h3_cell": cell_for(record["lat"], record["lon"]),
                 "pupil_teacher_ratio": ptr,
                 "students_per_room": spr,
@@ -138,6 +147,44 @@ def ingest_city(conn, client: udise_src.UdiseClient, *, city: str) -> IngestResu
     return IngestResult(city=city, schools_loaded=loaded, data_vintage=vintage)
 
 
+def ingest_city_osm(conn, client: osm_src.OsmSchoolsClient, *, city: str) -> IngestResult:
+    """Load OSM school locations for a city.
+
+    OSM is the presence source: it answers "is there a school here", which UDISE
+    demonstrably fails to answer in Bengaluru. It carries no staffing or
+    enrolment data, so every such field on these rows stays NULL — deliberately,
+    since a zero would read as "a school with no teachers".
+
+    Vintage is now(): OSM is continuously edited, so the data is as current as the
+    moment it was fetched. That is the opposite of UDISE's frozen 2022 snapshot,
+    and the reason the payload reports the two vintages separately.
+    """
+    vintage = datetime.now(timezone.utc)
+    loaded = 0
+
+    for record in client.schools_for_city(city):
+        db.upsert_school(
+            conn,
+            {
+                **record,
+                "source": "osm",
+                "udise_code": None,
+                "state": None,
+                "district": city,
+                "h3_cell": cell_for(record["lat"], record["lon"]),
+                "pupil_teacher_ratio": None,
+                "students_per_room": None,
+                "proxy_score": None,
+                "data_vintage": vintage,
+                "source_name": osm_src.SOURCE_NAME,
+            },
+        )
+        loaded += 1
+
+    log.info("%s: loaded %d OSM schools", city, loaded)
+    return IngestResult(city=city, schools_loaded=loaded, data_vintage=vintage)
+
+
 # ---------------------------------------------------------------------------
 # Phase 2 — aggregate per locality
 # ---------------------------------------------------------------------------
@@ -146,54 +193,88 @@ def ingest_city(conn, client: udise_src.UdiseClient, *, city: str) -> IngestResu
 def build_envelope_for_locality(
     conn, locality: dict[str, Any], *, vintage: datetime, now: Optional[datetime] = None
 ) -> LocalityResult:
+    """Build one locality's schools envelope from whatever is already stored.
+
+    Presence and staffing come from different sources and are kept apart the
+    whole way through:
+
+      * **Presence** (how many schools, what they are called, how far) prefers
+        OpenStreetMap, because UDISE's Bengaluru coordinates are missing schools
+        that plainly exist — 61 vs 0 within 2 km of Indiranagar.
+      * **Staffing** (pupil-teacher ratio, the proxy score) can only come from
+        UDISE, which is the only source carrying those numbers at all.
+
+    They are never blended into one figure. The payload reports the count, the
+    smaller number of schools that have staffing data, and both vintages, so the
+    card can say "61 schools nearby; staffing known for 12 of them, as of 2022"
+    rather than implying we know 61 schools' worth of detail.
+    """
     now = now or datetime.now(timezone.utc)
     lat, lon, slug = locality["lat"], locality["lon"], locality["slug"]
 
-    wide = db.schools_near(conn, lat=lat, lon=lon, radius_km=WIDE_RADIUS_KM)
-    if not wide:
-        # A real answer, not an error. Some localities genuinely have no UDISE
-        # school within 5 km, and saying so is the product's whole premise.
+    osm_wide = db.schools_near(conn, lat=lat, lon=lon, radius_km=WIDE_RADIUS_KM, source="osm")
+    udise_wide = db.schools_near(conn, lat=lat, lon=lon, radius_km=WIDE_RADIUS_KM, source="udise")
+
+    # Presence from whichever source actually sees this neighbourhood. OSM wins
+    # ties because it is continuously edited; UDISE is a frozen 2022 snapshot.
+    if len(osm_wide) >= len(udise_wide):
+        presence, presence_source = osm_wide, osm_src.SOURCE_NAME
+    else:
+        presence, presence_source = udise_wide, udise_src.SOURCE_NAME
+
+    if not presence:
         return LocalityResult(
             slug=slug,
             ok=False,
-            reason=f"no UDISE school recorded within {WIDE_RADIUS_KM:g} km",
+            reason=f"no school recorded within {WIDE_RADIUS_KM:g} km by either source",
         )
 
-    close = [s for s in wide if s["distance_km"] <= CLOSE_RADIUS_KM]
+    close = [s for s in presence if s["distance_km"] <= CLOSE_RADIUS_KM]
 
-    # Refuse to publish a count we have measured to be wrong — see
-    # agents/schools/coverage.py for the Indiranagar 61-vs-0 comparison that
-    # motivates this.
+    # The guard still applies, but now against the best available presence count
+    # rather than UDISE alone — which is what lets Bengaluru publish again.
     gap = coverage.insufficient_coverage_reason(
-        within_2km=len(close), within_5km=len(wide)
+        within_2km=len(close), within_5km=len(presence)
     )
     if gap is not None:
         return LocalityResult(slug=slug, ok=False, reason=gap)
 
-    # Medians over the close set where there is one, else the wide set — a
-    # locality on the edge of the city shouldn't report nothing just because its
-    # schools are 3 km out.
-    basis = close or wide
+    # Staffing is always UDISE, over the tight radius where there is one.
+    staffing_close = [s for s in udise_wide if s["distance_km"] <= CLOSE_RADIUS_KM]
+    staffing = [s for s in (staffing_close or udise_wide) if s["pupil_teacher_ratio"] is not None]
 
     boards = sorted(
         {
             board
-            for school in basis
+            for school in presence
             for board in (school["board_secondary"], school["board_higher_sec"])
             if board
         }
     )
 
     government = sum(
-        1 for s in basis if (s["management"] or "").strip().lower() in GOVERNMENT_MANAGEMENTS
+        1 for s in presence if (s["management"] or "").strip().lower() in GOVERNMENT_MANAGEMENTS
     )
 
     payload = SchoolsAreaPayload(
         schools_within_2km=len(close),
-        schools_within_5km=len(wide),
-        median_pupil_teacher_ratio=scoring.median_or_none([s["pupil_teacher_ratio"] for s in basis]),
-        median_proxy_score=scoring.median_or_none([s["proxy_score"] for s in basis]),
-        government_share_pct=round(100 * government / len(basis), 1) if basis else None,
+        schools_within_5km=len(presence),
+        presence_source=presence_source,
+        schools_with_staffing_data=len(staffing),
+        median_pupil_teacher_ratio=(
+            scoring.median_or_none([s["pupil_teacher_ratio"] for s in staffing])
+            if len(staffing) >= MIN_STAFFING_SAMPLE
+            else None
+        ),
+        median_proxy_score=(
+            scoring.median_or_none([s["proxy_score"] for s in staffing])
+            if len(staffing) >= MIN_STAFFING_SAMPLE
+            else None
+        ),
+        government_share_pct=(
+            round(100 * government / len(presence), 1) if government else None
+        ),
+        staffing_vintage=vintage if staffing else None,
         boards_available=boards,
         nearest_schools=[
             SchoolsPayload(
@@ -210,21 +291,26 @@ def build_envelope_for_locality(
                 total_teachers=s["total_teachers"],
                 proxy_score=s["proxy_score"],
             )
-            for s in wide[:NEAREST_COUNT]
+            for s in presence[:NEAREST_COUNT]
         ],
-        sources_used=[udise_src.SOURCE_NAME],
+        sources_used=sorted({presence_source, *([udise_src.SOURCE_NAME] if staffing else [])}),
     )
 
     envelope = DataEnvelope(
         category=Category.SCHOOLS,
-        source_name=udise_src.SOURCE_NAME,
-        source_url=udise_src.SOURCE_URL,
+        source_name=presence_source,
+        source_url=(
+            osm_src.SOURCE_URL if presence_source == osm_src.SOURCE_NAME else udise_src.SOURCE_URL
+        ),
         fetched_at=now,
-        # The gap between these two is the entire story for this category: we
-        # fetched today, the data is from 2022.
-        data_vintage=vintage,
+        # The envelope's vintage is the *oldest* thing it leans on. If any staffing
+        # figure is shown, that 2022 snapshot is the honest answer for the payload
+        # as a whole, even when the school list itself is current.
+        data_vintage=vintage if staffing else now,
         h3_cell=locality["h3_cell"],
-        confidence=assess_confidence(vintage, has_pass_rates=False, now=now),
+        confidence=assess_confidence(
+            vintage if staffing else now, has_pass_rates=False, now=now
+        ),
         payload=payload.model_dump(mode="json"),
     )
 

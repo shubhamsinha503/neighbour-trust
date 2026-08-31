@@ -12,6 +12,8 @@ import type {
   AirQualityPayload,
   AqiBand,
   Confidence,
+  SchoolsAreaPayload,
+  SchoolsPayload,
   TrendPoint,
 } from "@schema/envelope";
 
@@ -146,6 +148,101 @@ function toAirQualityPayload(raw: Record<string, any>): AirQualityPayload {
         day: point.day,
         aqi: point.aqi,
         observationCount: point.observation_count,
+      }),
+    ),
+    sourcesUsed: raw.sources_used ?? [],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Schools
+// ---------------------------------------------------------------------------
+
+export interface SchoolsVerdict {
+  headline: string;
+  eyebrow: string;
+  score: number;
+  caveat: string;
+  qualityDisclaimer: string;
+}
+
+export interface SchoolsView {
+  locality: Locality;
+  sourceName: string;
+  sourceUrl?: string;
+  fetchedAt: string;
+  dataVintage: string;
+  h3Cell: string;
+  confidence: Confidence;
+  payload: SchoolsAreaPayload;
+  verdict: SchoolsVerdict;
+}
+
+export async function fetchSchools(slug: string): Promise<SchoolsView> {
+  // Schools data changes on the order of years, not hours — an hour of cache is
+  // still far fresher than the underlying 2022 survey.
+  const response = await fetch(`${API_BASE}/api/v1/localities/${slug}/schools`, {
+    next: { revalidate: 3600 },
+  });
+
+  if (response.status === 404) {
+    const body = await response.json().catch(() => null);
+    const detail = body?.detail;
+    throw new NoDataError(
+      typeof detail === "string"
+        ? detail
+        : (detail?.reason ?? "No schools data for this locality yet."),
+    );
+  }
+  if (!response.ok) {
+    throw new Error(`Failed to load schools (${response.status})`);
+  }
+
+  const raw = (await response.json()) as Record<string, any>;
+  return {
+    locality: toLocality(raw.locality),
+    sourceName: raw.source_name,
+    sourceUrl: raw.source_url ?? undefined,
+    fetchedAt: raw.fetched_at,
+    dataVintage: raw.data_vintage,
+    h3Cell: raw.h3_cell,
+    confidence: raw.confidence as Confidence,
+    payload: toSchoolsPayload(raw.payload),
+    verdict: {
+      headline: raw.verdict.headline,
+      eyebrow: raw.verdict.eyebrow,
+      score: raw.verdict.score,
+      caveat: raw.verdict.caveat,
+      qualityDisclaimer: raw.verdict.quality_disclaimer,
+    },
+  };
+}
+
+function toSchoolsPayload(raw: Record<string, any>): SchoolsAreaPayload {
+  return {
+    schoolsWithin2km: raw.schools_within_2km ?? 0,
+    schoolsWithin5km: raw.schools_within_5km ?? 0,
+    presenceSource: raw.presence_source ?? undefined,
+    schoolsWithStaffingData: raw.schools_with_staffing_data ?? 0,
+    medianPupilTeacherRatio: raw.median_pupil_teacher_ratio ?? undefined,
+    medianProxyScore: raw.median_proxy_score ?? undefined,
+    governmentSharePct: raw.government_share_pct ?? undefined,
+    staffingVintage: raw.staffing_vintage ?? undefined,
+    boardsAvailable: raw.boards_available ?? [],
+    nearestSchools: ((raw.nearest_schools ?? []) as Array<Record<string, any>>).map(
+      (s): SchoolsPayload => ({
+        name: s.name,
+        board: s.board ?? undefined,
+        distanceKm: s.distance_km ?? undefined,
+        pupilTeacherRatio: s.pupil_teacher_ratio ?? undefined,
+        infraScore: s.infra_score ?? undefined,
+        passRate: s.pass_rate ?? undefined,
+        udiseCode: s.udise_code ?? undefined,
+        management: s.management ?? undefined,
+        schoolCategory: s.school_category ?? undefined,
+        totalStudents: s.total_students ?? undefined,
+        totalTeachers: s.total_teachers ?? undefined,
+        proxyScore: s.proxy_score ?? undefined,
       }),
     ),
     sourcesUsed: raw.sources_used ?? [],

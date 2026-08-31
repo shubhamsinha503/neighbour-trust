@@ -354,42 +354,53 @@ def _json_default(value: Any) -> Any:
 
 
 SCHOOL_COLUMNS = (
-    "name", "state", "district", "pincode", "school_category", "school_type",
-    "management", "board_secondary", "board_higher_sec", "year_established",
-    "class_from", "class_to", "total_teachers", "total_students", "class_rooms",
-    "other_rooms", "pupil_teacher_ratio", "students_per_room", "proxy_score",
-    "data_vintage", "source_name",
+    "udise_code", "name", "state", "district", "pincode", "school_category",
+    "school_type", "management", "board_secondary", "board_higher_sec",
+    "year_established", "class_from", "class_to", "total_teachers",
+    "total_students", "class_rooms", "other_rooms", "pupil_teacher_ratio",
+    "students_per_room", "proxy_score", "data_vintage", "source_name",
 )
 
 
 def upsert_school(conn: psycopg.Connection, school: dict[str, Any]) -> int:
-    """Insert or refresh one school, keyed on its UDISE code.
+    """Insert or refresh one school, keyed on (source, external_id).
 
-    Keyed on udise_code rather than a surrogate id so that a later refresh to a
-    newer UDISE cycle updates schools in place — which is what makes the
-    2022-snapshot problem fixable by configuration rather than by reimport.
+    Keyed on the upstream's own identifier rather than a surrogate id so a later
+    refresh updates rows in place — which is what makes the 2022 UDISE snapshot
+    fixable by configuration rather than by reimport. UDISE rows key on the UDISE
+    code, OSM rows on "way/12345".
     """
     values = [school.get(col) for col in SCHOOL_COLUMNS]
     assignments = ", ".join(f"{c} = EXCLUDED.{c}" for c in SCHOOL_COLUMNS)
     row = conn.execute(
         f"""
-        INSERT INTO school (udise_code, location, h3_cell, {", ".join(SCHOOL_COLUMNS)}, fetched_at)
-        VALUES (%s, ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography, %s,
+        INSERT INTO school (source, external_id, location, h3_cell,
+                            {", ".join(SCHOOL_COLUMNS)}, fetched_at)
+        VALUES (%s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography, %s,
                 {", ".join(["%s"] * len(SCHOOL_COLUMNS))}, now())
-        ON CONFLICT (udise_code) DO UPDATE SET
+        ON CONFLICT (source, external_id) DO UPDATE SET
             location = EXCLUDED.location,
             h3_cell  = EXCLUDED.h3_cell,
             {assignments},
             fetched_at = now()
         RETURNING id
         """,
-        (school["udise_code"], school["lon"], school["lat"], school["h3_cell"], *values),
+        (
+            school["source"], school["external_id"],
+            school["lon"], school["lat"], school["h3_cell"], *values,
+        ),
     ).fetchone()
     return row["id"]
 
 
 def schools_near(
-    conn: psycopg.Connection, *, lat: float, lon: float, radius_km: float, limit: int = 200
+    conn: psycopg.Connection,
+    *,
+    lat: float,
+    lon: float,
+    radius_km: float,
+    source: Optional[str] = None,
+    limit: int = 500,
 ) -> list[dict[str, Any]]:
     """Schools within a radius of a point, nearest first.
 
@@ -399,17 +410,18 @@ def schools_near(
     """
     return conn.execute(
         """
-        SELECT udise_code, name, management, school_category, board_secondary,
-               board_higher_sec, total_students, total_teachers,
+        SELECT source, external_id, udise_code, name, management, school_category,
+               board_secondary, board_higher_sec, total_students, total_teachers,
                pupil_teacher_ratio, students_per_room, proxy_score,
                ST_Distance(location, ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography) / 1000.0
                    AS distance_km
         FROM school
         WHERE ST_DWithin(location, ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography, %s)
+          AND (%s::text IS NULL OR source = %s)
         ORDER BY distance_km
         LIMIT %s
         """,
-        (lon, lat, lon, lat, radius_km * 1000, limit),
+        (lon, lat, lon, lat, radius_km * 1000, source, source, limit),
     ).fetchall()
 
 

@@ -13,6 +13,7 @@ from typing import Optional
 
 from agents.common import db
 from agents.schools import agent as schools_agent
+from agents.schools.sources import osm as osm_src
 from agents.schools.sources import udise as udise_src
 
 log = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ log = logging.getLogger(__name__)
 @dataclass
 class JobOutcome:
     schools_loaded: int = 0
+    osm_loaded: int = 0
     ok: int = 0
     skipped: int = 0
     data_vintage: Optional[datetime] = None
@@ -42,6 +44,7 @@ def run_once(
     """
     outcome = JobOutcome()
     client = udise_src.UdiseClient()
+    osm_client = osm_src.OsmSchoolsClient()
 
     try:
         with db.connect() as conn:
@@ -63,6 +66,19 @@ def run_once(
                     for city in udise_src.CITY_DISTRICTS:
                         result = schools_agent.ingest_city(conn, client, city=city)
                         outcome.schools_loaded += result.schools_loaded
+
+                    # OSM second, and non-fatally: Overpass is donated
+                    # infrastructure and goes busy under load. Losing it degrades
+                    # presence counts back to UDISE, which is worse but not broken
+                    # — losing the whole run over it would be.
+                    for city in osm_src.CITY_BBOX:
+                        try:
+                            osm_result = schools_agent.ingest_city_osm(
+                                conn, osm_client, city=city
+                            )
+                            outcome.osm_loaded += osm_result.schools_loaded
+                        except Exception as exc:
+                            log.warning("OSM ingest failed for %s: %s", city, exc)
                     # Commit the school load before building envelopes so a
                     # failure in aggregation doesn't discard a long download.
                     if not dry_run:
@@ -110,5 +126,6 @@ def run_once(
                 raise
     finally:
         client.close()
+        osm_client.close()
 
     return outcome

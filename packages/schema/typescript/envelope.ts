@@ -68,9 +68,17 @@ export interface SchoolsPayload {
 export interface SchoolsAreaPayload {
   schoolsWithin2km: number;
   schoolsWithin5km: number;
+  /** Which source the counts came from — may differ from the staffing source. */
+  presenceSource?: string;
+
+  /** How many nearby schools have staffing figures at all. Usually far fewer. */
+  schoolsWithStaffingData: number;
   medianPupilTeacherRatio?: number;
   medianProxyScore?: number;
   governmentSharePct?: number;
+  /** ISO 8601 — vintage of the staffing figures specifically. */
+  staffingVintage?: string;
+
   boardsAvailable: string[];
   nearestSchools: SchoolsPayload[];
   sourcesUsed: string[];

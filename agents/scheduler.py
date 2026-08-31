@@ -12,8 +12,8 @@ an hour of trend data that becomes unrecoverable once it falls out of that
 window. `aq_observation` accumulating our own readings is the one asset here that
 compounds — and it only compounds while this is running.
 
-Only air quality is scheduled today. As Phase 2 agents land they register here on
-their own cadences (weekly for RERA, annual for UDISE+, continuous for news),
+Air quality and schools are scheduled today. As the remaining Phase 2 agents land
+they register here on their own cadences (weekly for RERA, continuous for news),
 which is why the job registry is a table rather than a single hardcoded call.
 """
 
@@ -35,6 +35,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler  # noqa: E402
 from apscheduler.triggers.cron import CronTrigger  # noqa: E402
 
 from agents.air_quality import job as air_quality_job  # noqa: E402
+from agents.schools import job as schools_job  # noqa: E402
 
 log = logging.getLogger("scheduler")
 
@@ -67,6 +68,35 @@ def run_air_quality() -> None:
             log.warning("  skipped %s: %s", result.slug, result.reason)
 
 
+def run_schools() -> None:
+    """One weekly schools pass.
+
+    Weekly rather than the annual cadence docs/strategy.md gives UDISE, because
+    the two sources behind this agent move at completely different speeds: the
+    UDISE snapshot is frozen at 2022 and will not change until the portal
+    publishes a new cycle, but OpenStreetMap is edited continuously and is what
+    supplies the school counts. Annual would leave the presence data stale for
+    months at a time; weekly is cheap (two Overpass queries and one CKAN page
+    walk) and keeps the number that buyers actually read current.
+    """
+    started = datetime.now(timezone.utc)
+    log.info("schools: starting")
+    try:
+        outcome = schools_job.run_once()
+    except Exception:
+        log.exception("schools: run failed")
+        return
+
+    elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+    log.info(
+        "schools: done in %.0fs — %d UDISE + %d OSM loaded, %d localities stored, %d skipped",
+        elapsed, outcome.schools_loaded, outcome.osm_loaded, outcome.ok, outcome.skipped,
+    )
+    for result in outcome.results:
+        if not result.ok:
+            log.warning("  skipped %s: %s", result.slug, result.reason)
+
+
 # (name, callable, cron kwargs). Cadences come from the agent specification in
 # docs/strategy.md.
 JOBS: list[tuple[str, Callable[[], None], dict[str, Any]]] = [
@@ -75,6 +105,8 @@ JOBS: list[tuple[str, Callable[[], None], dict[str, Any]]] = [
     # makes our traffic pattern predictable to the upstream, which is politer
     # than jittering every run.
     ("air_quality", run_air_quality, {"minute": 17}),
+    # Sunday 03:47 UTC — off-peak for Overpass, which is donated infrastructure.
+    ("schools", run_schools, {"day_of_week": "sun", "hour": 3, "minute": 47}),
 ]
 
 
@@ -112,7 +144,7 @@ def main() -> int:
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: scheduler.shutdown(wait=False))
 
-    log.info("scheduler up; next run at :%02d past the hour UTC", JOBS[0][2]["minute"])
+    log.info("scheduler up with %d job(s) registered", len(JOBS))
     try:
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):

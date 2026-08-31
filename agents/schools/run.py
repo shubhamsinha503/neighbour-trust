@@ -38,7 +38,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not args.verbose:
         logging.getLogger("httpx").setLevel(logging.WARNING)
 
-    print("Source: UDISE via India Data Portal (no API key required)\n")
+    print(
+        "Sources: OpenStreetMap (school presence) + UDISE via India Data Portal\n"
+        "         (staffing). Neither requires an API key.\n"
+    )
 
     try:
         outcome = schools_job.run_once(skip_ingest=args.skip_ingest, dry_run=args.dry_run)
@@ -53,8 +56,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             f"({age_years:.1f} years old)\n"
         )
 
-    if outcome.schools_loaded:
-        print(f"Schools loaded: {outcome.schools_loaded}\n")
+    if outcome.schools_loaded or outcome.osm_loaded:
+        print(
+            f"Loaded: {outcome.schools_loaded} UDISE schools, "
+            f"{outcome.osm_loaded} OSM schools\n"
+        )
 
     for result in outcome.results:
         if result.ok and result.envelope is not None:
@@ -64,8 +70,9 @@ def main(argv: Optional[list[str]] = None) -> int:
                 f"  OK   {result.slug:<18} "
                 f"{p['schools_within_2km']:>3} within 2km  "
                 f"{p['schools_within_5km']:>4} within 5km  "
-                f"PTR {ptr if ptr is not None else '  -':>5}  "
-                f"score {p['median_proxy_score'] if p['median_proxy_score'] is not None else '-':>5}  "
+                f"[{(p['presence_source'] or '?')[:14]:<14}]  "
+                f"staffing for {p['schools_with_staffing_data']:>3}  "
+                f"PTR {ptr if ptr is not None else '-':>5}  "
                 f"{result.envelope.confidence.value}"
             )
         else:

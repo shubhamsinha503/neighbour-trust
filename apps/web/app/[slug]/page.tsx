@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AirQualityCard } from "@/components/AirQualityCard";
-import { fetchAirQuality, fetchLocalities, NoDataError } from "@/lib/api";
+import { SchoolsCard } from "@/components/SchoolsCard";
+import {
+  fetchAirQuality,
+  fetchLocalities,
+  fetchSchools,
+  NoDataError,
+} from "@/lib/api";
+
+const API_DOWN =
+  "Couldn't reach the API. Start it with: uvicorn apps.api.app.main:app --reload";
 
 export default async function LocalityPage({
   params,
@@ -14,23 +23,19 @@ export default async function LocalityPage({
   const locality = localities.find((entry) => entry.slug === slug);
   if (localities.length > 0 && !locality) notFound();
 
-  let view = null;
-  let unavailable: string | null = null;
-  try {
-    view = await fetchAirQuality(slug);
-  } catch (error) {
-    if (error instanceof NoDataError) {
-      unavailable = error.reason;
-    } else {
-      unavailable =
-        "Couldn't reach the API. Start it with: uvicorn apps.api.app.main:app --reload";
-    }
-  }
+  // Both categories are fetched together; neither blocks the other, so a
+  // category with no data still renders its own honest empty state rather than
+  // taking the page down.
+  const [air, schools] = await Promise.all([
+    fetchAirQuality(slug).then(asLoaded).catch(toUnavailable),
+    fetchSchools(slug).then(asLoaded).catch(toUnavailable),
+  ]);
 
-  const name = view?.locality.name ?? locality?.name ?? slug;
-  const city = view?.locality.city ?? locality?.city;
-  const state = view?.locality.state ?? locality?.state;
-  const pincode = view?.locality.pincode ?? locality?.pincode;
+  const name = air.view?.locality.name ?? schools.view?.locality.name ?? locality?.name ?? slug;
+  const city = air.view?.locality.city ?? schools.view?.locality.city ?? locality?.city;
+  const state = air.view?.locality.state ?? schools.view?.locality.state ?? locality?.state;
+  const pincode =
+    air.view?.locality.pincode ?? schools.view?.locality.pincode ?? locality?.pincode;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -51,29 +56,71 @@ export default async function LocalityPage({
         )}
       </header>
 
-      <h2 className="mb-2.5 text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
-        Air quality
-      </h2>
-
-      {view ? (
-        <AirQualityCard view={view} />
+      <SectionTitle>Air quality</SectionTitle>
+      {air.view ? (
+        <AirQualityCard view={air.view} />
       ) : (
-        /* "No data" is a first-class answer in this product, not an error state
-           to hide — docs/strategy.md is explicit that saying so plainly is the
-           difference between a trustworthy product and a hallucinating one. */
-        <div className="rounded-[20px] border border-hairline bg-surface-1 p-5">
-          <b className="text-[13px]">No air quality data for this locality yet.</b>
-          <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-secondary">
-            {unavailable}
-          </p>
-        </div>
+        <NoData
+          title="No air quality data for this locality yet."
+          reason={air.reason}
+        />
+      )}
+
+      <div className="mt-8" />
+      <SectionTitle>Schools</SectionTitle>
+      {schools.view ? (
+        <SchoolsCard view={schools.view} />
+      ) : (
+        <NoData
+          title="No schools data for this locality yet."
+          reason={schools.reason}
+        />
       )}
 
       <p className="mt-6 text-[10.5px] leading-relaxed text-ink-muted">
-        Phase 1 covers air quality only. Schools, safety, water, power and
-        infrastructure are not yet wired to live sources — see
+        Phase 2 in progress: air quality and schools are live. Safety, water,
+        power and infrastructure are not yet wired to sources — see
         docs/build-roadmap.md.
       </p>
     </main>
   );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-2.5 text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
+      {children}
+    </h2>
+  );
+}
+
+/**
+ * "No data" is a first-class answer in this product, not an error state to hide
+ * — docs/strategy.md is explicit that saying so plainly is the difference
+ * between a trustworthy product and a hallucinating one. For schools it is
+ * load-bearing: a locality can be withheld because coverage was measured to be
+ * unreliable there, and that reason is worth reading.
+ */
+function NoData({ title, reason }: { title: string; reason?: string }) {
+  return (
+    <div className="rounded-[20px] border border-hairline bg-surface-1 p-5">
+      <b className="text-[13px]">{title}</b>
+      {reason && (
+        <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-secondary">
+          {reason}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function asLoaded<T>(view: T): { view: T; reason?: string } {
+  return { view };
+}
+
+function toUnavailable(error: unknown): { view: null; reason: string } {
+  return {
+    view: null,
+    reason: error instanceof NoDataError ? error.reason : API_DOWN,
+  };
 }
