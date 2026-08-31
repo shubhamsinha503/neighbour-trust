@@ -144,12 +144,56 @@ class SchoolsAreaPayload(BaseModel):
     sources_used: list[str] = Field(default_factory=list)
 
 
+class NewsIncident(BaseModel):
+    """One press-reported incident, kept as an item rather than folded into a count."""
+
+    title: str
+    url: str
+    domain: Optional[str] = None
+    language: Optional[str] = None
+    published_at: Optional[datetime] = None
+    incident_type: Optional[str] = None
+
+
+class NewsCoverage(BaseModel):
+    """Press-derived signal, with its own limits attached.
+
+    Deliberately not reducible to a rate. docs/strategy.md is emphatic: press
+    coverage is a function of media-market size and newsworthiness, not incident
+    rate, so a well-covered locality looks worse than an identical but
+    under-covered one. It is reported as "N incidents reported in local press over
+    12 months" and never normalised into a score without a coverage-normalisation
+    step that does not yet exist.
+    """
+
+    incidents_12m: int = 0
+    incident_types: list[str] = Field(default_factory=list)
+    recent: list[NewsIncident] = Field(default_factory=list)
+
+    # The funnel, exposed rather than hidden. Keyword search finds far more than
+    # is real; showing how many were fetched, judged and confirmed is what stops
+    # `incidents_12m` reading as an exhaustive tally.
+    mentions_fetched: int = 0
+    mentions_classified: int = 0
+    classifier: Optional[str] = None
+    coverage_caveat: str = Field(
+        "Counts press coverage, not incidents. Better-covered areas appear worse.",
+        description="Shown verbatim in the UI — this caveat is not optional.",
+    )
+
+
 class CrimePayload(BaseModel):
     official_crime_rate_district: Optional[float] = Field(
         None, description="Always district-level per NCRB — never present as locality-specific."
     )
     resident_reports_90d_count: int = 0
-    blended_safety_perception_score: Optional[float] = None
+    blended_safety_perception_score: Optional[float] = Field(
+        None,
+        description="Intentionally left None while the only input is press coverage. "
+        "docs/strategy.md warns against blending coverage into a single number without "
+        "coverage normalisation; a score here would imply a precision nothing supports.",
+    )
+    news: Optional[NewsCoverage] = None
 
 
 class AqiBand(str, Enum):
@@ -238,6 +282,7 @@ class WaterPayload(BaseModel):
     reported_supply_frequency: Optional[str] = None
     groundwater_trend: Optional[str] = None
     tanker_dependency_pct: Optional[float] = None
+    news: Optional[NewsCoverage] = None
 
 
 class PowerPayload(BaseModel):

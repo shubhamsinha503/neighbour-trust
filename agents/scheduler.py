@@ -35,6 +35,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler  # noqa: E402
 from apscheduler.triggers.cron import CronTrigger  # noqa: E402
 
 from agents.air_quality import job as air_quality_job  # noqa: E402
+from agents.news_monitor import job as news_job  # noqa: E402
 from agents.schools import job as schools_job  # noqa: E402
 
 log = logging.getLogger("scheduler")
@@ -97,6 +98,32 @@ def run_schools() -> None:
             log.warning("  skipped %s: %s", result.slug, result.reason)
 
 
+def run_news_monitor() -> None:
+    """One daily news-monitoring pass, feeding crime and water.
+
+    Daily rather than continuous: docs/strategy.md describes news ingestion as a
+    continuous digest, but GDELT allows one request every 5 seconds and a full
+    pass is 22 queries (11 localities x 2 categories). Daily keeps the incident
+    counts current without leaning on donated infrastructure, and press coverage
+    of a locality does not move hour to hour.
+    """
+    started = datetime.now(timezone.utc)
+    log.info("news_monitor: starting")
+    try:
+        outcome = news_job.run_once()
+    except Exception:
+        log.exception("news_monitor: run failed")
+        return
+
+    elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+    log.info(
+        "news_monitor: done in %.0fs — %d mentions, %d judged, %d confirmed, "
+        "%d undecided (classifier: %s)",
+        elapsed, outcome.mentions_found, outcome.judged, outcome.confirmed,
+        outcome.undecided, outcome.classifier,
+    )
+
+
 # (name, callable, cron kwargs). Cadences come from the agent specification in
 # docs/strategy.md.
 JOBS: list[tuple[str, Callable[[], None], dict[str, Any]]] = [
@@ -107,6 +134,9 @@ JOBS: list[tuple[str, Callable[[], None], dict[str, Any]]] = [
     ("air_quality", run_air_quality, {"minute": 17}),
     # Sunday 03:47 UTC — off-peak for Overpass, which is donated infrastructure.
     ("schools", run_schools, {"day_of_week": "sun", "hour": 3, "minute": 47}),
+    # Daily at 04:23 UTC (09:53 IST) — after Indian morning editions have been
+    # indexed, and off the hour like the others.
+    ("news_monitor", run_news_monitor, {"hour": 4, "minute": 23}),
 ]
 
 

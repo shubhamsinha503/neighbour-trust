@@ -453,3 +453,118 @@ def schools_near(
 
 def count_schools(conn: psycopg.Connection) -> int:
     return conn.execute("SELECT COUNT(*) AS n FROM school").fetchone()["n"]
+
+
+# ---------------------------------------------------------------------------
+# News mentions — see infra/migrations/005_news.sql
+# ---------------------------------------------------------------------------
+
+
+def upsert_news_mention(conn: psycopg.Connection, mention: dict[str, Any]) -> int:
+    """Store one locality-tagged article.
+
+    Existing rows keep their classification on conflict. Re-fetching the same
+    article every week must not wipe a judgement already made about it — with an
+    LLM classifier that would mean paying to re-decide the same headline
+    indefinitely.
+    """
+    row = conn.execute(
+        """
+        INSERT INTO news_mention
+            (locality_id, h3_cell, category, url, title, domain, language,
+             source_country, published_at, query_term, source_name)
+        VALUES (%s, %s, %s::category_t, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (locality_id, category, url) DO UPDATE SET
+            title      = EXCLUDED.title,
+            fetched_at = now()
+        RETURNING id
+        """,
+        (
+            mention["locality_id"], mention["h3_cell"], mention["category"],
+            mention["url"], mention["title"], mention.get("domain"),
+            mention.get("language"), mention.get("source_country"),
+            mention.get("published_at"), mention.get("query_term"),
+            mention.get("source_name", "GDELT"),
+        ),
+    ).fetchone()
+    return row["id"]
+
+
+def unclassified_mentions(
+    conn: psycopg.Connection, *, limit: int = 500
+) -> list[dict[str, Any]]:
+    return conn.execute(
+        """
+        SELECT n.id, n.title, n.category, n.url, l.name AS locality, l.city
+        FROM news_mention n
+        JOIN locality l ON l.id = n.locality_id
+        WHERE n.classified_at IS NULL
+        ORDER BY n.published_at DESC NULLS LAST
+        LIMIT %s
+        """,
+        (limit,),
+    ).fetchall()
+
+
+def record_classification(
+    conn: psycopg.Connection,
+    mention_id: int,
+    *,
+    is_locality_specific: bool,
+    incident_type: Optional[str],
+    classifier: str,
+    reason: str,
+) -> None:
+    conn.execute(
+        """
+        UPDATE news_mention
+           SET is_locality_specific = %s,
+               incident_type        = %s,
+               classifier           = %s,
+               classifier_reason    = %s,
+               classified_at        = now()
+         WHERE id = %s
+        """,
+        (is_locality_specific, incident_type, classifier, reason, mention_id),
+    )
+
+
+def confirmed_incidents(
+    conn: psycopg.Connection, *, h3_cell: str, category: str, months: int = 12
+) -> list[dict[str, Any]]:
+    """Mentions confirmed as locality-specific incidents.
+
+    `is_locality_specific IS TRUE` rather than `IS NOT FALSE`: an unclassified
+    mention (NULL) is not evidence of anything and must never reach a count.
+    """
+    return conn.execute(
+        """
+        SELECT title, url, domain, language, published_at, incident_type, classifier
+        FROM news_mention
+        WHERE h3_cell = %s
+          AND category = %s::category_t
+          AND is_locality_specific IS TRUE
+          AND published_at >= now() - make_interval(months => %s)
+        ORDER BY published_at DESC
+        """,
+        (h3_cell, category, months),
+    ).fetchall()
+
+
+def mention_counts(
+    conn: psycopg.Connection, *, h3_cell: str, category: str, months: int = 12
+) -> dict[str, int]:
+    """Fetched / classified / confirmed, so the gap between them stays visible."""
+    row = conn.execute(
+        """
+        SELECT COUNT(*) AS fetched,
+               COUNT(*) FILTER (WHERE classified_at IS NOT NULL) AS classified,
+               COUNT(*) FILTER (WHERE is_locality_specific IS TRUE) AS confirmed
+        FROM news_mention
+        WHERE h3_cell = %s
+          AND category = %s::category_t
+          AND published_at >= now() - make_interval(months => %s)
+        """,
+        (h3_cell, category, months),
+    ).fetchone()
+    return {k: int(v or 0) for k, v in row.items()}
