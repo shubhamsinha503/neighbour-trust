@@ -1,28 +1,101 @@
 # Deploying Neighbour Trust
 
-Per `docs/build-roadmap.md`: **Postgres + API + scheduler on Railway, frontend on
-Vercel.** Three Railway services and one Vercel project.
+Two supported paths. Both end with the same thing running.
 
-Budget about 60–90 minutes for a first run. Read step 1 before you start — it's
-the one that wastes an afternoon if you get it wrong.
+**Path A — free tier (recommended for launch).** Neon for Postgres+PostGIS,
+Render for the API, GitHub Actions for scheduled ingestion, Vercel for the
+frontend. Costs nothing. More providers to set up, and Render's free API sleeps
+after 15 minutes idle (~30s cold start on the next request).
+
+**Path B — Railway (~$5/month).** What `docs/build-roadmap.md` originally
+specified. Fewer providers, an always-on scheduler, simpler to operate. Note
+Railway's trial is time-limited and its template library has **no PostGIS
+template** — you must deploy the database via **Docker Image** with
+`postgis/postgis:16-3.4`, not via the PostgreSQL template, which will fail on the
+first migration.
+
+Path A is written out below; Path B follows it.
 
 ---
 
-## Before you begin
+# Path A — free tier
 
-Push the repo to GitHub. Railway and Vercel both deploy from a repo, not from
-your laptop.
+## A1. Database: Neon
 
-```powershell
-cd C:\Users\pc\Desktop\neighbour-trust-starter
-git remote add origin https://github.com/<you>/neighbour-trust.git
-git push -u origin main
+[neon.tech](https://neon.tech) → new project → region closest to your users
+(Singapore or Mumbai for India). Then enable PostGIS once, from the Neon SQL
+Editor:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS postgis;
 ```
 
-`.env` is gitignored and stays local. Every secret is re-entered in Railway and
-Vercel by hand.
+Copy the **pooled** connection string from the dashboard. It looks like
+`postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require`
+— keep `?sslmode=require`, psycopg needs it.
+
+Free tier is 0.5 GB and 100 compute-hours/month. This project's whole dataset is
+around 6,300 school rows plus a few thousand observations, so storage is not the
+constraint; compute-hours are, and an hourly agent run uses very few.
+
+## A2. Scheduled ingestion: GitHub Actions
+
+Already configured in `.github/workflows/ingest.yml`. It runs the same job
+modules the local scheduler does, on the same cadences, and writes to
+`ingest_run` so `/healthz` can still tell whether ingestion is alive.
+
+Add these under **repo → Settings → Secrets and variables → Actions → New
+repository secret**:
+
+| Secret | Required |
+|---|---|
+| `DATABASE_URL` | yes — the Neon pooled string |
+| `OPENAQ_API_KEY` | yes |
+| `AQICN_TOKEN` | optional (corroboration only) |
+| `DATA_GOV_IN_API_KEY` | optional, official CPCB source |
+| `ANTHROPIC_API_KEY` | optional, news classifier |
+| `ANTHROPIC_WORKSPACE_ID` | only if the key is identity-linked |
+
+Then **Actions → Ingest → Run workflow** to trigger the first run by hand. It
+applies migrations and seeds localities before running the agent, so that first
+manual run is also your database setup — there is no separate migrate step.
+
+> Note: GitHub disables scheduled workflows on repos with no activity for 60
+> days. A commit re-enables them. Not an issue during active development; worth
+> knowing if the project goes quiet.
+
+## A3. API: Render
+
+[render.com](https://render.com) → New → **Web Service** → connect the repo.
+
+- **Runtime**: Docker
+- **Dockerfile path**: `infra/Dockerfile`
+- **Instance type**: Free
+- **Environment variables**: `DATABASE_URL` (the Neon string), plus
+  `CORS_ALLOWED_ORIGINS` once you know the Vercel domain
+
+The free instance sleeps after 15 minutes idle and takes ~30 seconds to wake.
+Acceptable for launch; the fix when it stops being acceptable is Render's
+paid tier or a ping service, not an architecture change.
+
+## A4. Frontend: Vercel
+
+Import the repo → **Root Directory: `apps/web`** → set
+`NEXT_PUBLIC_API_BASE_URL` to the Render URL. Deploy, then put the Vercel domain
+into `CORS_ALLOWED_ORIGINS` on Render and redeploy that service.
+
+## A5. Verify
+
+```powershell
+curl https://<your-render-service>.onrender.com/healthz
+```
+
+First request may take ~30s while the instance wakes. You want `status: "ok"`
+and `stale: false` under `air_quality`.
 
 ---
+
+# Path B — Railway
 
 ## 1. Database — do NOT use Railway's default Postgres
 
@@ -30,15 +103,20 @@ Railway's standard Postgres has **no PostGIS**, and Railway has said it does not
 plan to add extensions to the default templates. `CREATE EXTENSION postgis` fails
 on it, `001_init.sql` won't apply, and nothing downstream works.
 
-Deploy from a PostGIS template instead:
+Railway's template library has no maintained PostGIS template either — a search
+for "postgis" returns nothing, and the "PostgreSQL" template is the plain image.
+So deploy the database as a raw container:
 
-**New Project → Deploy from Template → search "PostGIS"** —
-[postgis/postgis:17-3.5](https://railway.com/deploy/postgis-spatial-database) is
-closest to local (we run 16-3.4), or the
-[PostgreSQL Extensions template](https://railway.com/deploy/postgresql-extensions--postgresql-extensions)
-if you'd also like pgvector and pg_cron available for later phases.
+**New → Docker Image →** `postgis/postgis:16-3.4`, then set on that service:
 
-Once it's up, open the service → **Variables** → copy `DATABASE_URL`.
+```
+POSTGRES_USER=neighbour
+POSTGRES_PASSWORD=<something long>
+POSTGRES_DB=neighbour_trust
+```
+
+Add a **volume mounted at `/var/lib/postgresql/data`**, or the database is wiped
+on every restart. Then copy `DATABASE_URL` from its Variables tab.
 
 > Local is PostGIS 3.4, this is 3.5. Nothing in our migrations is
 > version-sensitive — `geography(Point,4326)`, `ST_DWithin`, `ST_Distance` have

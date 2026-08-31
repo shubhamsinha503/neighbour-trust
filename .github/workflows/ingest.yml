@@ -1,0 +1,118 @@
+# Scheduled data ingestion.
+#
+# This replaces the long-lived APScheduler process (agents/scheduler.py) when
+# deploying somewhere without an always-on worker. Both paths call the same job
+# modules, so a run here does exactly what a local `make fetch` does — including
+# writing to ingest_run, which is what /healthz reads to tell whether ingestion
+# is alive.
+#
+# Why Actions rather than a hosted worker: the agents are short bursts of I/O on
+# a fixed cadence, which is precisely the shape cron was made for. A container
+# idling 23 hours a day to run 3.5 minutes of work is the wrong unit to pay for,
+# and the run logs end up in the repo where you would look for them anyway.
+#
+# Cadences match agents/scheduler.py — see the comments there for why each is
+# offset off the hour.
+
+name: Ingest
+
+on:
+  schedule:
+    # Hourly at :17. CPCB publishes near the hour and every naive scraper hits
+    # :00; the offset is politeness as much as reliability.
+    - cron: "17 * * * *"
+    # Sundays 03:47 UTC — schools. Off-peak for Overpass, donated infrastructure.
+    - cron: "47 3 * * 0"
+    # Daily 04:23 UTC — news, after Indian morning editions are indexed.
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: "Which agent to run"
+        required: true
+        default: air_quality
+        type: choice
+        options: [air_quality, schools, news_monitor, all]
+
+concurrency:
+  # A slow run must never overlap the next one — the agents upsert, so an
+  # overlap is not corrupting, but it doubles upstream API spend against rate
+  # limits that are already the binding constraint.
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    # Generous: a full air quality pass is ~3.5 minutes, most of it waiting out
+    # OpenAQ's 60 requests/minute limit, and schools re-downloads ~6,300 rows.
+    timeout-minutes: 30
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      OPENAQ_API_KEY: ${{ secrets.OPENAQ_API_KEY }}
+      AQICN_TOKEN: ${{ secrets.AQICN_TOKEN }}
+      DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Decide which agent this run is for
+        id: which
+        run: |
+          # A scheduled run knows only its own cron expression, so map it back
+          # to the agent it was scheduled for.
+          case "${{ github.event.schedule }}" in
+            "17 * * * *")  echo "agent=air_quality"  >> "$GITHUB_OUTPUT" ;;
+            "47 3 * * 0")  echo "agent=schools"      >> "$GITHUB_OUTPUT" ;;
+            "23 4 * * *")  echo "agent=news_monitor" >> "$GITHUB_OUTPUT" ;;
+            *)             echo "agent=${{ inputs.agent || 'air_quality' }}" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Apply migrations
+        # Idempotent, and cheap. Running it every time means a schema change
+        # ships with the commit that needs it rather than as a remembered step.
+        run: python -m infra.migrate
+
+      - name: Seed localities
+        run: python -m agents.common.seed_localities
+
+      - name: Run air quality
+        if: steps.which.outputs.agent == 'air_quality' || steps.which.outputs.agent == 'all'
+        run: python -m agents.air_quality.run
+
+      - name: Run schools
+        if: steps.which.outputs.agent == 'schools' || steps.which.outputs.agent == 'all'
+        run: python -m agents.schools.run
+
+      - name: Run news monitor
+        if: steps.which.outputs.agent == 'news_monitor' || steps.which.outputs.agent == 'all'
+        run: python -m agents.news_monitor.run
+
+      - name: Report ingestion health
+        # Always runs, so a failed agent still leaves a readable summary rather
+        # than only a red cross.
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          from agents.common import db
+          with db.connect() as conn:
+              for category in ("air_quality", "schools", "crime"):
+                  row = db.last_productive_ingest(conn, category=category)
+                  if row:
+                      print(f"{category}: last stored {row['localities_ok']} localities "
+                            f"at {row['finished_at']}")
+                  else:
+                      print(f"{category}: no productive run on record")
+          PY
