@@ -1,7 +1,12 @@
-# Secrets — never commit. .env.example is the checked-in template.
+# Secrets — never commit. .env.example is the only checked-in env file.
+# The wildcard matters: deploys routinely produce .env.production,
+# .env.vercel and similar, and those are the ones that get committed by
+# accident because nobody expects them to exist.
 .env
-.env.local
+.env.*
+!.env.example
 *.pem
+*.key
 
 # Python
 __pycache__/
