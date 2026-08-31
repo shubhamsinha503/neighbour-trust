@@ -327,14 +327,40 @@ def finish_ingest_run(
     )
 
 
-def last_successful_ingest(
+def last_productive_ingest(
     conn: psycopg.Connection, *, category: str
 ) -> Optional[dict[str, Any]]:
+    """The last run that actually stored something.
+
+    `status = 'ok'` is not enough, and that distinction is the whole point of
+    this function. On 2026-08-31 the air quality job completed cleanly while
+    storing zero localities — the upstream CPCB feed had stopped publishing, so
+    every locality was correctly skipped. The run was a success in the sense that
+    nothing crashed, and a total data outage in the sense that mattered.
+    Requiring localities_ok > 0 is what makes the second sense visible.
+    """
     return conn.execute(
         """
         SELECT started_at, finished_at, localities_ok, localities_skipped
         FROM ingest_run
-        WHERE category = %s::category_t AND status = 'ok'
+        WHERE category = %s::category_t AND status = 'ok' AND localities_ok > 0
+        ORDER BY started_at DESC
+        LIMIT 1
+        """,
+        (category,),
+    ).fetchone()
+
+
+def last_ingest_run(
+    conn: psycopg.Connection, *, category: str
+) -> Optional[dict[str, Any]]:
+    """The most recent run of any outcome — so "running but producing nothing"
+    can be told apart from "not running at all"."""
+    return conn.execute(
+        """
+        SELECT started_at, finished_at, status, localities_ok, localities_skipped, error
+        FROM ingest_run
+        WHERE category = %s::category_t
         ORDER BY started_at DESC
         LIMIT 1
         """,
