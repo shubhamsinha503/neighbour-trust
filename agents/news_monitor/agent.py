@@ -39,6 +39,7 @@ from neighbour_trust_schema.envelope import (
 )
 
 from agents.common import db
+from agents.news_monitor import characterise as characterise_mod
 from agents.news_monitor import classify as classify_mod
 from agents.news_monitor.sources import gdelt as gdelt_src
 from agents.news_monitor.sources import google_news as gnews_src
@@ -258,6 +259,7 @@ def build_envelope(
             )
             for i in incidents[:RECENT_LIMIT]
         ],
+        characterisation=characterise_mod.characterise(category, incidents),
         mentions_fetched=counts["fetched"],
         mentions_classified=counts["classified"],
         classifier=incidents[0]["classifier"] if incidents else None,

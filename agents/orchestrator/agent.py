@@ -190,6 +190,11 @@ def _category_summary(category: str, envelope: Optional[dict[str, Any]]) -> str:
     if category in ("crime", "water"):
         news = payload.get("news") or {}
         n = news.get("incidents_12m", 0)
+        # Lead with what kind, not how many — the count is the part distorted by
+        # how much press attention a locality gets.
+        described = news.get("characterisation")
+        if described:
+            return described
         return f"{n} incident(s) in local press (12 months) · not scored"
 
     return ""

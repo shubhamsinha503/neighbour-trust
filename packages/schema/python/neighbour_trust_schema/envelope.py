@@ -168,6 +168,13 @@ class NewsCoverage(BaseModel):
 
     incidents_12m: int = 0
     incident_types: list[str] = Field(default_factory=list)
+    characterisation: Optional[str] = Field(
+        None,
+        description="What KIND of incident is reported here, in a sentence. This is the "
+        "part that survives coverage bias: how many articles mention a locality is "
+        "largely a fact about media attention, but whether those incidents are "
+        "chain-snatchings or murders is a fact about the place.",
+    )
     recent: list[NewsIncident] = Field(default_factory=list)
 
     # The funnel, exposed rather than hidden. Keyword search finds far more than
