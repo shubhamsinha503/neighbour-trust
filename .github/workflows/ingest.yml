@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     # Generous: a full air quality pass is ~3.5 minutes, most of it waiting out
     # OpenAQ's 60 requests/minute limit, and schools re-downloads ~6,300 rows.
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -60,6 +60,10 @@ jobs:
       # is a few dollars on Opus and a fraction of that on Haiku, and short
       # headline classification is a task Haiku handles well.
       NEWS_CLASSIFIER_MODEL: ${{ secrets.NEWS_CLASSIFIER_MODEL }}
+      # GDELT has been unreachable from every network tried since 2026-09-01.
+      # Each attempt costs a 30s timeout and a run makes 22 of them, so it is
+      # off unless explicitly switched back on.
+      ENABLE_GDELT: ${{ vars.ENABLE_GDELT }}
 
     steps:
       - uses: actions/checkout@v4

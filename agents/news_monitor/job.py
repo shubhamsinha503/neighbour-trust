@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -45,7 +46,22 @@ def run_once(
     classifier = classify_mod.build_classifier(prefer_claude=prefer_claude)
     outcome.classifier = classifier.name
     gnews_client = gnews_src.GoogleNewsClient()
-    gdelt_client = gdelt_src.GdeltClient()
+
+    # GDELT is opt-in, and off by default as of 2026-09-01 because it has been
+    # unreachable from every network tried — this machine and GitHub's runners
+    # both time out, including on the TLS handshake.
+    #
+    # This is not merely tidiness. Each failed attempt burns the full 30-second
+    # connect timeout before Google News is even tried, and a run makes 22 of
+    # them: eleven minutes of a thirty-minute job spent waiting on a dead host.
+    # Set ENABLE_GDELT=1 to try it again once it recovers.
+    gdelt_client = (
+        gdelt_src.GdeltClient()
+        if os.environ.get("ENABLE_GDELT", "").strip().lower() in ("1", "true", "yes")
+        else None
+    )
+    if gdelt_client is None:
+        log.info("GDELT disabled (set ENABLE_GDELT=1 to re-enable)")
 
     try:
         with db.connect() as conn:
@@ -137,6 +153,7 @@ def run_once(
                 raise
     finally:
         gnews_client.close()
-        gdelt_client.close()
+        if gdelt_client is not None:
+            gdelt_client.close()
 
     return outcome
