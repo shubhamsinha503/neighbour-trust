@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
 from agents.common import db, freshness  # noqa: E402
+from agents.orchestrator import agent as orchestrator  # noqa: E402
 from apps.api.app.schools_verdict import build_verdict as build_schools_verdict  # noqa: E402
 from apps.api.app.verdict import build_verdict  # noqa: E402
 
@@ -332,4 +333,96 @@ def get_schools(slug: str) -> dict[str, Any]:
         "confidence": confidence,
         "payload": payload,
         "verdict": build_schools_verdict(payload, confidence),
+    }
+
+
+# ---------------------------------------------------------------------------
+# The locality report — the composite view, and the actual product.
+# ---------------------------------------------------------------------------
+
+
+class ReportCategory(BaseModel):
+    category: str
+    label: str
+    score: Optional[int] = None
+    confidence: Optional[str] = None
+    weight: float
+    available: bool
+    counted: bool = Field(
+        ..., description="Whether this category contributed to the Trust Score."
+    )
+    status: str
+    summary: str = ""
+    source_name: Optional[str] = None
+    data_vintage: Optional[str] = None
+
+
+class ReportDisagreement(BaseModel):
+    category: str
+    headline: str
+    detail: str
+    severity: str
+
+
+class TrustScoreOut(BaseModel):
+    score: Optional[int] = Field(
+        None, description="None when too few categories have data to justify one number."
+    )
+    coverage_pct: int = Field(
+        ..., description="Share of total category weight that produced the score."
+    )
+    categories_counted: int
+    categories_total: int
+    reason_unavailable: Optional[str] = None
+
+
+class ReportResponse(BaseModel):
+    locality: Locality
+    trust_score: TrustScoreOut
+    verdict: str
+    biggest_watchout: Optional[dict[str, Any]] = None
+    disagreements: list[ReportDisagreement]
+    categories: list[ReportCategory]
+    sources_used: list[str]
+    generated_at: str
+
+
+@app.get("/api/v1/localities/{slug}/report", response_model=ReportResponse)
+def get_report(slug: str) -> dict[str, Any]:
+    """Everything known about one locality, merged and reconciled.
+
+    Assembled per request rather than stored: weights, copy and reconciliation
+    rules change often, and a stored composite would need a backfill each time
+    and would drift from the envelopes it came from.
+    """
+    with db.connect() as conn:
+        locality = db.get_locality(conn, slug)
+        if locality is None:
+            raise HTTPException(status_code=404, detail=f"unknown locality: {slug}")
+        report = orchestrator.build_report(conn, locality)
+
+    trust = report.trust_score
+    return {
+        "locality": report.locality,
+        "trust_score": {
+            "score": trust.score,
+            "coverage_pct": trust.coverage_pct,
+            "categories_counted": trust.categories_counted,
+            "categories_total": trust.categories_total,
+            "reason_unavailable": trust.reason_unavailable,
+        },
+        "verdict": report.verdict,
+        "biggest_watchout": report.biggest_watchout,
+        "disagreements": [
+            {
+                "category": d.category,
+                "headline": d.headline,
+                "detail": d.detail,
+                "severity": d.severity,
+            }
+            for d in report.disagreements
+        ],
+        "categories": report.categories,
+        "sources_used": report.sources_used,
+        "generated_at": report.generated_at.isoformat(),
     }

@@ -248,3 +248,89 @@ function toSchoolsPayload(raw: Record<string, any>): SchoolsAreaPayload {
     sourcesUsed: raw.sources_used ?? [],
   };
 }
+
+// ---------------------------------------------------------------------------
+// The locality report — composite Trust Score, categories, disagreements
+// ---------------------------------------------------------------------------
+
+export interface ReportCategory {
+  category: string;
+  label: string;
+  score: number | null;
+  confidence: Confidence | null;
+  weight: number;
+  available: boolean;
+  /** Whether this category contributed to the Trust Score. */
+  counted: boolean;
+  status: string;
+  summary: string;
+  sourceName?: string;
+  dataVintage?: string;
+}
+
+export interface Disagreement {
+  category: string;
+  headline: string;
+  detail: string;
+  severity: "info" | "notable";
+}
+
+export interface TrustScore {
+  /** null when too few categories have data to justify one number. */
+  score: number | null;
+  coveragePct: number;
+  categoriesCounted: number;
+  categoriesTotal: number;
+  reasonUnavailable?: string;
+}
+
+export interface LocalityReport {
+  locality: Locality;
+  trustScore: TrustScore;
+  verdict: string;
+  biggestWatchout: { category: string; label: string; score: number; detail: string } | null;
+  disagreements: Disagreement[];
+  categories: ReportCategory[];
+  sourcesUsed: string[];
+  generatedAt: string;
+}
+
+export async function fetchReport(slug: string): Promise<LocalityReport> {
+  const response = await fetch(`${API_BASE}/api/v1/localities/${slug}/report`, {
+    next: { revalidate: 300 },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load report (${response.status})`);
+  }
+  const raw = (await response.json()) as Record<string, any>;
+  return {
+    locality: toLocality(raw.locality),
+    trustScore: {
+      score: raw.trust_score.score ?? null,
+      coveragePct: raw.trust_score.coverage_pct,
+      categoriesCounted: raw.trust_score.categories_counted,
+      categoriesTotal: raw.trust_score.categories_total,
+      reasonUnavailable: raw.trust_score.reason_unavailable ?? undefined,
+    },
+    verdict: raw.verdict,
+    biggestWatchout: raw.biggest_watchout ?? null,
+    disagreements: raw.disagreements ?? [],
+    categories: ((raw.categories ?? []) as Array<Record<string, any>>).map(
+      (c): ReportCategory => ({
+        category: c.category,
+        label: c.label,
+        score: c.score ?? null,
+        confidence: (c.confidence ?? null) as Confidence | null,
+        weight: c.weight,
+        available: c.available,
+        counted: c.counted,
+        status: c.status,
+        summary: c.summary ?? "",
+        sourceName: c.source_name ?? undefined,
+        dataVintage: c.data_vintage ?? undefined,
+      }),
+    ),
+    sourcesUsed: raw.sources_used ?? [],
+    generatedAt: raw.generated_at,
+  };
+}

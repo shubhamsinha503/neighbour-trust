@@ -568,3 +568,27 @@ def mention_counts(
         (h3_cell, category, months),
     ).fetchone()
     return {k: int(v or 0) for k, v in row.items()}
+
+
+def latest_envelope_by_source(
+    conn: psycopg.Connection, *, category: str, h3_cell: str, source_name: str
+) -> Optional[dict[str, Any]]:
+    """Latest envelope for one cell from one specific source.
+
+    Needed because a category can hold envelopes from several sources at once —
+    air quality stores CPCB and AQICN separately and on different scales. The
+    orchestrator fetches the second one explicitly to surface the disagreement
+    between them, which is precisely the behaviour docs/strategy.md calls the
+    product's differentiator.
+    """
+    return conn.execute(
+        """
+        SELECT category, source_name, source_url, fetched_at, data_vintage,
+               h3_cell, confidence, payload
+        FROM data_envelope
+        WHERE category = %s::category_t AND h3_cell = %s AND source_name = %s
+        ORDER BY data_vintage DESC, fetched_at DESC
+        LIMIT 1
+        """,
+        (category, h3_cell, source_name),
+    ).fetchone()

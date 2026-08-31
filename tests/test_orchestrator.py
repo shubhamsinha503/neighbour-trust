@@ -1,0 +1,178 @@
+"""Tests for the composite Trust Score and reconciliation.
+
+The scoring is a product judgement rather than a measurement, so these tests pin
+the *properties* that must hold rather than specific numbers — above all that
+missing data never becomes a bad score, and that a thin score is never published
+as if it were a full one.
+"""
+
+import pytest
+
+from agents.orchestrator import reconcile, score as score_mod
+
+
+def envelope(payload: dict, confidence: str = "high", source: str = "Test") -> dict:
+    return {"payload": payload, "confidence": confidence, "source_name": source}
+
+
+AQ_GOOD = envelope({"current_aqi": 40.0, "aqi_band": "good", "nearest_station_km": 2.0})
+AQ_BAD = envelope({"current_aqi": 320.0, "aqi_band": "very_poor", "nearest_station_km": 2.0})
+SCHOOLS_GOOD = envelope(
+    {"schools_within_2km": 40, "median_pupil_teacher_ratio": 20.0,
+     "schools_with_staffing_data": 30}
+)
+
+
+class TestAqiScore:
+    def test_clean_air_scores_high(self):
+        assert score_mod.score_from_aqi(30) >= 88
+
+    def test_severe_air_scores_low(self):
+        assert score_mod.score_from_aqi(420) <= 15
+
+    def test_monotonic(self):
+        """Worse air must never score better."""
+        scores = [score_mod.score_from_aqi(a) for a in (0, 50, 100, 200, 300, 400, 500)]
+        assert scores == sorted(scores, reverse=True)
+
+    def test_curve_is_steepest_across_the_decision_range(self):
+        """AQI 100-200 is the Moderate-to-Poor stretch where a buyer's decision
+        actually changes, so a 50-point rise there must cost more of the score
+        than the same rise among already-clean or already-hazardous air."""
+        clean = score_mod.score_from_aqi(0) - score_mod.score_from_aqi(50)
+        decision = score_mod.score_from_aqi(100) - score_mod.score_from_aqi(150)
+        hazardous = score_mod.score_from_aqi(350) - score_mod.score_from_aqi(400)
+        assert decision > clean
+        assert decision > hazardous
+
+
+class TestSchoolsScore:
+    def test_access_alone_is_capped(self):
+        """61 schools nearby with staffing known for one has not earned 100."""
+        assert score_mod.score_from_schools(61, None) <= 75
+
+    def test_staffing_improves_the_score(self):
+        assert score_mod.score_from_schools(40, 20.0) > score_mod.score_from_schools(40, None)
+
+    def test_crowded_schools_score_worse(self):
+        assert score_mod.score_from_schools(40, 50.0) < score_mod.score_from_schools(40, 20.0)
+
+
+class TestCategoryScore:
+    def test_crime_and_water_never_score(self):
+        """Press coverage is a function of media-market size, not incident rate.
+        Folding it into a number would make well-covered areas look dangerous."""
+        payload = {"news": {"incidents_12m": 12}}
+        assert score_mod.category_score("crime", payload) is None
+        assert score_mod.category_score("water", payload) is None
+
+    def test_unbuilt_categories_never_score(self):
+        assert score_mod.category_score("power", {}) is None
+        assert score_mod.category_score("infrastructure", {}) is None
+
+
+class TestComposite:
+    def test_missing_categories_do_not_drag_the_score_down(self):
+        """The central rule: absent data must not read as a bad neighbourhood.
+        Two categories at ~96 must produce ~96, not 96 * 2/6."""
+        result = score_mod.compute({"air_quality": AQ_GOOD, "schools": SCHOOLS_GOOD})
+        assert result.score is not None
+        assert result.score >= 85
+
+    def test_coverage_is_reported(self):
+        result = score_mod.compute({"air_quality": AQ_GOOD, "schools": SCHOOLS_GOOD})
+        assert result.categories_counted == 2
+        assert result.categories_total == 6
+        assert result.coverage_pct == 40  # 0.20 + 0.20 of total weight
+
+    def test_one_category_is_not_enough_for_a_composite(self):
+        """A single measurement wearing the words "Trust Score" is worse than no
+        score at all."""
+        result = score_mod.compute({"schools": SCHOOLS_GOOD})
+        assert result.score is None
+        assert result.reason_unavailable is not None
+        assert "1 of 6" in result.reason_unavailable
+
+    def test_no_data_at_all_yields_no_score(self):
+        result = score_mod.compute({})
+        assert result.score is None
+        assert result.categories_counted == 0
+
+    def test_every_category_appears_even_when_empty(self):
+        """A grid of six that silently shows two is a different claim than one
+        that shows six and admits four are empty."""
+        result = score_mod.compute({"air_quality": AQ_GOOD, "schools": SCHOOLS_GOOD})
+        assert len(result.categories) == 6
+        assert {c.category for c in result.categories} == set(score_mod.CATEGORY_WEIGHTS)
+
+    def test_bad_air_lowers_the_composite(self):
+        good = score_mod.compute({"air_quality": AQ_GOOD, "schools": SCHOOLS_GOOD})
+        bad = score_mod.compute({"air_quality": AQ_BAD, "schools": SCHOOLS_GOOD})
+        assert bad.score < good.score
+
+    def test_weights_sum_to_one(self):
+        assert sum(score_mod.CATEGORY_WEIGHTS.values()) == pytest.approx(1.0)
+
+    def test_crime_envelope_present_but_uncounted(self):
+        """Crime can have an envelope and still contribute nothing."""
+        result = score_mod.compute({
+            "air_quality": AQ_GOOD,
+            "schools": SCHOOLS_GOOD,
+            "crime": envelope({"news": {"incidents_12m": 5}}, "community_estimated"),
+        })
+        crime = next(c for c in result.categories if c.category == "crime")
+        assert crime.available is True
+        assert crime.counted is False
+        assert result.categories_counted == 2
+
+
+class TestReconcile:
+    def test_surfaces_two_aqi_scales(self):
+        found = reconcile.find({
+            "air_quality": envelope({"current_aqi": 96.0}),
+            "air_quality_aqicn": envelope({"epa_aqi": 134.0}),
+        })
+        assert any("96" in d.headline and "134" in d.headline for d in found)
+
+    def test_no_aqi_conflict_when_only_one_source(self):
+        found = reconcile.find({"air_quality": envelope({"current_aqi": 96.0})})
+        assert not any(d.category == "air_quality" for d in found)
+
+    def test_surfaces_the_schools_coverage_gap(self):
+        """The Indiranagar case: 61 schools mapped, staffing known for one."""
+        found = reconcile.find({
+            "schools": envelope({
+                "schools_within_2km": 61,
+                "schools_with_staffing_data": 1,
+                "presence_source": "OpenStreetMap",
+            })
+        })
+        assert any(d.category == "schools" for d in found)
+
+    def test_no_schools_conflict_when_coverage_is_good(self):
+        found = reconcile.find({
+            "schools": envelope({
+                "schools_within_2km": 40,
+                "schools_with_staffing_data": 35,
+                "presence_source": "UDISE",
+            })
+        })
+        assert not any(d.category == "schools" for d in found)
+
+    def test_press_coverage_is_flagged_as_uncounted(self):
+        found = reconcile.find({
+            "crime": envelope({"news": {"incidents_12m": 7}}, "community_estimated")
+        })
+        assert any("not counted in the score" in d.headline for d in found)
+
+    def test_notable_conflicts_sort_first(self):
+        found = reconcile.find({
+            "air_quality": envelope({"current_aqi": 96.0}),
+            "air_quality_aqicn": envelope({"epa_aqi": 134.0}),
+            "schools": envelope({
+                "schools_within_2km": 61,
+                "schools_with_staffing_data": 1,
+                "presence_source": "OpenStreetMap",
+            }),
+        })
+        assert found[0].severity == "notable"

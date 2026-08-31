@@ -60,6 +60,22 @@ FRESH_WITHIN = timedelta(hours=3)
 STALE_AFTER = timedelta(hours=24)
 UNUSABLE_AFTER = timedelta(days=7)
 
+# When no regulatory station can produce a full CPCB AQI, a community low-cost
+# sensor reporting PM2.5 alone is still real, current, local information. During
+# the CPCB outage of late August 2026 it was the only air data available for
+# Bengaluru at all — every regulatory station in the city had been silent for
+# four days.
+#
+# It is published as a PM2.5 concentration, never as an "AQI", at
+# COMMUNITY_ESTIMATED confidence with the operator named. That is precisely what
+# that confidence value is for: not worse official data, but a different kind of
+# data. Low-cost sensors are not reference monitors, and the card says so.
+PM25_ONLY_FALLBACK = True
+
+# A PM2.5-only sensor must be close to be worth reporting — with no second
+# pollutant to corroborate it, distance is the only quality signal left.
+PM25_ONLY_MAX_KM = 8.0
+
 
 @dataclass
 class StationReading:
@@ -226,6 +242,57 @@ def _readings_from_openaq(
         )
 
 
+def _pm25_only_reading(
+    client: openaq_src.OpenAqClient, *, lat: float, lon: float
+) -> Optional[StationReading]:
+    """Nearest live sensor with a usable PM2.5 figure, whatever else it lacks.
+
+    Used only when no station in range can produce a full CPCB AQI. Returns a
+    reading whose `concentrations` may hold nothing but pm2_5 — the caller must
+    not pass it to compute_aqi, which would correctly refuse it.
+    """
+    stations = client.live_stations_near(lat, lon)
+    ranked = sorted(
+        (
+            {**s, "distance_km": haversine_km(lat, lon, s["lat"], s["lon"])}
+            for s in stations
+        ),
+        key=lambda s: s["distance_km"],
+    )
+
+    for station in ranked:
+        if station["distance_km"] > PM25_ONLY_MAX_KM:
+            break
+
+        latest, observed_at, sensor_ids = client.latest_concentrations(station["id"])
+        if observed_at is None or "pm2_5" not in sensor_ids:
+            continue
+
+        averaged, _hours = client.rolling_24h_concentrations(
+            {"pm2_5": sensor_ids["pm2_5"]}
+        )
+        concentrations = averaged or {k: v for k, v in latest.items() if k == "pm2_5"}
+        if "pm2_5" not in concentrations:
+            continue
+
+        return StationReading(
+            source_name=_openaq_source_name(station.get("provider")),
+            source_url=openaq_src.SOURCE_URL,
+            source_key="openaq",
+            external_id=str(station["id"]),
+            name=station["name"],
+            lat=station["lat"],
+            lon=station["lon"],
+            distance_km=station["distance_km"],
+            observed_at=observed_at,
+            concentrations={"pm2_5": concentrations["pm2_5"]},
+            latest_hour={k: v for k, v in latest.items() if k == "pm2_5"},
+            openaq_location_id=station["id"],
+            sensor_ids={"pm2_5": sensor_ids["pm2_5"]},
+        )
+    return None
+
+
 def _openaq_source_name(provider: Optional[str]) -> str:
     if provider and provider.strip().upper() == "CPCB":
         return openaq_src.SOURCE_NAME  # "CPCB via OpenAQ"
@@ -346,7 +413,16 @@ def run_for_locality(
             slug, candidate.name, sorted(candidate.concentrations),
         )
 
-    if reading is None or result is None:
+    # Fallback: a community sensor with PM2.5 but too few pollutants for a CPCB
+    # AQI. Only reached when nothing above worked.
+    pm25_only: Optional[StationReading] = None
+    if reading is None and PM25_ONLY_FALLBACK and openaq_client is not None:
+        try:
+            pm25_only = _pm25_only_reading(openaq_client, lat=lat, lon=lon)
+        except Exception as exc:
+            log.warning("[%s] PM2.5 fallback failed: %s", slug, exc)
+
+    if reading is None and pm25_only is None:
         return LocalityResult(
             slug=slug,
             ok=False,
@@ -354,13 +430,29 @@ def run_for_locality(
                 "no live station within range"
                 if considered == 0
                 else f"{considered} station(s) in range, none meeting CPCB's minimum "
-                "for an AQI (3 pollutants including PM2.5 or PM10)"
+                "for an AQI (3 pollutants including PM2.5 or PM10), and no community "
+                "PM2.5 sensor either"
             ),
+        )
+
+    # Adopt the fallback if that is all we have. `result` stays None, which is
+    # what every branch below keys off to know it is publishing a PM2.5 reading
+    # rather than an AQI.
+    pm25_mode = reading is None
+    if pm25_mode:
+        reading = pm25_only
+        log.info(
+            "[%s] no CPCB-capable station; falling back to PM2.5 only from %s",
+            slug, reading.name,
         )
 
     sources_used: list[str] = [reading.source_name]
     age = now - reading.observed_at
     confidence = assess_confidence(reading.distance_km, age)
+    if confidence is not None and pm25_mode:
+        # A single-pollutant reading from a low-cost sensor is a different kind
+        # of evidence, not a lesser grade of the official kind.
+        confidence = Confidence.COMMUNITY_ESTIMATED
     if confidence is None:
         return LocalityResult(
             slug=slug,
@@ -386,8 +478,8 @@ def run_for_locality(
         station_id=station_id,
         source=reading.source_key,
         observed_at=reading.observed_at,
-        aqi=result.aqi,
-        dominant_pollutant=result.dominant_pollutant,
+        aqi=result.aqi if result else None,
+        dominant_pollutant=result.dominant_pollutant if result else None,
         pollutants=reading.concentrations,
     )
 
@@ -454,12 +546,29 @@ def run_for_locality(
         aqi_lib.compute_aqi(reading.latest_hour) if reading.latest_hour else None
     )
 
+    if pm25_mode:
+        # PM2.5 alone cannot be an AQI, so the AQI fields carry the PM2.5
+        # sub-index and the band it falls in — accurate for that one pollutant,
+        # and labelled as such by aqi_basis so no consumer can mistake it for a
+        # full CPCB index.
+        pm25 = reading.concentrations["pm2_5"]
+        sub_index = aqi_lib.sub_index("pm2_5", pm25) or 0.0
+        headline_aqi = round(sub_index, 1)
+        band = aqi_lib.band_for(headline_aqi)
+        dominant = "PM2.5"
+        basis = "pm2_5_only"
+    else:
+        headline_aqi = result.aqi
+        band = result.band
+        dominant = aqi_lib.pollutant_label(result.dominant_pollutant)
+        basis = "24h_rolling"
+
     payload = AirQualityPayload(
-        current_aqi=result.aqi,
-        aqi_band=result.band,
-        aqi_basis="24h_rolling",
+        current_aqi=headline_aqi,
+        aqi_band=band,
+        aqi_basis=basis,
         latest_hour_aqi=latest_hour_result.aqi if latest_hour_result else None,
-        dominant_pollutant=aqi_lib.pollutant_label(result.dominant_pollutant),
+        dominant_pollutant=dominant,
         pm2_5=reading.concentrations.get("pm2_5"),
         pm10=reading.concentrations.get("pm10"),
         no2=reading.concentrations.get("no2"),
