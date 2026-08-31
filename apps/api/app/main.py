@@ -10,6 +10,7 @@ Run from the repo root:
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -32,11 +33,20 @@ app = FastAPI(
     description="Sourced, confidence-tagged neighbourhood data for Bengaluru and Gurugram.",
 )
 
-# The Next.js dev server. Production origins get added at deploy time rather than
-# wildcarded here.
+# Allowed browser origins. Local dev origins are always permitted; production
+# ones come from CORS_ALLOWED_ORIGINS (comma-separated) so deploying to a new
+# domain is an environment variable rather than a code change — one less thing to
+# forget at 2am, and one less reason to reach for a wildcard.
+_DEFAULT_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+_EXTRA_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_DEFAULT_ORIGINS + _EXTRA_ORIGINS,
     allow_methods=["GET"],
     allow_headers=["*"],
 )
