@@ -81,7 +81,22 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.dry_run:
         print("\nDry run — all writes rolled back.")
 
-    return 1 if outcome.skipped else 0
+    # Exit code semantics, which matter because CI reads them: a run where some
+    # localities had no usable data is a *success*. Upstream feeds go down
+    # routinely — that is why the skip logic exists — and failing on a partial
+    # skip turns an ordinary Tuesday into a red build, and worse, stops the
+    # workflow steps that come after it.
+    #
+    # Non-zero is reserved for "this run achieved nothing": every locality
+    # skipped, which means a broken credential, a dead upstream, or a bug.
+    stored = outcome.ok
+    if stored == 0 and outcome.results:
+        print(
+            f"\nAll {outcome.skipped} localities skipped — nothing stored.",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
