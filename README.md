@@ -184,6 +184,17 @@ docs/ design/          the planning handoff
 tests/                 AQI maths and confidence rules
 ```
 
+## Known follow-ups
+
+**Next.js 16 upgrade.** We run 15.5.24, which clears the critical CVE-2025-66478
+that shipped in 15.1.6. Two advisories remain and both need Next 16, a breaking
+major: a moderate Next issue, and a high-severity PostCSS one. The PostCSS
+advisories all concern processing *attacker-controlled* CSS — sourceMappingURL
+path traversal, XSS via an unescaped `</style>` — and PostCSS here only ever
+processes `apps/web/app/globals.css`, which we author. Practical exposure is
+nil; the upgrade is worth doing on a week where a breaking change can be tested
+rather than shipped blind.
+
 ## Still open
 
 Unchanged from the planning handoff, none of it blocking Phase 2:
