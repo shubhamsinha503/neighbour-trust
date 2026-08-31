@@ -23,6 +23,7 @@ caveat as text so the UI cannot quietly drop it.
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -154,42 +155,65 @@ def fetch_for_locality(
 # ---------------------------------------------------------------------------
 
 
+# How many headlines to classify at once. Each is an independent single-shot
+# call with no shared state, so this is embarrassingly parallel — and it has to
+# be: a real fetch produces ~1,300 mentions, which sequentially at ~1.5s each is
+# over thirty minutes and overruns the CI job before finishing.
+#
+# Eight is chosen against the API's rate limits rather than the machine's cores;
+# the work is entirely network-bound.
+CLASSIFY_CONCURRENCY = 8
+
+
 def classify_pending(
-    conn, classifier: classify_mod.Classifier, *, limit: int = 500
+    conn, classifier: classify_mod.Classifier, *, limit: int = 2000
 ) -> ClassifyResult:
     """Judge every unclassified mention.
 
-    Only ever touches rows with `classified_at IS NULL`, which makes the whole
-    phase resumable and stops a weekly re-fetch from paying to re-judge headlines
-    that were already decided.
+    Only ever touches rows with `classified_at IS NULL`, which makes the phase
+    resumable and stops a re-fetch from paying to re-judge headlines already
+    decided. That property is what makes a timeout survivable: the next run
+    continues from where this one stopped rather than starting over.
+
+    Classification runs concurrently, but the database writes stay on this
+    thread — psycopg connections are not thread-safe, and the ordering here is
+    cheap anyway compared to the network round-trips.
     """
     result = ClassifyResult(classifier=classifier.name)
+    pending = db.unclassified_mentions(conn, limit=limit)
+    if not pending:
+        return result
 
-    for mention in db.unclassified_mentions(conn, limit=limit):
-        judgement = classifier.classify(
+    log.info("classifying %d mentions with %s", len(pending), classifier.name)
+
+    def judge(mention: dict[str, Any]):
+        return mention, classifier.classify(
             title=mention["title"],
             locality=mention["locality"],
             city=mention["city"],
             category=mention["category"],
         )
-        if judgement is None:
-            # The classifier declined to decide. The row stays unclassified and
-            # is excluded from every count — being unsure costs recall, guessing
-            # would cost correctness.
-            result.undecided += 1
-            continue
 
-        db.record_classification(
-            conn,
-            mention["id"],
-            is_locality_specific=judgement.is_locality_specific,
-            incident_type=judgement.incident_type,
-            classifier=judgement.classifier,
-            reason=judgement.reason,
-        )
-        result.judged += 1
-        if judgement.is_locality_specific:
-            result.confirmed += 1
+    with ThreadPoolExecutor(max_workers=CLASSIFY_CONCURRENCY) as pool:
+        for mention, judgement in pool.map(judge, pending):
+            if judgement is None:
+                # The classifier declined to decide. The row stays unclassified
+                # and is excluded from every count — being unsure costs recall,
+                # guessing would cost correctness.
+                result.undecided += 1
+                continue
+
+            db.record_classification(
+                conn,
+                mention["id"],
+                is_locality_specific=judgement.is_locality_specific,
+                incident_type=judgement.incident_type,
+                classifier=judgement.classifier,
+                reason=judgement.reason,
+            )
+            result.judged += 1
+            if judgement.is_locality_specific:
+                result.confirmed += 1
 
     return result
 
