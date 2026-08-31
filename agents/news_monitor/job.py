@@ -10,6 +10,7 @@ from agents.common import db
 from agents.news_monitor import agent as news_agent
 from agents.news_monitor import classify as classify_mod
 from agents.news_monitor.sources import gdelt as gdelt_src
+from agents.news_monitor.sources import google_news as gnews_src
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +44,8 @@ def run_once(
     outcome = JobOutcome()
     classifier = classify_mod.build_classifier(prefer_claude=prefer_claude)
     outcome.classifier = classifier.name
-    client = gdelt_src.GdeltClient()
+    gnews_client = gnews_src.GoogleNewsClient()
+    gdelt_client = gdelt_src.GdeltClient()
 
     try:
         with db.connect() as conn:
@@ -53,7 +55,11 @@ def run_once(
                 db.start_ingest_run(
                     conn,
                     category="crime",
-                    sources={gdelt_src.SOURCE_NAME: True, classifier.name: True},
+                    sources={
+                        gnews_src.SOURCE_NAME: True,
+                        gdelt_src.SOURCE_NAME: True,
+                        classifier.name: True,
+                    },
                 )
                 if record_run and not dry_run
                 else None
@@ -76,7 +82,10 @@ def run_once(
                 if not skip_fetch:
                     for locality in localities:
                         outcome.mentions_found += news_agent.fetch_for_locality(
-                            conn, client, locality
+                            conn,
+                            locality,
+                            gnews_client=gnews_client,
+                            gdelt_client=gdelt_client,
                         )
                     if not dry_run:
                         # Commit the fetch before classifying: GDELT's rate limit
@@ -127,6 +136,7 @@ def run_once(
                     conn.commit()
                 raise
     finally:
-        client.close()
+        gnews_client.close()
+        gdelt_client.close()
 
     return outcome

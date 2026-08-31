@@ -40,6 +40,7 @@ from neighbour_trust_schema.envelope import (
 from agents.common import db
 from agents.news_monitor import classify as classify_mod
 from agents.news_monitor.sources import gdelt as gdelt_src
+from agents.news_monitor.sources import google_news as gnews_src
 
 log = logging.getLogger(__name__)
 
@@ -87,38 +88,63 @@ class LocalityResult:
 
 
 def fetch_for_locality(
-    conn, client: gdelt_src.GdeltClient, locality: dict[str, Any]
+    conn,
+    locality: dict[str, Any],
+    *,
+    gnews_client: Optional[gnews_src.GoogleNewsClient] = None,
+    gdelt_client: Optional[gdelt_src.GdeltClient] = None,
 ) -> int:
-    """Search GDELT for this locality across both categories and store the hits."""
+    """Search every available source for this locality and store the hits.
+
+    Both sources are tried rather than one falling back to the other, because
+    they fail and succeed independently — GDELT went unreachable from two
+    separate networks on 2026-09-01 while Google News answered in five seconds —
+    and because they index different press. Duplicates across sources are
+    absorbed by the (locality, category, url) unique constraint.
+    """
     stored = 0
+
     for category in CATEGORIES:
-        try:
-            articles = list(
-                client.search_locality(
-                    locality=locality["name"],
-                    city=locality["city"],
-                    category=category,
-                    months=LOOKBACK_MONTHS,
+        found = 0
+
+        for label, client in (
+            (gnews_src.SOURCE_NAME, gnews_client),
+            (gdelt_src.SOURCE_NAME, gdelt_client),
+        ):
+            if client is None:
+                continue
+            try:
+                articles = list(
+                    client.search_locality(
+                        locality=locality["name"],
+                        city=locality["city"],
+                        category=category,
+                        months=LOOKBACK_MONTHS,
+                    )
                 )
-            )
-        except Exception as exc:
-            log.warning("[%s/%s] GDELT fetch failed: %s", locality["slug"], category, exc)
-            continue
+            except Exception as exc:
+                # One dead source must not cost the other's results.
+                log.warning(
+                    "[%s/%s] %s fetch failed: %s",
+                    locality["slug"], category, label, exc,
+                )
+                continue
 
-        for article in articles:
-            db.upsert_news_mention(
-                conn,
-                {
-                    **article,
-                    "locality_id": locality["id"],
-                    "h3_cell": locality["h3_cell"],
-                    "category": category,
-                    "source_name": gdelt_src.SOURCE_NAME,
-                },
-            )
-            stored += 1
+            for article in articles:
+                db.upsert_news_mention(
+                    conn,
+                    {
+                        **article,
+                        "locality_id": locality["id"],
+                        "h3_cell": locality["h3_cell"],
+                        "category": category,
+                        "source_name": label,
+                    },
+                )
+                stored += 1
+                found += 1
 
-        log.info("[%s/%s] %d mentions", locality["slug"], category, len(articles))
+        log.info("[%s/%s] %d mentions", locality["slug"], category, found)
 
     return stored
 

@@ -47,7 +47,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     has_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
     using_claude = has_key and not args.no_claude
-    print("Source: GDELT DOC 2.0 (no API key required)")
+    print("Sources: Google News RSS + GDELT DOC 2.0 (neither needs an API key)")
     print(
         f"Classifier: {'Claude' if using_claude else 'heuristic'}"
         f"{'' if has_key else '  (ANTHROPIC_API_KEY not set)'}\n"
