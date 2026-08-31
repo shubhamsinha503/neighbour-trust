@@ -1,18 +1,34 @@
 """Compare the heuristic and Claude classifiers on real GDELT headlines.
 
-The headlines below are the actual results GDELT returned for "Indiranagar" and
-"Sushant Lok" during development, plus two synthetic controls. They are the cases
-that motivated having a classifier at all.
+    python scripts/compare_classifiers.py
 
-Read-only: this calls the classifiers directly and touches no database.
-Temporary — delete after running.
+The headlines below are the actual results GDELT returned for "Indiranagar" and
+"Sushant Lok" during development, plus two unambiguous controls. They are the
+cases that motivated having a classifier at all: a keyword search cannot tell
+"chain snatching in Indiranagar" from a Maharashtra stabbing that merely mentions
+the word, or from a planning-policy story.
+
+Read-only — calls the classifiers directly and touches no database. Runs without
+an API key, showing heuristic results only.
 """
 
-from dotenv import load_dotenv
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+# Python puts this file's directory (scripts/) on sys.path, not the repo root,
+# so `agents` is not importable without this.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv()
 
-from agents.news_monitor.classify import ClaudeClassifier, HeuristicClassifier
+from agents.news_monitor.classify import (  # noqa: E402
+    ClaudeClassifier,
+    HeuristicClassifier,
+)
 
 # (locality, city, category, headline, what a careful human would say)
 CASES = [
@@ -41,43 +57,68 @@ def verdict(judgement) -> str:
     return "INCIDENT" if judgement.is_locality_specific else "not an incident"
 
 
-def main() -> None:
+def main() -> int:
     heuristic = HeuristicClassifier()
-    claude = ClaudeClassifier()
-    print(f"Claude classifier: {claude.name}\n")
 
-    agree = disagree = 0
-    heur_right = claude_right = 0
+    # Without a key there is still something worth seeing. Better than a
+    # traceback for a reader who just wants to run this.
+    claude = None
+    try:
+        claude = ClaudeClassifier()
+        print(f"Claude classifier : {claude.name}")
+    except Exception as exc:
+        print(f"Claude classifier : unavailable\n  {exc}")
+    print(f"Heuristic         : always available, no credentials\n")
+
+    heur_right = heur_wrong = heur_declined = 0
+    claude_right = claude_wrong = claude_declined = 0
 
     for locality, city, category, headline, expected in CASES:
         kwargs = dict(title=headline, locality=locality, city=city, category=category)
         h = heuristic.classify(**kwargs)
-        c = claude.classify(**kwargs)
+        c = claude.classify(**kwargs) if claude is not None else None
 
-        expected_str = "INCIDENT" if expected else "not an incident"
-        h_v, c_v = verdict(h), verdict(c)
-
-        if h is not None and h.is_locality_specific == expected:
+        if h is None:
+            heur_declined += 1
+        elif h.is_locality_specific == expected:
             heur_right += 1
-        if c is not None and c.is_locality_specific == expected:
-            claude_right += 1
-        if h_v == c_v:
-            agree += 1
         else:
-            disagree += 1
+            heur_wrong += 1
 
-        print(f'  "{headline[:66]}"')
-        print(f"     expected  : {expected_str}")
-        print(f"     heuristic : {h_v:<16} {h.reason if h else '(declined to judge)'}")
-        print(f"     claude    : {c_v:<16} {c.reason if c else '(no answer)'}")
-        if c is not None and c.incident_type:
-            print(f"     type      : {c.incident_type}")
+        if claude is not None:
+            if c is None:
+                claude_declined += 1
+            elif c.is_locality_specific == expected:
+                claude_right += 1
+            else:
+                claude_wrong += 1
+
+        print(f'  "{headline[:68]}"')
+        print(f"     expected  : {'INCIDENT' if expected else 'not an incident'}")
+        print(f"     heuristic : {verdict(h):<16} "
+              f"{h.reason if h else '(declined to judge)'}")
+        if claude is not None:
+            print(f"     claude    : {verdict(c):<16} "
+                  f"{c.reason if c else '(no answer)'}")
+            if c is not None and c.incident_type:
+                print(f"     type      : {c.incident_type}")
         print()
 
     total = len(CASES)
-    print(f"Correct  — heuristic {heur_right}/{total}, claude {claude_right}/{total}")
-    print(f"Agreement— {agree}/{total} agree, {disagree}/{total} differ")
+    print(f"heuristic : {heur_right} right, {heur_wrong} wrong, {heur_declined} declined "
+          f"(of {total})")
+    if claude is not None:
+        print(f"claude    : {claude_right} right, {claude_wrong} wrong, "
+              f"{claude_declined} declined (of {total})")
+    else:
+        print("claude    : not run — set ANTHROPIC_API_KEY in .env to compare")
+
+    # A wrong answer is the only real failure here. Declining costs recall;
+    # guessing costs correctness, and correctness is the product.
+    print("\nA declined headline is excluded from incident counts, so it costs "
+          "recall but never accuracy.")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
