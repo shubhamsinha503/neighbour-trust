@@ -3,7 +3,7 @@
 
 PY := .venv/Scripts/python.exe
 
-.PHONY: help setup db migrate seed fetch schedule api web test clean
+.PHONY: help setup db migrate seed fetch schools schedule api web test clean
 
 help:
 	@echo "setup     - create venv, install Python + web deps"
@@ -11,6 +11,7 @@ help:
 	@echo "migrate   - apply infra/migrations to a running db"
 	@echo "seed      - insert the Bengaluru + Gurugram localities"
 	@echo "fetch     - run the air quality agent once"
+	@echo "schools   - run the schools agent once (UDISE + OpenStreetMap)"
 	@echo "schedule  - run the hourly scheduler in the foreground"
 	@echo "api       - run FastAPI on :8000"
 	@echo "web       - run Next.js on :3000"
@@ -33,6 +34,9 @@ seed:
 
 fetch:
 	$(PY) -m agents.air_quality.run
+
+schools:
+	$(PY) -m agents.schools.run
 
 schedule:
 	$(PY) -m agents.scheduler
