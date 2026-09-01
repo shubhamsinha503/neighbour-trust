@@ -31,6 +31,22 @@ from typing import Any, Iterable, Optional
 VIOLENT = ("assault", "murder", "kidnap", "molest", "harass", "rape", "attack", "stab", "violence")
 PROPERTY = ("theft", "robbery", "burglary", "snatch", "fraud", "cheat", "scam", "steal", "loot")
 
+# Excluded from the crime characterisation entirely, rather than bucketed.
+#
+# Self-harm is not a crime against residents and says nothing about whether an
+# area is safe to live in, and reporting suicides broken down by neighbourhood
+# is precisely what press guidelines on suicide reporting caution against. It
+# was appearing in production as "2 suicide" on Whitefield's safety card.
+#
+# Deaths in custody and policing complaints are removed for a different reason:
+# they describe conduct by an institution, not risk to someone living there, and
+# they cluster wherever a police station happens to be.
+EXCLUDED = (
+    "suicide", "self_harm", "selfharm", "self-harm",
+    "custody", "illegal arrest", "illegal_arrest", "police misconduct",
+    "police_misconduct", "custodial",
+)
+
 # Water types grouped by what they tell you about living there.
 FLOODING = ("waterlog", "flood", "inundat", "drain")
 SUPPLY = ("shortage", "tanker", "supply", "scarcity", "cut")
@@ -44,6 +60,11 @@ MONSOON_MONTHS = (6, 7, 8, 9)
 # one theft is an anecdote, and describing it as "mostly property crime" would
 # dress a single article as a trend.
 MIN_FOR_PATTERN = 3
+
+
+def is_excluded(incident_type: Optional[str]) -> bool:
+    text = (incident_type or "").lower()
+    return any(needle in text for needle in EXCLUDED)
 
 
 def _bucket(incident_type: Optional[str], groups: dict[str, tuple[str, ...]]) -> str:
@@ -78,30 +99,63 @@ def characterise_crime(incidents: list[dict[str, Any]]) -> Optional[str]:
         return None
 
     groups = {"violent": VIOLENT, "property": PROPERTY}
-    buckets = Counter(_bucket(i.get("incident_type"), groups) for i in incidents)
-    types = [i.get("incident_type") for i in incidents]
 
+    # Drop what does not belong on a neighbourhood safety card before counting,
+    # so excluded items cannot show up in a total either.
+    incidents = [i for i in incidents if not is_excluded(i.get("incident_type"))]
+    if len(incidents) < MIN_FOR_PATTERN:
+        return None
+
+    def types_in(bucket: str) -> list[str]:
+        return [
+            i.get("incident_type")
+            for i in incidents
+            if _bucket(i.get("incident_type"), groups) == bucket
+        ]
+
+    buckets = Counter(_bucket(i.get("incident_type"), groups) for i in incidents)
     violent = buckets.get("violent", 0)
     prop = buckets.get("property", 0)
 
-    detail = _top_types(types)
-
+    # Each sentence below illustrates the claim it just made, using types drawn
+    # from the bucket it named. Listing the overall most-common types instead
+    # produced a live contradiction on Whitefield — "a notable share involve
+    # violence (6 of 33) — 7 illegal arrest, 2 police misconduct and 2 suicide",
+    # where not one of the three examples was a violent incident.
     if violent == 0:
+        property_detail = _top_types(types_in("property"))
+        if not property_detail:
+            # Nothing violent and nothing recognisably property crime either.
+            # "Property crime rather than violent crime" would be false, but the
+            # absence of violence is still true and still worth saying.
+            other = _top_types(types_in("other"))
+            if not other:
+                return None  # no usable type labels at all
+            return (
+                f"Nothing involving violence appeared in local press over the "
+                f"year. Reported incidents were {other}."
+            )
         return (
             f"Reported incidents are property crime rather than violent crime — "
-            f"{detail}. Nothing involving violence appeared in local press over the year."
+            f"{property_detail}. Nothing involving violence appeared in local "
+            f"press over the year."
         )
     if prop > violent * 2:
         return (
-            f"Mostly property crime — {detail} — with {violent} incident"
-            f"{'' if violent == 1 else 's'} involving violence."
+            f"Mostly property crime — {_top_types(types_in('property'))} — with "
+            f"{violent} incident{'' if violent == 1 else 's'} involving violence "
+            f"({_top_types(types_in('violent'))})."
         )
     if violent > prop:
         return (
             f"A notable share of reported incidents involve violence "
-            f"({violent} of {len(incidents)}) — {detail}."
+            f"({violent} of {len(incidents)}) — {_top_types(types_in('violent'))}."
         )
-    return f"A mix of property and violent incidents — {detail}."
+    return (
+        f"A mix of property and violent incidents — "
+        f"{_top_types(types_in('property'))} against "
+        f"{_top_types(types_in('violent'))}."
+    )
 
 
 def characterise_water(incidents: list[dict[str, Any]]) -> Optional[str]:

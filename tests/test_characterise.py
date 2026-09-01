@@ -13,6 +13,7 @@ from agents.news_monitor.characterise import (
     characterise,
     characterise_crime,
     characterise_water,
+    is_excluded,
 )
 
 
@@ -48,15 +49,69 @@ class TestCrime:
         assert "involve violence" in result
 
     def test_unknown_types_do_not_crash_or_vanish(self):
-        """The classifier is not constrained to a fixed vocabulary."""
+        """The classifier is not constrained to a fixed vocabulary. Unrecognised
+        types must still be described — but not miscalled property crime."""
         result = characterise_crime(
             [incident("cybercrime"), incident("trespass"), incident("nuisance")]
         )
         assert result is not None
+        assert "property crime" not in result
+        assert "cybercrime" in result
 
-    def test_none_incident_type_is_tolerated(self):
-        result = characterise_crime([{"incident_type": None}] * 4)
+    def test_untyped_incidents_produce_no_claim(self):
+        """With no type labels there is nothing true to say about the kind of
+        crime, so the card falls back to the plain count rather than inventing
+        a character for the place."""
+        assert characterise_crime([{"incident_type": None}] * 4) is None
+
+    def test_examples_come_from_the_bucket_the_sentence_claims(self):
+        """Shipped broken once. Whitefield read "a notable share involve violence
+        (6 of 33) — 7 illegal arrest, 2 police misconduct and 2 suicide": the
+        claim was about violence and not one example was violent."""
+        result = characterise_crime(
+            [incident("assault")] * 4 + [incident("murder")] * 2 + [incident("theft")]
+        )
         assert result is not None
+        assert "assault" in result and "murder" in result
+        assert "theft" not in result
+
+    def test_property_sentence_illustrates_with_property_types(self):
+        result = characterise_crime([incident("theft")] * 6 + [incident("assault")] * 2)
+        assert result is not None
+        head, _, tail = result.partition("with")
+        assert "theft" in head          # the "mostly property" half
+        assert "assault" in tail        # the violence half
+
+    def test_self_harm_never_appears_on_a_safety_card(self):
+        """Not a crime against residents, not a signal about the area, and
+        reporting suicides by neighbourhood is what press guidelines on suicide
+        reporting specifically caution against."""
+        result = characterise_crime(
+            [incident("suicide")] * 5 + [incident("theft")] * 4
+        )
+        assert result is not None
+        assert "suicide" not in result.lower()
+
+    def test_policing_complaints_are_excluded(self):
+        """They describe an institution's conduct, not risk to a resident, and
+        they cluster wherever a police station happens to be."""
+        assert is_excluded("illegal arrest")
+        assert is_excluded("police misconduct")
+        assert is_excluded("custodial death")
+        assert not is_excluded("assault")
+
+    def test_excluded_items_are_not_in_the_denominator(self):
+        """"6 of 33" counted excluded items in the total, understating how
+        concentrated the real incidents were."""
+        result = characterise_crime(
+            [incident("assault")] * 4 + [incident("theft")] * 2 + [incident("suicide")] * 20
+        )
+        assert result is not None
+        assert "of 6" in result
+        assert "33" not in result and "26" not in result
+
+    def test_excluded_only_yields_nothing(self):
+        assert characterise_crime([incident("suicide")] * 8) is None
 
 
 class TestWater:
