@@ -144,3 +144,53 @@ class TestUdiseParsing:
     )
     def test_name_casing_keeps_acronyms(self, raw, expected):
         assert _titleish(raw) == expected
+
+
+class TestConfidenceRanking:
+    """More evidence must never rank below less.
+
+    Confidence used to key on vintage alone, which inverted the ranking: a
+    locality matched to UDISE inherited the 2022 snapshot's date and scored LOW,
+    while a locality UDISE had never heard of kept OpenStreetMap's current date
+    and scored MEDIUM. Banashankari — 116 schools with staffing and a known
+    pupil-teacher ratio — was rated below Banaswadi, which had a count of
+    buildings and nothing else.
+    """
+
+    def test_presence_only_is_never_better_than_staffed(self):
+        from datetime import datetime, timedelta, timezone
+
+        from agents.schools.agent import assess_confidence
+
+        now = datetime(2026, 9, 1, tzinfo=timezone.utc)
+        order = {Confidence.LOW: 0, Confidence.MEDIUM: 1, Confidence.HIGH: 2}
+
+        presence_only = assess_confidence(
+            now, has_pass_rates=False, has_staffing=False, now=now
+        )
+        staffed_but_old = assess_confidence(
+            now - timedelta(days=1700), has_pass_rates=False, has_staffing=True, now=now
+        )
+        assert order[presence_only] <= order[staffed_but_old]
+
+    def test_presence_only_is_low_however_fresh(self):
+        from datetime import datetime, timezone
+
+        from agents.schools.agent import assess_confidence
+
+        now = datetime(2026, 9, 1, tzinfo=timezone.utc)
+        assert (
+            assess_confidence(now, has_pass_rates=False, has_staffing=False, now=now)
+            == Confidence.LOW
+        )
+
+    def test_fresh_staffing_still_reaches_medium(self):
+        from datetime import datetime, timezone
+
+        from agents.schools.agent import assess_confidence
+
+        now = datetime(2026, 9, 1, tzinfo=timezone.utc)
+        assert (
+            assess_confidence(now, has_pass_rates=False, has_staffing=True, now=now)
+            == Confidence.MEDIUM
+        )

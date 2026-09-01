@@ -96,16 +96,35 @@ class LocalityResult:
     schools_within_2km: int = 0
 
 
-def assess_confidence(vintage: datetime, *, has_pass_rates: bool, now: Optional[datetime] = None) -> Confidence:
+def assess_confidence(
+    vintage: datetime,
+    *,
+    has_pass_rates: bool,
+    has_staffing: bool = True,
+    now: Optional[datetime] = None,
+) -> Confidence:
     """Confidence for a schools envelope.
 
     Deliberately cannot return HIGH without pass rates, regardless of how fresh
     the UDISE data is — the strategy doc's rule requires both, and enrolment
     counts alone do not describe school quality no matter what year they are from.
+
+    `has_staffing` exists because keying confidence on recency alone inverted the
+    ranking. A locality matched to UDISE inherits that 2022 snapshot's vintage and
+    scored LOW; a locality UDISE has never heard of kept OpenStreetMap's current
+    date and scored MEDIUM. Banashankari, with 116 schools of staffing data and a
+    known pupil-teacher ratio, was rated *below* Banaswadi, which had nothing but
+    a count of buildings.
+
+    Recency is not the only thing confidence means. Knowing a locality has 32
+    schools and nothing else about any of them is thin, however freshly the
+    building was mapped, so presence-only evidence is LOW as well.
     """
     now = now or datetime.now(timezone.utc)
     age = now - vintage
 
+    if not has_staffing:
+        return Confidence.LOW
     if age > MEDIUM_CONFIDENCE_MAX_AGE:
         return Confidence.LOW
     if not has_pass_rates:
@@ -309,7 +328,10 @@ def build_envelope_for_locality(
         data_vintage=vintage if staffing else now,
         h3_cell=locality["h3_cell"],
         confidence=assess_confidence(
-            vintage if staffing else now, has_pass_rates=False, now=now
+            vintage if staffing else now,
+            has_pass_rates=False,
+            has_staffing=bool(staffing),
+            now=now,
         ),
         payload=payload.model_dump(mode="json"),
     )
