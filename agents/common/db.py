@@ -647,9 +647,26 @@ def coverage_stats(conn: psycopg.Connection) -> dict[str, Any]:
         row = cur.fetchone()
 
     with conn.cursor() as cur:
-        # Named separately so the page can list them rather than assert a count.
+        # Only sources currently being served.
+        #
+        # `data_envelope` is keyed by (category, source_name, h3_cell), so when a
+        # category changes source the old rows are superseded rather than
+        # replaced. A plain DISTINCT therefore keeps naming GDELT — which has
+        # been unreachable for days and whose envelopes were all rewritten by
+        # Google News — on a page whose entire claim is that it shows where its
+        # data came from.
+        #
+        # Taking the freshest envelope per (category, cell) first names the
+        # sources actually behind what a visitor can read today.
         cur.execute(
-            "SELECT DISTINCT source_name FROM data_envelope ORDER BY source_name"
+            """
+            SELECT DISTINCT source_name FROM (
+              SELECT DISTINCT ON (category, h3_cell) source_name
+              FROM data_envelope
+              ORDER BY category, h3_cell, fetched_at DESC
+            ) current_sources
+            ORDER BY source_name
+            """
         )
         row["source_names"] = [r["source_name"] for r in cur.fetchall()]
 

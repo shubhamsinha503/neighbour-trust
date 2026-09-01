@@ -52,18 +52,29 @@ export function HomeIntro({ stats }: { stats: CoverageStats | null }) {
 }
 
 function Numbers({ stats }: { stats: CoverageStats }) {
+  // Three numbers describing the work: what we gathered, what we sifted, what
+  // survived being checked. Together they show a funnel rather than a total,
+  // which is the point — a headline count with no screening step behind it is
+  // exactly the kind of figure this product exists to distrust.
+  //
+  // Air quality readings are deliberately not among them. India's regulatory
+  // network has been silent since 2026-08-27, so the stored count is currently
+  // 19 — a fact about CPCB's outage, not about our coverage, and one that would
+  // read as "this product barely works". The outage is disclosed where it
+  // actually bears on a decision: on every air quality card, which says no
+  // regulatory station is reporting and names the low-cost sensor standing in.
   const items: Array<{ value: string; label: string }> = [
     {
       value: stats.schools.toLocaleString("en-IN"),
       label: "schools mapped",
     },
     {
-      value: stats.airReadings.toLocaleString("en-IN"),
-      label: "air quality readings",
-    },
-    {
       value: stats.headlinesScreened.toLocaleString("en-IN"),
       label: "headlines screened",
+    },
+    {
+      value: stats.incidentsConfirmed.toLocaleString("en-IN"),
+      label: "incidents verified",
     },
   ];
 
