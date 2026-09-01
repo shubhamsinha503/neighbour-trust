@@ -219,3 +219,56 @@ class TestAirQualitySummary:
                 "nearest_station_km": 3.4, "aqi_basis": basis,
             }))
             assert "3.4 km" in summary
+
+
+class TestPartialClassification:
+    """A half-assessed locality must not present its count as complete.
+
+    When a run hits the classification cap the unjudged mentions are whichever
+    the query happened to return last, so one locality can be fully assessed and
+    the next only half. Comparing their incident counts then compares how far a
+    batch job got rather than the two places — and the page gave no sign. A real
+    run left 1,439 of 3,439 mentions unjudged exactly this way.
+    """
+
+    def _summary(self, fetched, classified, incidents=5):
+        from agents.orchestrator.agent import _category_summary
+
+        return _category_summary("crime", envelope({
+            "news": {
+                "incidents_12m": incidents,
+                "mentions_fetched": fetched,
+                "mentions_classified": classified,
+                "characterisation": "Mostly property crime — 4 theft.",
+            }
+        }))
+
+    def test_partial_pass_says_it_undercounts(self):
+        summary = self._summary(fetched=100, classified=58)
+        assert "undercounts" in summary
+        assert "58%" in summary
+
+    def test_partial_pass_does_not_show_a_characterisation(self):
+        """Describing the character of incidents from half the evidence claims
+        more than the data supports."""
+        summary = self._summary(fetched=100, classified=58)
+        assert "property crime" not in summary
+
+    def test_complete_pass_is_unaffected(self):
+        summary = self._summary(fetched=100, classified=100)
+        assert "undercounts" not in summary
+        assert "property crime" in summary
+
+    def test_small_shortfall_is_tolerated(self):
+        """A couple of undecided headlines is not a coverage problem."""
+        summary = self._summary(fetched=100, classified=95)
+        assert "undercounts" not in summary
+
+    def test_missing_counts_do_not_trigger_the_warning(self):
+        """Older envelopes predate these fields."""
+        from agents.orchestrator.agent import _category_summary
+
+        summary = _category_summary("crime", envelope({
+            "news": {"incidents_12m": 3, "characterisation": "Mostly property crime."}
+        }))
+        assert "undercounts" not in summary

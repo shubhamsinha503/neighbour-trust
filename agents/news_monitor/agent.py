@@ -166,8 +166,24 @@ def fetch_for_locality(
 CLASSIFY_CONCURRENCY = 8
 
 
+# How many mentions one run may classify.
+#
+# Sized so a full pass finishes in a single run. At 44 localities a fetch
+# produces ~3,400 mentions, and a cap of 2,000 left 1,439 of them unjudged —
+# which is not merely incomplete, it is *biased* incomplete: the unjudged rows
+# are whatever the query returned last, so some localities got their evidence
+# fully assessed and others did not, and the resulting counts are not comparable
+# between them. Counts that cannot be compared are worse than no counts, because
+# nothing on the page says which locality got a full reading.
+#
+# Concurrency is 8 and each call is ~1.5s, so 4,000 is about 12 minutes — well
+# inside the 45-minute job timeout. The cap stays as a guard against an
+# unexpected fetch explosion running up a bill, not as a routine limit.
+CLASSIFY_LIMIT = 4000
+
+
 def classify_pending(
-    conn, classifier: classify_mod.Classifier, *, limit: int = 2000
+    conn, classifier: classify_mod.Classifier, *, limit: int = CLASSIFY_LIMIT
 ) -> ClassifyResult:
     """Judge every unclassified mention.
 

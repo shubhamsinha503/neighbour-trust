@@ -214,6 +214,21 @@ def _category_summary(category: str, envelope: Optional[dict[str, Any]]) -> str:
     if category in ("crime", "water"):
         news = payload.get("news") or {}
         n = news.get("incidents_12m", 0)
+
+        # A partly-classified locality understates its own count, and does so
+        # invisibly. When a run hits its classification cap the leftover mentions
+        # are simply whichever the query returned last, so one locality can be
+        # fully assessed while the next is half assessed — and comparing their
+        # counts then compares how far a batch job got, not the places. Said
+        # plainly rather than left for the reader to not notice.
+        fetched = news.get("mentions_fetched") or 0
+        classified = news.get("mentions_classified") or 0
+        if fetched and classified < fetched * 0.9:
+            pct = round(classified / fetched * 100)
+            return (
+                f"{n} incident(s) so far · only {pct}% of {fetched} articles "
+                f"assessed yet, so this undercounts"
+            )
         # Lead with what kind, not how many — the count is the part distorted by
         # how much press attention a locality gets.
         described = news.get("characterisation")
