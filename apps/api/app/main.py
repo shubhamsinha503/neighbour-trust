@@ -11,7 +11,7 @@ Run from the repo root:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 from dotenv import load_dotenv
@@ -66,6 +66,26 @@ class Locality(BaseModel):
     h3_cell: str
     lat: float
     lon: float
+
+
+class CoverageStats(BaseModel):
+    """What this deployment actually holds. Every field is a row count.
+
+    The home page states its own coverage from this rather than from constants,
+    so the claim on the page cannot drift from the database behind it.
+    """
+
+    localities: int
+    cities: int
+    schools: int
+    air_readings: int
+    air_since: Optional[date] = None
+    headlines_screened: int
+    incidents_confirmed: int
+    sources: int
+    source_names: list[str] = []
+    categories_live: int
+    last_update: Optional[datetime] = None
 
 
 class Verdict(BaseModel):
@@ -199,6 +219,13 @@ def _ingest_health(conn: Any, category: str) -> dict[str, Any]:
             )
 
     return info
+
+
+@app.get("/api/v1/stats", response_model=CoverageStats)
+def get_stats() -> dict[str, Any]:
+    """Coverage figures for the home page. Cheap — ten counts on indexed tables."""
+    with db.connect() as conn:
+        return db.coverage_stats(conn)
 
 
 @app.get("/api/v1/localities", response_model=list[Locality])

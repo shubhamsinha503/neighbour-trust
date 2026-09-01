@@ -224,6 +224,35 @@ def classify_pending(
 # ---------------------------------------------------------------------------
 
 
+def attribution(contributing: list[str]) -> tuple[str, Optional[str]]:
+    """Which source to credit for a locality's press coverage.
+
+    Derived from the mentions actually stored, not from a constant. This shipped
+    wrong: the envelope named GDELT unconditionally while every article in the
+    database had come from Google News, so the UI credited a source that had been
+    unreachable for days. On a product whose stated differentiator is showing
+    where its data came from, that is not a cosmetic bug.
+
+    Both sources are attempted every run and they fail independently, so which
+    one supplied a given locality is a fact about the data rather than a property
+    of the code.
+    """
+    known = {
+        gnews_src.SOURCE_NAME: gnews_src.SOURCE_URL,
+        gdelt_src.SOURCE_NAME: gdelt_src.SOURCE_URL,
+    }
+    named = [s for s in contributing if s]
+    if not named:
+        # No mentions to attribute. build_envelope returns early in that case, so
+        # this is only reachable if rows exist with no source recorded.
+        return gnews_src.SOURCE_NAME, gnews_src.SOURCE_URL
+
+    # One source: name it and link it. Several: name all, and link only if they
+    # agree on a destination — a single URL cannot stand for two.
+    urls = {known.get(s) for s in named}
+    return " + ".join(sorted(named)), urls.pop() if len(urls) == 1 else None
+
+
 def build_envelope(
     conn, locality: dict[str, Any], *, category: str, now: Optional[datetime] = None
 ) -> LocalityResult:
@@ -283,10 +312,12 @@ def build_envelope(
         else now
     )
 
+    source_name, source_url = attribution(counts.get("sources") or [])
+
     envelope = DataEnvelope(
         category=Category(category),
-        source_name=gdelt_src.SOURCE_NAME,
-        source_url=gdelt_src.SOURCE_URL,
+        source_name=source_name,
+        source_url=source_url,
         fetched_at=now,
         data_vintage=vintage,
         h3_cell=h3_cell,

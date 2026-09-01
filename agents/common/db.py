@@ -562,12 +562,19 @@ def confirmed_incidents(
 def mention_counts(
     conn: psycopg.Connection, *, h3_cell: str, category: str, months: int = 12
 ) -> dict[str, int]:
-    """Fetched / classified / confirmed, so the gap between them stays visible."""
+    """Fetched / classified / confirmed, so the gap between them stays visible.
+
+    Also returns which sources the mentions actually came from. The envelope used
+    to name its source statically, and so credited GDELT for every article Google
+    News had fetched — on a product whose entire claim is that it shows where its
+    data came from.
+    """
     row = conn.execute(
         """
         SELECT COUNT(*) AS fetched,
                COUNT(*) FILTER (WHERE classified_at IS NOT NULL) AS classified,
-               COUNT(*) FILTER (WHERE is_locality_specific IS TRUE) AS confirmed
+               COUNT(*) FILTER (WHERE is_locality_specific IS TRUE) AS confirmed,
+               ARRAY_AGG(DISTINCT source_name) AS sources
         FROM news_mention
         WHERE h3_cell = %s
           AND category = %s::category_t
@@ -575,7 +582,10 @@ def mention_counts(
         """,
         (h3_cell, category, months),
     ).fetchone()
-    return {k: int(v or 0) for k, v in row.items()}
+    sources = [s for s in (row.pop("sources", None) or []) if s]
+    counts: dict[str, Any] = {k: int(v or 0) for k, v in row.items()}
+    counts["sources"] = sorted(sources)
+    return counts
 
 
 def latest_envelope_by_source(
@@ -600,3 +610,47 @@ def latest_envelope_by_source(
         """,
         (category, h3_cell, source_name),
     ).fetchone()
+
+
+def coverage_stats(conn: psycopg.Connection) -> dict[str, Any]:
+    """Live counts describing how much this deployment actually knows.
+
+    Exists so the home page can state its own coverage without anyone hardcoding
+    a number that quietly goes stale. Every figure here is a count of rows we
+    hold, not a marketing figure — per docs/strategy.md, the differentiator is
+    "being the one that shows its work", and a made-up number on the page that
+    does the credibility work would undo exactly that.
+
+    Deliberately absent: anything about users, views or residents. The mockup
+    sketched "184 verified residents" and "2.3K buyers viewed this month" as
+    social proof, and both are real mechanisms — but resident reporting does not
+    exist yet, so those numbers would be invented.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+              (SELECT count(*) FROM locality)                       AS localities,
+              (SELECT count(DISTINCT city) FROM locality)           AS cities,
+              (SELECT count(*) FROM school)                         AS schools,
+              (SELECT count(*) FROM aq_observation)                 AS air_readings,
+              (SELECT min(observed_at)::date FROM aq_observation)   AS air_since,
+              (SELECT count(*) FROM news_mention)                   AS headlines_screened,
+              (SELECT count(*) FROM news_mention
+                 WHERE is_locality_specific)                        AS incidents_confirmed,
+              (SELECT count(DISTINCT source_name) FROM data_envelope) AS sources,
+              (SELECT count(DISTINCT category) FROM data_envelope)  AS categories_live,
+              (SELECT max(finished_at) FROM ingest_run
+                 WHERE status = 'ok' AND localities_ok > 0)         AS last_update
+            """
+        )
+        row = cur.fetchone()
+
+    with conn.cursor() as cur:
+        # Named separately so the page can list them rather than assert a count.
+        cur.execute(
+            "SELECT DISTINCT source_name FROM data_envelope ORDER BY source_name"
+        )
+        row["source_names"] = [r["source_name"] for r in cur.fetchall()]
+
+    return row

@@ -1,32 +1,43 @@
+import { HomeIntro } from "@/components/HomeIntro";
 import { LocalitySearch } from "@/components/LocalitySearch";
-import { fetchLocalities, type Locality } from "@/lib/api";
+import {
+  fetchLocalities,
+  fetchStats,
+  type CoverageStats,
+  type Locality,
+} from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   let localities: Locality[] = [];
+  let stats: CoverageStats | null = null;
   let error: string | null = null;
 
-  try {
-    localities = await fetchLocalities();
-  } catch {
+  // Fetched together — the page needs both and they are independent.
+  const [localityResult, statsResult] = await Promise.allSettled([
+    fetchLocalities(),
+    fetchStats(),
+  ]);
+
+  if (localityResult.status === "fulfilled") {
+    localities = localityResult.value;
+  } else {
     error =
       "Couldn't reach the API. Start it with: uvicorn apps.api.app.main:app --reload";
+  }
+
+  // Stats are decoration on top of the list; losing them must not cost the page.
+  // HomeIntro renders without them.
+  if (statsResult.status === "fulfilled") {
+    stats = statsResult.value;
   }
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
       <MapHero />
 
-      <h1 className="mt-6 text-[23px] font-bold tracking-[-0.01em]">
-        Neighbour Trust
-      </h1>
-      <p className="mt-1 text-[12.5px] leading-[1.55] text-ink-secondary">
-        Sourced, confidence-tagged neighbourhood data for{" "}
-        {localities.length > 0 ? localities.length : ""} localities across
-        Bengaluru and Gurugram. Every figure says where it came from and how old
-        it is.
-      </p>
+      <HomeIntro stats={stats} />
 
       {error ? (
         <div className="mt-6 rounded-2xl border border-hairline bg-surface-1 p-4 text-[12px] text-ink-secondary">

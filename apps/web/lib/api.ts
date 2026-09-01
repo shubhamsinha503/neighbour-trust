@@ -334,3 +334,46 @@ export async function fetchReport(slug: string): Promise<LocalityReport> {
     generatedAt: raw.generated_at,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Coverage stats — the home page's credibility numbers
+// ---------------------------------------------------------------------------
+
+export interface CoverageStats {
+  localities: number;
+  cities: number;
+  schools: number;
+  airReadings: number;
+  airSince?: string;
+  headlinesScreened: number;
+  incidentsConfirmed: number;
+  sources: number;
+  sourceNames: string[];
+  categoriesLive: number;
+  lastUpdate?: string;
+}
+
+export async function fetchStats(): Promise<CoverageStats> {
+  // Ten row counts. Five minutes of cache keeps the home page off the database
+  // on every visit without the numbers ever being meaningfully wrong.
+  const response = await fetch(`${API_BASE}/api/v1/stats`, {
+    next: { revalidate: 300 },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load stats (${response.status})`);
+  }
+  const raw = (await response.json()) as Record<string, any>;
+  return {
+    localities: raw.localities ?? 0,
+    cities: raw.cities ?? 0,
+    schools: raw.schools ?? 0,
+    airReadings: raw.air_readings ?? 0,
+    airSince: raw.air_since ?? undefined,
+    headlinesScreened: raw.headlines_screened ?? 0,
+    incidentsConfirmed: raw.incidents_confirmed ?? 0,
+    sources: raw.sources ?? 0,
+    sourceNames: raw.source_names ?? [],
+    categoriesLive: raw.categories_live ?? 0,
+    lastUpdate: raw.last_update ?? undefined,
+  };
+}

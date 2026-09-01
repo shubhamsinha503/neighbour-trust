@@ -153,3 +153,47 @@ class TestDispatch:
 
     def test_threshold_is_shared(self):
         assert MIN_FOR_PATTERN >= 3
+
+
+class TestSourceAttribution:
+    """The envelope must credit the source that actually fetched the articles.
+
+    This shipped wrong: the news envelope named GDELT as its source
+    unconditionally, while every article in the database had come from Google
+    News — a source that had been unreachable for days. On a product whose
+    stated differentiator is showing where its data came from, crediting the
+    wrong source is not a cosmetic bug.
+    """
+
+    def test_credits_the_source_that_fetched(self):
+        from agents.news_monitor.agent import attribution
+
+        name, url = attribution(["Google News"])
+        assert name == "Google News"
+        assert url == "https://news.google.com/"
+
+    def test_does_not_credit_a_source_that_contributed_nothing(self):
+        from agents.news_monitor.agent import attribution
+
+        name, _ = attribution(["Google News"])
+        assert "GDELT" not in name
+
+    def test_names_every_contributing_source(self):
+        from agents.news_monitor.agent import attribution
+
+        name, _ = attribution(["Google News", "GDELT"])
+        assert "Google News" in name and "GDELT" in name
+
+    def test_no_link_when_sources_disagree_on_one(self):
+        """A single source_url cannot honestly stand for two different sources."""
+        from agents.news_monitor.agent import attribution
+
+        _, url = attribution(["Google News", "GDELT"])
+        assert url is None
+
+    def test_ordering_is_stable(self):
+        from agents.news_monitor.agent import attribution
+
+        assert attribution(["GDELT", "Google News"])[0] == attribution(
+            ["Google News", "GDELT"]
+        )[0]
