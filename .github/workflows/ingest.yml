@@ -115,8 +115,14 @@ jobs:
 
       - name: Run news monitor
         if: steps.which.outputs.agent == 'news_monitor' || steps.which.outputs.agent == 'all'
+        # `inputs.reclassify == true` rather than a bare truthiness check.
+        # GitHub expressions treat any non-empty string as true, and a boolean
+        # input does not always arrive as a boolean — from a schedule or the API
+        # it can be the string "false", which would silently enable a flag that
+        # queues several thousand paid re-judgements. The explicit comparison is
+        # false for "false", for null, and for an absent input.
         run: |
-          python -m agents.news_monitor.run             ${{ inputs.reclassify && '--reclassify' || '' }}
+          python -m agents.news_monitor.run             ${{ inputs.reclassify == true && '--reclassify' || '' }}
 
       - name: Report ingestion health
         # Always runs, so a failed agent still leaves a readable summary rather
