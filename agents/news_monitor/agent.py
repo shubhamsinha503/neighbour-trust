@@ -40,6 +40,7 @@ from neighbour_trust_schema.envelope import (
 
 from agents.common import db
 from agents.news_monitor import characterise as characterise_mod
+from agents.news_monitor import exclusions as exclusions_mod
 from agents.news_monitor import classify as classify_mod
 from agents.news_monitor.sources import gdelt as gdelt_src
 from agents.news_monitor.sources import google_news as gnews_src
@@ -281,6 +282,16 @@ def build_envelope(
     incidents = db.confirmed_incidents(
         conn, h3_cell=h3_cell, category=category, months=LOOKBACK_MONTHS
     )
+
+    # Drop headlines confirmed by the classifier that name this locality without
+    # being about it. Applied here rather than at classification so a correction
+    # takes effect on the next ordinary run instead of requiring — and paying
+    # for — a full re-judgement of the corpus.
+    incidents, excluded = exclusions_mod.filter_incidents(
+        incidents, locality=locality["name"]
+    )
+    for title, reason in excluded:
+        log.info("[%s/%s] excluded: %s (%s)", slug, category, title[:70], reason)
 
     if counts["fetched"] == 0:
         return LocalityResult(
