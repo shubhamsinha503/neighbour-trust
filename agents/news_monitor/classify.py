@@ -152,6 +152,8 @@ IN the named locality.
 
 Answer false when the headline is:
 - about a different place that merely shares a name, or a different city entirely
+- using the locality name as part of a PERSON'S name rather than as a place. Indian news routinely identifies people by their town: "Monu Manesar" is a man, not the town of Manesar, and a murder case he is involved in is not a murder in Manesar. Ask whether the name is naming a person or locating an event.
+- about a NATIONAL INSTITUTION that happens to sit in the locality — a defence establishment, a central training academy, a university, a large factory or industrial estate. These generate statewide and national coverage that says nothing about the streets around them. A labour dispute at an industrial estate, or a course run at a training centre, is not a neighbourhood incident.
 - city-wide or state-wide policy, budgets, announcements, launches, or surveys
 - an opinion piece, listicle, property advertisement, or event listing
 - about the locality but with no incident (a restaurant opening, a traffic diversion)
@@ -159,8 +161,12 @@ Answer false when the headline is:
 Answer true only when a real event occurred in that locality: a theft, an \
 assault, a water shortage, a burst pipeline, flooding, and so on.
 
-Be conservative. A false positive becomes a number on a buyer's safety card that \
-nothing else supports."""
+Be conservative, and weigh the two errors differently. Missing a real incident \
+costs one data point among many. A false positive becomes a number on a safety \
+card telling someone a neighbourhood is dangerous, and these compound: a single \
+nationally-covered story about a man named after a town produced 25 murders for \
+a locality of a few thousand people. When the connection to the locality is not \
+clear from the headline itself, answer false."""
 
 
 class ClaudeClassifier:

@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from agents.common import db
 from agents.news_monitor import job as news_job  # noqa: E402
 
 
@@ -33,6 +34,25 @@ def main(argv: Optional[list[str]] = None) -> int:
         "--no-claude",
         action="store_true",
         help="Use the heuristic classifier even if a key is available.",
+    )
+    parser.add_argument(
+        "--reclassify",
+        action="store_true",
+        help=(
+            "Re-judge every already-classified mention. Needed after a classifier "
+            "change: judged mentions are normally never revisited, so a prompt fix "
+            "otherwise leaves the verdicts it was written to correct in place. "
+            "Costs a full classification pass."
+        ),
+    )
+    parser.add_argument(
+        "--reclassify-from",
+        metavar="PREFIX",
+        help=(
+            "Re-judge only mentions decided by classifiers matching this prefix, "
+            "e.g. 'heuristic'. Cheaper than --reclassify when only part of the "
+            "corpus needs revisiting."
+        ),
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--verbose", "-v", action="store_true")
@@ -58,6 +78,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         f"Classifier: {'Claude' if using_claude else 'heuristic'}"
         f"{'' if has_key else '  (ANTHROPIC_API_KEY not set)'}\n"
     )
+
+    if args.reclassify or args.reclassify_from:
+        # Explicit and loud. Every cleared row is re-judged at full price on the
+        # pass that follows, so this must never be something a run does quietly.
+        prefix = args.reclassify_from
+        with db.connect() as conn:
+            cleared = db.clear_classifications(conn, classifier_prefix=prefix)
+            conn.commit()
+        scope = f"judged by {prefix}*" if prefix else "previously judged"
+        print(f"Re-classifying: cleared {cleared} mentions {scope}.")
+        print("These are re-judged below at full classification cost.\n")
 
     try:
         outcome = news_job.run_once(

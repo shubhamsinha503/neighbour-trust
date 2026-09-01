@@ -690,3 +690,41 @@ def coverage_by_cell(conn: psycopg.Connection) -> dict[str, int]:
         """
     ).fetchall()
     return {r["h3_cell"]: int(r["n"]) for r in rows}
+
+
+def clear_classifications(
+    conn: psycopg.Connection, *, classifier_prefix: Optional[str] = None
+) -> int:
+    """Mark classified mentions as unjudged so the next run re-decides them.
+
+    Classification is idempotent by design — a judged mention is never re-judged,
+    which is what keeps a re-run cheap and makes a timeout survivable. The cost
+    is that improving the classifier does nothing for anything already stored:
+    the verdicts that a prompt fix was written to correct are exactly the ones
+    protected from being revisited.
+
+    So correcting them has to be deliberate and explicit. This is that lever, and
+    it is not cheap to pull — every cleared row is re-judged at full price on the
+    next run.
+
+    `classifier_prefix` limits the reset to rows judged by one classifier, so a
+    heuristic backfill can be redone without paying to re-judge Claude's work.
+    """
+    if classifier_prefix:
+        result = conn.execute(
+            """
+            UPDATE news_mention
+            SET classified_at = NULL, is_locality_specific = NULL
+            WHERE classified_at IS NOT NULL AND classifier LIKE %s
+            """,
+            (f"{classifier_prefix}%",),
+        )
+    else:
+        result = conn.execute(
+            """
+            UPDATE news_mention
+            SET classified_at = NULL, is_locality_specific = NULL
+            WHERE classified_at IS NOT NULL
+            """
+        )
+    return result.rowcount

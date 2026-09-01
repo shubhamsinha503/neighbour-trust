@@ -33,6 +33,15 @@ on:
         default: air_quality
         type: choice
         options: [air_quality, schools, news_monitor, all]
+      reclassify:
+        description: >-
+          Re-judge every stored headline (news_monitor only). Needed after a
+          classifier change: judged mentions are never revisited, so a prompt
+          fix leaves the verdicts it was written to correct in place. Costs a
+          full classification pass — leave off for routine runs.
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   # A slow run must never overlap the next one — the agents upsert, so an
@@ -106,7 +115,8 @@ jobs:
 
       - name: Run news monitor
         if: steps.which.outputs.agent == 'news_monitor' || steps.which.outputs.agent == 'all'
-        run: python -m agents.news_monitor.run
+        run: |
+          python -m agents.news_monitor.run             ${{ inputs.reclassify && '--reclassify' || '' }}
 
       - name: Report ingestion health
         # Always runs, so a failed agent still leaves a readable summary rather
