@@ -157,7 +157,14 @@ def healthz() -> dict[str, Any]:
     is reported separately so a productive-but-old system can be told apart from
     a busy-but-empty one.
     """
-    categories = ("air_quality", "schools")
+    # Every category with a scheduled agent behind it.
+    #
+    # "crime" was missing, so the news agent — which writes both crime and water
+    # — was invisible here. Two news runs were triggered without any way to see
+    # from /healthz whether either had happened, which is precisely the question
+    # this endpoint exists to answer. The news agent records its runs under
+    # "crime"; "water" comes from the same pass and would double-count it.
+    categories = ("air_quality", "schools", "crime")
     try:
         with db.connect() as conn:
             count = conn.execute("SELECT COUNT(*) AS n FROM locality").fetchone()["n"]
@@ -185,6 +192,11 @@ def healthz() -> dict[str, Any]:
 _STALE_AFTER = {
     "air_quality": timedelta(hours=2, minutes=30),
     "schools": timedelta(days=15),
+    # News runs daily at 04:23 UTC. A flat 24 hours would flip this to stale in
+    # the minutes before each run and clear it again straight after, so the
+    # threshold carries a day of headroom: it should fire when a run has actually
+    # been missed, not when one is merely due.
+    "crime": timedelta(days=2),
 }
 
 
