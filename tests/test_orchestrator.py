@@ -176,3 +176,46 @@ class TestReconcile:
             }),
         })
         assert found[0].severity == "notable"
+
+
+class TestAirQualitySummary:
+    """A number's meaning depends on what produced it.
+
+    Since India's regulatory network stopped publishing on 2026-08-27, every
+    reading we serve comes from a community low-cost sensor measuring PM2.5
+    alone, and one Bengaluru sensor is standing in for a dozen localities that
+    consequently all display the same figure. The card has to say so, or that
+    figure reads as a measurement taken in the reader's neighbourhood.
+    """
+
+    def test_regulatory_reading_is_called_an_aqi(self):
+        from agents.orchestrator.agent import _category_summary
+
+        summary = _category_summary("air_quality", envelope({
+            "current_aqi": 96.0, "aqi_band": "moderate",
+            "nearest_station_km": 2.0, "aqi_basis": "24h_rolling",
+        }))
+        assert summary.startswith("AQI 96")
+        assert "low-cost" not in summary
+
+    def test_low_cost_reading_is_not_presented_as_an_aqi(self):
+        from agents.orchestrator.agent import _category_summary
+
+        summary = _category_summary("air_quality", envelope({
+            "current_aqi": 24.5, "aqi_band": "good",
+            "nearest_station_km": 7.97, "aqi_basis": "pm2_5_only",
+        }))
+        assert "low-cost sensor" in summary
+        assert "no regulatory station" in summary
+        # It is a PM2.5 index, not the CPCB National AQI, and must not claim to be.
+        assert not summary.startswith("AQI")
+
+    def test_distance_is_always_shown(self):
+        from agents.orchestrator.agent import _category_summary
+
+        for basis in ("24h_rolling", "pm2_5_only"):
+            summary = _category_summary("air_quality", envelope({
+                "current_aqi": 50.0, "aqi_band": "good",
+                "nearest_station_km": 3.4, "aqi_basis": basis,
+            }))
+            assert "3.4 km" in summary

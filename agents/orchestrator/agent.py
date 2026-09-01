@@ -176,9 +176,25 @@ def _category_summary(category: str, envelope: Optional[dict[str, Any]]) -> str:
 
     if category == "air_quality":
         aqi = payload.get("current_aqi")
+        if aqi is None:
+            return ""
         band = (payload.get("aqi_band") or "").replace("_", " ")
         km = payload.get("nearest_station_km")
-        return f"AQI {round(aqi)} ({band}) · station {km} km away" if aqi is not None else ""
+
+        # Two readings can carry the same number and mean very different things.
+        # A full CPCB AQI from a regulatory monitor is a measurement; a PM2.5-only
+        # value from a community low-cost sensor several kilometres away is an
+        # indication. Since India's regulatory network went quiet on 2026-08-27,
+        # every locality we serve is on the second kind — and a dozen Bengaluru
+        # localities are being served by the *same* sensor, so they all show an
+        # identical figure. Saying "station 8.0 km away" invites that number to be
+        # read as this neighbourhood's air. Naming what produced it does not.
+        if payload.get("aqi_basis") == "pm2_5_only":
+            return (
+                f"PM2.5 index {round(aqi)} ({band}) · low-cost sensor "
+                f"{km} km away, no regulatory station reporting"
+            )
+        return f"AQI {round(aqi)} ({band}) · station {km} km away"
 
     if category == "schools":
         near = payload.get("schools_within_2km", 0)
