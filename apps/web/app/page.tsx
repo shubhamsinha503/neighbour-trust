@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LocalitySearch } from "@/components/LocalitySearch";
 import { fetchLocalities, type Locality } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +14,6 @@ export default async function HomePage() {
       "Couldn't reach the API. Start it with: uvicorn apps.api.app.main:app --reload";
   }
 
-  const cities = groupByCity(localities);
-
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
       <MapHero />
@@ -23,47 +21,22 @@ export default async function HomePage() {
       <h1 className="mt-6 text-[23px] font-bold tracking-[-0.01em]">
         Neighbour Trust
       </h1>
-      <p className="mt-1 text-[12.5px] text-ink-secondary">
-        Sourced, confidence-tagged neighbourhood data. Phase 1: live air quality
-        for Bengaluru and Gurugram.
+      <p className="mt-1 text-[12.5px] leading-[1.55] text-ink-secondary">
+        Sourced, confidence-tagged neighbourhood data for{" "}
+        {localities.length > 0 ? localities.length : ""} localities across
+        Bengaluru and Gurugram. Every figure says where it came from and how old
+        it is.
       </p>
 
-      {error && (
+      {error ? (
         <div className="mt-6 rounded-2xl border border-hairline bg-surface-1 p-4 text-[12px] text-ink-secondary">
           {error}
         </div>
+      ) : (
+        <LocalitySearch localities={localities} />
       )}
-
-      {Object.entries(cities).map(([city, entries]) => (
-        <section key={city} className="mt-8">
-          <h2 className="mb-3 text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
-            {city}
-          </h2>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            {entries.map((locality) => (
-              <Link
-                key={locality.slug}
-                href={`/${locality.slug}`}
-                className="rounded-2xl border border-hairline bg-surface-1 p-3.5 transition-colors hover:border-brand"
-              >
-                <div className="text-[13px] font-semibold">{locality.name}</div>
-                <div className="mt-0.5 text-[11px] text-ink-muted">
-                  {locality.pincode ?? locality.state}
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ))}
     </main>
   );
-}
-
-function groupByCity(localities: Locality[]): Record<string, Locality[]> {
-  return localities.reduce<Record<string, Locality[]>>((acc, locality) => {
-    (acc[locality.city] ??= []).push(locality);
-    return acc;
-  }, {});
 }
 
 /** The map-style hero from the v2 mockup, reduced to its essentials. */
