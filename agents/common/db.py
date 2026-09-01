@@ -671,3 +671,22 @@ def coverage_stats(conn: psycopg.Connection) -> dict[str, Any]:
         row["source_names"] = [r["source_name"] for r in cur.fetchall()]
 
     return row
+
+
+def coverage_by_cell(conn: psycopg.Connection) -> dict[str, int]:
+    """How many categories hold data, per H3 cell.
+
+    Kept out of list_localities deliberately. That function's columns are pinned
+    by tests/test_db_contract.py against get_locality, after the two diverged
+    once and produced a KeyError that only fired on the all-localities path.
+    Coverage is a different question from identity, so it gets its own query
+    rather than widening one whose shape is a contract.
+    """
+    rows = conn.execute(
+        """
+        SELECT h3_cell, COUNT(DISTINCT category) AS n
+        FROM data_envelope
+        GROUP BY h3_cell
+        """
+    ).fetchall()
+    return {r["h3_cell"]: int(r["n"]) for r in rows}

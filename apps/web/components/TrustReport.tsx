@@ -44,8 +44,21 @@ export function TrustReport({ report }: { report: LocalityReport }) {
         <div className="flex items-start gap-4">
           <ScoreMeter trust={trust} />
           <div>
+            {/* What the number is a score *of*.
+             *
+             * The score currently rests on two categories, and across the whole
+             * site it lands between 84 and 97 — dense Indian cities have schools
+             * everywhere, and with the regulatory air network down every locality
+             * reads the same low PM2.5. A bare "94" therefore looks like a verdict
+             * on the neighbourhood while being a statement about two things.
+             *
+             * Naming the basis beside the number costs nothing and is the
+             * difference between a claim and an overclaim. The honesty banner
+             * below gives the weighting; this gives the subject. */}
             <div className="mb-1 text-[10.5px] font-bold uppercase tracking-[0.05em] text-brand">
-              Our take
+              {trust.score === null
+                ? "Our take"
+                : `Based on ${countedLabels(report) || "partial data"}`}
             </div>
             <h2 className="text-[14.5px] font-semibold leading-[1.4] text-ink-primary">
               {report.verdict}
@@ -160,6 +173,17 @@ export function TrustReport({ report }: { report: LocalityReport }) {
     </div>
   );
 }
+
+/** The categories actually behind the number, lowercased for inline use. */
+function countedLabels(report: LocalityReport): string {
+  const labels = report.categories
+    .filter((c) => c.counted)
+    .map((c) => c.label.toLowerCase());
+  if (labels.length === 0) return "";
+  if (labels.length === 1) return labels[0];
+  return labels.slice(0, -1).join(", ") + " and " + labels[labels.length - 1];
+}
+
 
 function ScoreMeter({ trust }: { trust: LocalityReport["trustScore"] }) {
   const radius = 32;

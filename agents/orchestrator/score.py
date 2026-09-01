@@ -48,6 +48,16 @@ CATEGORY_WEIGHTS: dict[str, float] = {
 # with their status, contributing nothing to the number.
 SCOREABLE = ("air_quality", "schools")
 
+# Display names, so copy generated here matches the labels on the cards.
+LABELS = {
+    "schools": "Schools",
+    "crime": "Safety",
+    "air_quality": "Air quality",
+    "water": "Water",
+    "power": "Power",
+    "infrastructure": "Infrastructure",
+}
+
 # Below this share of total weight, no composite is published at all. Two
 # categories out of six is 40% of the weight — thin, but a real signal about air
 # and schools. One category would be a single measurement wearing the word
@@ -153,6 +163,48 @@ STATUS_TEXT = {
 }
 
 
+def _no_score_reason(results: list[CategoryResult]) -> str:
+    """Why there is no composite, without contradicting the page around it.
+
+    This read "Only 1 of 6 categories have data for this locality" on pages that
+    were visibly showing three cards. It was counting *scoreable* categories and
+    calling them *data*, so a reader could see it was wrong — on a product whose
+    entire proposition is that its numbers are trustworthy.
+
+    Scoreable and present are genuinely different things here, and the difference
+    is deliberate: safety and water have data and are excluded from scoring on
+    purpose, because press coverage measures attention rather than incidence.
+    Saying so is more convincing than a bare count.
+    """
+    available = [r for r in results if r.available]
+    scoreable = [r for r in available if r.counted]
+    unscored = [r for r in available if not r.counted]
+
+    if not available:
+        return (
+            "We have no data for this locality yet. Rather than estimate, we "
+            "leave it empty until a source we trust covers it."
+        )
+
+    parts = [
+        f"Only {len(scoreable)} of {len(CATEGORY_WEIGHTS)} categories can be "
+        f"scored here, which is too little to put a single number on."
+    ]
+    if unscored:
+        labels = sorted(LABELS.get(r.category, r.category) for r in unscored)
+        names = (
+            labels[0] if len(labels) == 1
+            else ", ".join(labels[:-1]) + " and " + labels[-1]
+        )
+        parts.append(
+            f"{names} {'has' if len(unscored) == 1 else 'have'} data below, but "
+            f"come from press coverage and are deliberately never scored — how "
+            f"often an area is written about is not how often things happen there."
+        )
+    parts.append("Everything we do know is shown individually below.")
+    return " ".join(parts)
+
+
 def compute(envelopes: dict[str, dict[str, Any]]) -> TrustScore:
     """Composite Trust Score from whatever category envelopes exist.
 
@@ -198,11 +250,7 @@ def compute(envelopes: dict[str, dict[str, Any]]) -> TrustScore:
             categories_counted=counted_n,
             categories_total=len(CATEGORY_WEIGHTS),
             categories=results,
-            reason_unavailable=(
-                f"Only {counted_n} of {len(CATEGORY_WEIGHTS)} categories have data "
-                f"for this locality — too little to put a single number on. The "
-                f"categories we do have are shown individually below."
-            ),
+            reason_unavailable=_no_score_reason(results),
         )
 
     # Renormalise over what was actually counted, so the score reads "out of what

@@ -29,6 +29,8 @@ export interface Locality {
   h3Cell: string;
   lat: number;
   lon: number;
+  /** How many of the six categories hold data here. */
+  categoriesWithData: number;
 }
 
 export interface Verdict {
@@ -123,6 +125,7 @@ function toLocality(raw: Record<string, any>): Locality {
     h3Cell: raw.h3_cell,
     lat: raw.lat,
     lon: raw.lon,
+    categoriesWithData: raw.categories_with_data ?? 0,
   };
 }
 

@@ -111,8 +111,22 @@ export function LocalitySearch({ localities }: { localities: Locality[] }) {
                 className="rounded-2xl border border-hairline bg-surface-1 p-3.5 transition-colors hover:border-brand"
               >
                 <div className="text-[13px] font-semibold">{locality.name}</div>
-                <div className="mt-0.5 text-[11px] text-ink-muted">
-                  {locality.pincode ?? locality.state}
+                <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-muted">
+                  <span>{locality.pincode ?? locality.state}</span>
+                  {/* What this locality actually holds, before the click.
+                    * Coverage is genuinely uneven — some localities have four
+                    * categories, others one — and letting someone discover that
+                    * only after opening the page makes a thin page feel broken
+                    * rather than honest. */}
+                  {locality.categoriesWithData > 0 && (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        {locality.categoriesWithData} categor
+                        {locality.categoriesWithData === 1 ? "y" : "ies"}
+                      </span>
+                    </>
+                  )}
                 </div>
               </Link>
             ))}

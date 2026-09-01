@@ -66,6 +66,12 @@ class Locality(BaseModel):
     h3_cell: str
     lat: float
     lon: float
+    categories_with_data: int = Field(
+        0,
+        description="How many of the six categories hold data here. Shown on the "
+        "index so a visitor can see what a locality offers before opening it, "
+        "rather than discovering it is thin after a click.",
+    )
 
 
 class CoverageStats(BaseModel):
@@ -231,7 +237,11 @@ def get_stats() -> dict[str, Any]:
 @app.get("/api/v1/localities", response_model=list[Locality])
 def get_localities() -> list[dict[str, Any]]:
     with db.connect() as conn:
-        return db.list_localities(conn)
+        localities = db.list_localities(conn)
+        coverage = db.coverage_by_cell(conn)
+    for locality in localities:
+        locality["categories_with_data"] = coverage.get(locality["h3_cell"], 0)
+    return localities
 
 
 @app.get(

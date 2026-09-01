@@ -108,9 +108,17 @@ def _load_envelopes(conn, h3_cell: str) -> dict[str, Any]:
 def _verdict_sentence(trust: score_mod.TrustScore, categories: list[dict[str, Any]]) -> str:
     """The headline. Interpretation first, per the mockup's ordering."""
     if trust.score is None:
+        # Must not contradict the cards below it. "Not enough data yet" was
+        # appearing above three populated categories, which reads as a broken
+        # page rather than a deliberate choice. What is actually missing is
+        # enough *scoreable* data, and that distinction is the point.
+        shown = [c for c in categories if c["available"]]
+        if not shown:
+            return "We have nothing on this locality yet."
         return (
-            "Not enough data yet to give this locality an overall score — "
-            "here is what we do know."
+            f"No overall score for this locality — {len(shown)} categories have "
+            f"data, but too few of them can be scored to justify a single number. "
+            f"Here is what we do know."
         )
 
     scored = [c for c in categories if c["counted"]]

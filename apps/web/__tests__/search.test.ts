@@ -27,6 +27,7 @@ function locality(
     h3Cell: "8961... ",
     lat: 0,
     lon: 0,
+    categoriesWithData: 4,
   };
 }
 
