@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from agents.common import db
+from agents.news_monitor import classify as classify_mod
 from agents.news_monitor import job as news_job  # noqa: E402
 
 
@@ -80,14 +81,45 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
 
     if args.reclassify or args.reclassify_from:
-        # Explicit and loud. Every cleared row is re-judged at full price on the
-        # pass that follows, so this must never be something a run does quietly.
+        # Prove the classifier can answer before queueing anything for it.
+        #
+        # The first version cleared first and classified afterwards. Run against
+        # an account with no quota left, it cleared 3,031 verdicts and judged
+        # none of them. Clearing no longer destroys the old verdict, so that is
+        # survivable now — but queueing 3,000 re-judgements that will all fail is
+        # still a wasted run, and the operator should be told why rather than
+        # discovering it in a summary of zeroes.
+        probe = classify_mod.build_classifier(prefer_claude=not args.no_claude)
+        if probe.name.startswith("heuristic"):
+            print(
+                "Refusing to re-classify: no Claude classifier available "
+                "(ANTHROPIC_API_KEY unset, or --no-claude given). The heuristic "
+                "would replace considered verdicts with keyword matches.",
+                file=sys.stderr,
+            )
+            return 1
+
+        if probe.classify(
+            title="Two held for chain snatching near the market",
+            locality="Koramangala",
+            city="Bengaluru",
+            category="crime",
+        ) is None:
+            print(
+                "Refusing to re-classify: the classifier could not answer a test "
+                "headline. Usually an exhausted quota or an invalid key. Check the "
+                "account before spending a run on it. Nothing was changed.",
+                file=sys.stderr,
+            )
+            return 1
+
         prefix = args.reclassify_from
         with db.connect() as conn:
             cleared = db.clear_classifications(conn, classifier_prefix=prefix)
             conn.commit()
         scope = f"judged by {prefix}*" if prefix else "previously judged"
-        print(f"Re-classifying: cleared {cleared} mentions {scope}.")
+        print(f"Re-classifying: queued {cleared} mentions {scope}.")
+        print("Existing verdicts stand until a new judgement replaces each one.")
         print("These are re-judged below at full classification cost.\n")
 
     try:

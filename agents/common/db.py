@@ -707,6 +707,18 @@ def clear_classifications(
     it is not cheap to pull — every cleared row is re-judged at full price on the
     next run.
 
+    **It does not delete the old verdict.** Only `classified_at` is cleared, which
+    is what `unclassified_mentions` queues on; `is_locality_specific` is left in
+    place until a new judgement overwrites it. That distinction is the difference
+    between a re-judgement and an outage.
+
+    The first version nulled the verdict too. Run against an account with no
+    quota left, it cleared 3,031 stored verdicts, classified none of them, and
+    took every safety and water count on the site to zero — because
+    confirmed_incidents keys off is_locality_specific. Emptying a column before
+    knowing you can refill it is not something to get right by being careful; the
+    operation simply must not destroy what it cannot yet replace.
+
     `classifier_prefix` limits the reset to rows judged by one classifier, so a
     heuristic backfill can be redone without paying to re-judge Claude's work.
     """
@@ -714,7 +726,7 @@ def clear_classifications(
         result = conn.execute(
             """
             UPDATE news_mention
-            SET classified_at = NULL, is_locality_specific = NULL
+            SET classified_at = NULL
             WHERE classified_at IS NOT NULL AND classifier LIKE %s
             """,
             (f"{classifier_prefix}%",),
@@ -723,7 +735,7 @@ def clear_classifications(
         result = conn.execute(
             """
             UPDATE news_mention
-            SET classified_at = NULL, is_locality_specific = NULL
+            SET classified_at = NULL
             WHERE classified_at IS NOT NULL
             """
         )
