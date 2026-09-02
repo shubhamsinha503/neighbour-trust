@@ -120,6 +120,16 @@ jobs:
         if: steps.which.outputs.agent == 'schools' || steps.which.outputs.agent == 'all'
         run: python -m agents.schools.run
 
+      - name: Check the classifier
+        # Only for news runs, and never fatal. It names *why* a classifier is
+        # unusable — a rejected key, a decommissioned model and a spent quota all
+        # surface as "could not answer a test headline", and the fix differs for
+        # each. Three seconds here saves reading a fifteen-minute run to learn
+        # the same thing less precisely.
+        if: steps.which.outputs.agent == 'news_monitor' || steps.which.outputs.agent == 'all'
+        continue-on-error: true
+        run: python -m scripts.check_classifier
+
       - name: Run news monitor
         if: steps.which.outputs.agent == 'news_monitor' || steps.which.outputs.agent == 'all'
         # `inputs.reclassify == true` rather than a bare truthiness check.

@@ -321,6 +321,14 @@ class GroqClassifier:
         self._client = OpenAI(api_key=key, base_url="https://api.groq.com/openai/v1")
         self.name = f"groq:{self._model}"
 
+        # A classifier that declines is indistinguishable from one that is
+        # broken, and both look like "could not answer a test headline". The
+        # first failure of a run is reported in full so the cause is visible —
+        # a decommissioned model, a rejected key and a rate limit are three
+        # different problems with three different fixes. Later failures stay
+        # quiet so a thousand-headline run does not bury its own summary.
+        self._reported_failure = False
+
     def classify(
         self, *, title: str, locality: str, city: str, category: str
     ) -> Optional[Judgement]:
@@ -353,14 +361,14 @@ class GroqClassifier:
         except Exception as exc:
             # Declining to decide, not deciding wrongly. The mention stays
             # unclassified and is excluded from every count.
-            log.debug("groq classify failed for %r: %s", title[:60], exc)
+            self._report(exc)
             return None
 
         raw = (response.choices[0].message.content or "").strip()
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
-            log.debug("groq returned unparseable JSON for %r: %s", title[:60], raw[:120])
+            self._report(f"returned unparseable JSON: {raw[:160]!r}")
             return None
 
         verdict = data.get("is_locality_specific")
