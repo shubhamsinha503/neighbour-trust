@@ -329,6 +329,30 @@ class GroqClassifier:
         # quiet so a thousand-headline run does not bury its own summary.
         self._reported_failure = False
 
+    def _report(self, problem: object) -> None:
+        """Say what went wrong, once per run.
+
+        A classifier that declines is indistinguishable from one that is broken:
+        both surface as "could not answer a test headline", and a rejected key, a
+        decommissioned model, a spent quota and a malformed response are four
+        different problems with four different fixes. The first failure of a run
+        is reported in full; the rest stay at DEBUG so a thousand-headline run
+        does not bury its own summary.
+        """
+        if self._reported_failure:
+            log.debug("groq: %s", problem)
+            return
+        self._reported_failure = True
+        log.warning(
+            "Groq (%s) failed: %s\n"
+            "  If this names a decommissioned model, set the GROQ_MODEL "
+            "repository variable to a current id from "
+            "https://console.groq.com/docs/models",
+            self._model,
+            problem,
+        )
+
+
     def classify(
         self, *, title: str, locality: str, city: str, category: str
     ) -> Optional[Judgement]:

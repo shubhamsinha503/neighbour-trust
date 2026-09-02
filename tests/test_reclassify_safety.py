@@ -212,3 +212,60 @@ class TestVerdictParsing:
         ).read_text(encoding="utf-8")
         groq = source[source.index("class GroqClassifier") :]
         assert 'raw.startswith("```")' in groq
+
+
+class TestClassifiersAreWellFormed:
+    """Every method a classifier calls on itself must exist.
+
+    GroqClassifier shipped with three calls to self._report and no _report
+    method. Nothing caught it: the calls sit on error paths, so the class
+    imports, constructs, and only fails when something else has already gone
+    wrong — turning a diagnosable API error into
+    "AttributeError: no attribute '_report'" at exactly the moment the real
+    reason was needed.
+    """
+
+    def test_every_self_call_resolves(self):
+        import ast
+        import pathlib
+
+        source = pathlib.Path("agents/news_monitor/classify.py").read_text(
+            encoding="utf-8"
+        )
+        tree = ast.parse(source)
+
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef):
+                continue
+
+            defined = {
+                item.name
+                for item in node.body
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+            } | {
+                target.id
+                for item in node.body
+                if isinstance(item, ast.Assign)
+                for target in item.targets
+                if isinstance(target, ast.Name)
+            }
+
+            # Attributes assigned in __init__ count as defined.
+            for item in ast.walk(node):
+                if isinstance(item, ast.Attribute) and isinstance(
+                    item.ctx, ast.Store
+                ):
+                    if isinstance(item.value, ast.Name) and item.value.id == "self":
+                        defined.add(item.attr)
+
+            used = {
+                item.attr
+                for item in ast.walk(node)
+                if isinstance(item, ast.Attribute)
+                and isinstance(item.ctx, ast.Load)
+                and isinstance(item.value, ast.Name)
+                and item.value.id == "self"
+            }
+
+            missing = used - defined
+            assert not missing, f"{node.name} calls undefined self.{missing}"
