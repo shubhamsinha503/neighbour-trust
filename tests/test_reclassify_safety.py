@@ -55,12 +55,18 @@ class TestRefusesWithoutAWorkingClassifier:
         clear_at = RUN_SOURCE.index("db.clear_classifications")
         assert probe_at < clear_at
 
-    def test_heuristic_is_refused(self):
-        assert "no Claude classifier available" in RUN_SOURCE
+    def test_refuses_when_only_the_heuristic_is_available(self):
+        """build_classifier probes each tier, so a heuristic result means every
+        language model is out of quota or misconfigured. Re-classifying then
+        would clear the queue, judge nothing, and leave every card reading
+        "0% assessed" — which is what happened before this check existed."""
+        assert 'probe.name.startswith("heuristic")' in RUN_SOURCE
 
-    def test_a_declining_classifier_is_refused(self):
-        """An unanswered test headline means an exhausted quota or a bad key."""
-        assert "could not answer a test" in RUN_SOURCE
+    def test_refusal_names_both_keys_and_mentions_quota(self):
+        """A missing key and a spent balance look identical from outside the
+        process, and the fix for each is different."""
+        assert "ANTHROPIC_API_KEY or GROQ_API_KEY" in RUN_SOURCE
+        assert "no credit left" in RUN_SOURCE
 
     def test_refusal_states_nothing_changed(self):
         assert "Nothing was changed" in RUN_SOURCE
