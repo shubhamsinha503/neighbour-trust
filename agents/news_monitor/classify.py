@@ -32,6 +32,8 @@ import logging
 import json
 import os
 import re
+import threading
+import time
 from dataclasses import dataclass
 from typing import Optional, Protocol
 
@@ -314,6 +316,22 @@ class GroqClassifier:
     # an account can actually reach, which is the only reliable source for this.
     DEFAULT_MODEL = "qwen/qwen3.8-27b"
 
+    # Groq's free tier meters tokens per minute, not requests, and that is the
+    # binding constraint. Measured against this account:
+    #
+    #   x-ratelimit-limit-tokens: 8000   (per minute)
+    #   one classification:        524   (450 prompt + 74 output)
+    #
+    # which is about fifteen classifications a minute. The system prompt is 450
+    # of those 524 tokens and is resent on every call — Groq has no prompt
+    # caching, so the instructions cost more than the headline they are about.
+    #
+    # Without pacing, eight concurrent workers empty the bucket in roughly two
+    # seconds and spend the rest of the run collecting 429s. A shared minimum
+    # interval serialises them to just under the limit instead, which is slower
+    # per call and far faster overall.
+    CALLS_PER_MINUTE = 14
+
     def __init__(self, model: Optional[str] = None) -> None:
         try:
             from openai import OpenAI  # Groq speaks the OpenAI protocol
@@ -341,6 +359,28 @@ class GroqClassifier:
         # different problems with three different fixes. Later failures stay
         # quiet so a thousand-headline run does not bury its own summary.
         self._reported_failure = False
+
+        # Shared across threads: the limit is per account, not per worker.
+        self._pace_lock = threading.Lock()
+        self._next_call_at = 0.0
+        self._min_interval = 60.0 / max(
+            1, int(os.environ.get("GROQ_CALLS_PER_MINUTE", self.CALLS_PER_MINUTE))
+        )
+
+    def _wait_turn(self) -> None:
+        """Hold each caller until the account's token budget has recovered.
+
+        Deliberately a fixed interval rather than a reactive backoff. Reacting to
+        429s means every worker learns the limit by being refused, and a refusal
+        still costs a round trip and a headline that goes unjudged for the run.
+        Pacing up front spends the same minute doing useful work.
+        """
+        with self._pace_lock:
+            now = time.monotonic()
+            wait = self._next_call_at - now
+            self._next_call_at = max(now, self._next_call_at) + self._min_interval
+        if wait > 0:
+            time.sleep(wait)
 
     def _report(self, problem: object) -> None:
         """Say what went wrong, once per run.
@@ -374,6 +414,8 @@ class GroqClassifier:
             f"Category: {category}\n"
             f"Headline: {title}"
         )
+
+        self._wait_turn()
 
         try:
             response = self._client.chat.completions.create(

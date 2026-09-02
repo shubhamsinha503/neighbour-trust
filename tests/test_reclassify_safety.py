@@ -269,3 +269,61 @@ class TestClassifiersAreWellFormed:
 
             missing = used - defined
             assert not missing, f"{node.name} calls undefined self.{missing}"
+
+
+class TestGroqPacing:
+    """The free tier meters tokens per minute, and that is the binding limit.
+
+    Measured on a real account: 8,000 tokens/minute, and one classification
+    costs 524 (450 of them the system prompt, resent every call because Groq has
+    no prompt caching). That is about fifteen classifications a minute. Eight
+    concurrent workers would empty the bucket in two seconds and spend the rest
+    of the run collecting 429s.
+    """
+
+    SOURCE = __import__("pathlib").Path(
+        "agents/news_monitor/classify.py"
+    ).read_text(encoding="utf-8")
+
+    def test_a_rate_is_declared(self):
+        from agents.news_monitor.classify import GroqClassifier
+
+        assert 0 < GroqClassifier.CALLS_PER_MINUTE <= 15
+
+    def test_every_call_waits_its_turn(self):
+        groq = self.SOURCE[self.SOURCE.index("class GroqClassifier") :]
+        body = groq[: groq.index("def _as_bool")]
+        assert body.index("self._wait_turn()") < body.index(
+            "self._client.chat.completions.create"
+        )
+
+    def test_pacing_is_shared_across_threads(self):
+        """The limit is per account, not per worker, so the interval has to be
+        held under a lock the workers share."""
+        assert "self._pace_lock = threading.Lock()" in self.SOURCE
+
+    def test_the_rate_is_overridable(self):
+        """Limits differ per account and per model, and a wrong constant should
+        not need a code change."""
+        assert "GROQ_CALLS_PER_MINUTE" in self.SOURCE
+
+    def test_pacing_holds_under_concurrency(self):
+        import threading
+        import time
+        from concurrent.futures import ThreadPoolExecutor
+
+        from agents.news_monitor.classify import GroqClassifier
+
+        # Exercise the pacing without constructing a client or needing a key.
+        paced = object.__new__(GroqClassifier)
+        paced._pace_lock = threading.Lock()
+        paced._next_call_at = 0.0
+        paced._min_interval = 0.05
+
+        started = time.monotonic()
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(lambda _: paced._wait_turn(), range(8)))
+        elapsed = time.monotonic() - started
+
+        # Seven gaps between eight calls, allowing for scheduler slop.
+        assert elapsed >= 0.05 * 7 * 0.8, elapsed
