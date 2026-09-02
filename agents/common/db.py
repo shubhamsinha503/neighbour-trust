@@ -740,3 +740,39 @@ def clear_classifications(
             """
         )
     return result.rowcount
+
+
+def classification_state(conn: psycopg.Connection) -> dict[str, Any]:
+    """Counts describing where every mention sits in the classify pipeline.
+
+    Added because two rounds of reasoning about this from the outside produced
+    two wrong explanations. The site reports "0% assessed" on every locality
+    while 792 verdicts are stored, and those cannot both be true unless some
+    column is in a state nobody predicted. Rather than infer it from run logs
+    again, ask.
+
+    Read-only, and cheap: five counts on one indexed table.
+    """
+    row = conn.execute(
+        """
+        SELECT
+          COUNT(*)                                                 AS mentions,
+          COUNT(*) FILTER (WHERE classifier IS NOT NULL)           AS ever_judged,
+          COUNT(*) FILTER (WHERE classified_at IS NOT NULL)        AS marked_classified,
+          COUNT(*) FILTER (WHERE is_locality_specific IS TRUE)     AS verdict_true,
+          COUNT(*) FILTER (WHERE is_locality_specific IS FALSE)    AS verdict_false,
+          COUNT(*) FILTER (WHERE is_locality_specific IS NULL)     AS verdict_missing,
+          -- The diagnostic pair. A row judged at some point but no longer
+          -- marked classified is what a cleared queue looks like; a judged row
+          -- with no verdict is what the destructive clear used to leave behind.
+          COUNT(*) FILTER (
+            WHERE classifier IS NOT NULL AND classified_at IS NULL
+          )                                                        AS queue_cleared,
+          COUNT(*) FILTER (
+            WHERE classifier IS NOT NULL AND is_locality_specific IS NULL
+          )                                                        AS verdict_lost,
+          COUNT(DISTINCT h3_cell)                                  AS cells
+        FROM news_mention
+        """
+    ).fetchone()
+    return dict(row)

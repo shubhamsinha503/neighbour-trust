@@ -246,6 +246,20 @@ def get_stats() -> dict[str, Any]:
         return db.coverage_stats(conn)
 
 
+@app.get("/debug/classification")
+def get_classification_state() -> dict[str, Any]:
+    """Where every news mention sits in the classify pipeline.
+
+    Operational, not part of the public API. It exists because the pipeline has
+    three independent nullable columns — classifier, classified_at,
+    is_locality_specific — and their combinations distinguish "never judged"
+    from "queued for re-judgement" from "verdict destroyed". Guessing which one
+    a symptom means, from run logs, produced two wrong diagnoses in a row.
+    """
+    with db.connect() as conn:
+        return db.classification_state(conn)
+
+
 @app.get("/api/v1/localities", response_model=list[Locality])
 def get_localities() -> list[dict[str, Any]]:
     with db.connect() as conn:
