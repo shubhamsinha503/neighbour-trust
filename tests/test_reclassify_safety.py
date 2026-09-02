@@ -85,3 +85,44 @@ class TestRepairMigration:
         bill that could not be paid in the first place."""
         sql = self.MIGRATION.read_text(encoding="utf-8").lower()
         assert "classified_at" in sql.split("set", 1)[1].split("where", 1)[0]
+
+
+class TestClassifierFallbackOrder:
+    """Claude, then Groq, then the heuristic.
+
+    The classifier is the only per-item cost in this system, and exhausting it
+    stops the news pipeline dead — it did, leaving 802 headlines unjudged and
+    every safety card reading "0% assessed". A free second tier turns a spent
+    budget into slower work rather than halted work.
+    """
+
+    SOURCE = __import__("pathlib").Path(
+        "agents/news_monitor/classify.py"
+    ).read_text(encoding="utf-8")
+
+    def test_groq_is_tried_before_the_heuristic(self):
+        build = self.SOURCE[self.SOURCE.index("def build_classifier") :]
+        assert build.index("GROQ_API_KEY") < build.index("HeuristicClassifier()")
+
+    def test_claude_is_tried_before_groq(self):
+        build = self.SOURCE[self.SOURCE.index("def build_classifier") :]
+        assert build.index("ANTHROPIC_API_KEY") < build.index("GROQ_API_KEY")
+
+    def test_both_models_share_one_system_prompt(self):
+        """The prompt encodes judgements about the task, not about a model —
+        that "Monu Manesar" names a man, that a labour dispute at an industrial
+        estate is not a neighbourhood incident. A lesson learned from one
+        classifier's mistake should improve both."""
+        groq = self.SOURCE[self.SOURCE.index("class GroqClassifier") :]
+        assert "SYSTEM_PROMPT" in groq[: groq.index("def _clean_type")]
+
+    def test_verdicts_record_which_model_made_them(self):
+        """So a mixed corpus stays auditable and --reclassify-from can revisit
+        one classifier's work without paying to redo the other's."""
+        assert 'self.name = f"groq:{self._model}"' in self.SOURCE
+
+    def test_an_unparseable_answer_declines_rather_than_guesses(self):
+        groq = self.SOURCE[self.SOURCE.index("class GroqClassifier") :]
+        body = groq[: groq.index("def _clean_type")]
+        assert "JSONDecodeError" in body
+        assert "isinstance(verdict, bool)" in body

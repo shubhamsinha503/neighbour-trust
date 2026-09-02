@@ -29,6 +29,7 @@ being counted either way.
 from __future__ import annotations
 
 import logging
+import json
 import os
 import re
 from dataclasses import dataclass
@@ -274,6 +275,109 @@ class ClaudeClassifier:
         )
 
 
+class GroqClassifier:
+    """Judges headlines through Groq's API.
+
+    Exists because the classifier is the one part of this system with a per-item
+    cost, and running out of credit stops the news pipeline dead — which it did,
+    leaving 802 headlines unjudged and every safety card reading "0% assessed".
+    Groq's free tier removes that as a single point of failure.
+
+    It shares the system prompt with the Claude classifier deliberately. The
+    prompt encodes hard-won judgements — that "Monu Manesar" is a man rather than
+    a town, that a labour dispute at an industrial estate is not a neighbourhood
+    incident — and those are properties of the task, not of the model. Keeping one
+    prompt means a lesson learned from one classifier's mistake improves both.
+
+    The API is OpenAI-compatible, so this uses the `openai` client pointed at
+    Groq's base URL rather than another SDK.
+
+    Verdicts record which model produced them (`groq:<model>`), so a mixed corpus
+    stays auditable and `--reclassify-from groq` can revisit just these if the
+    quality turns out to be worse than Claude's.
+    """
+
+    # Groq's free tier is rate-limited per minute rather than metered per token,
+    # so the practical limit is request pacing rather than budget.
+    DEFAULT_MODEL = "llama-3.3-70b-versatile"
+
+    def __init__(self, model: Optional[str] = None) -> None:
+        try:
+            from openai import OpenAI  # Groq speaks the OpenAI protocol
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError(
+                "The openai package is not installed. Run: pip install openai"
+            ) from exc
+
+        key = os.environ.get("GROQ_API_KEY")
+        if not key:
+            raise RuntimeError(
+                "GROQ_API_KEY is not set.\n"
+                "Get a free key at: https://console.groq.com/keys\n"
+                "Then add it to .env at the repo root."
+            )
+
+        self._model = model or os.environ.get("GROQ_MODEL", self.DEFAULT_MODEL)
+        self._client = OpenAI(api_key=key, base_url="https://api.groq.com/openai/v1")
+        self.name = f"groq:{self._model}"
+
+    def classify(
+        self, *, title: str, locality: str, city: str, category: str
+    ) -> Optional[Judgement]:
+        prompt = (
+            f"Locality: {locality}, {city}\n"
+            f"Category: {category}\n"
+            f"Headline: {title}"
+        )
+
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                max_tokens=256,
+                temperature=0,
+                # JSON mode rather than a free-text answer parsed with a regex.
+                # A classifier whose output format can drift fails silently.
+                response_format={"type": "json_object"},
+                messages=[
+                    {
+                        "role": "system",
+                        "content": SYSTEM_PROMPT
+                        + "\n\nRespond with JSON only, in exactly this shape:\n"
+                        '{"is_locality_specific": true|false, '
+                        '"incident_type": "short_snake_case" or null, '
+                        '"reason": "one short sentence"}',
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+            )
+        except Exception as exc:
+            # Declining to decide, not deciding wrongly. The mention stays
+            # unclassified and is excluded from every count.
+            log.debug("groq classify failed for %r: %s", title[:60], exc)
+            return None
+
+        raw = (response.choices[0].message.content or "").strip()
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            log.debug("groq returned unparseable JSON for %r: %s", title[:60], raw[:120])
+            return None
+
+        verdict = data.get("is_locality_specific")
+        if not isinstance(verdict, bool):
+            # A model that will not commit to true or false has not classified
+            # anything, and coercing a string here is how a "maybe" becomes a
+            # number on a safety card.
+            return None
+
+        return Judgement(
+            is_locality_specific=verdict,
+            incident_type=_clean_type(data.get("incident_type")),
+            reason=str(data.get("reason") or "")[:400],
+            classifier=self.name,
+        )
+
+
 def _clean_type(raw: object) -> Optional[str]:
     if not raw or not isinstance(raw, str):
         return None
@@ -282,15 +386,36 @@ def _clean_type(raw: object) -> Optional[str]:
 
 
 def build_classifier(prefer_claude: bool = True) -> Classifier:
-    """The best classifier available, falling back loudly rather than silently."""
+    """The best classifier available, falling back loudly rather than silently.
+
+    Claude, then Groq, then the heuristic. The first two are both language models
+    reading the same system prompt; the third is keyword matching that declines to
+    decide most of the time, and dropping to it is a material loss of quality
+    rather than a graceful degradation — which is why each step down says so.
+
+    Groq is in the middle because it is free. The classifier is the only
+    per-item cost in this system, and exhausting it stops the news pipeline dead:
+    that happened, leaving 802 headlines unjudged and every safety card reading
+    "0% assessed". A free second tier means a spent budget slows the work instead
+    of halting it.
+    """
     if prefer_claude and os.environ.get("ANTHROPIC_API_KEY"):
         try:
             return ClaudeClassifier()
         except Exception as exc:
-            log.warning("Claude classifier unavailable (%s); using heuristic", exc)
-    else:
-        log.warning(
-            "ANTHROPIC_API_KEY not set — using the heuristic classifier. It leaves "
-            "ambiguous headlines unclassified, so incident counts will under-report."
-        )
+            log.warning("Claude classifier unavailable (%s); trying Groq", exc)
+
+    if os.environ.get("GROQ_API_KEY"):
+        try:
+            classifier = GroqClassifier()
+            log.info("Using %s (free tier)", classifier.name)
+            return classifier
+        except Exception as exc:
+            log.warning("Groq classifier unavailable (%s); using heuristic", exc)
+
+    log.warning(
+        "No language-model classifier available (set ANTHROPIC_API_KEY or "
+        "GROQ_API_KEY) — falling back to the heuristic. It leaves ambiguous "
+        "headlines unclassified, so incident counts will under-report."
+    )
     return HeuristicClassifier()

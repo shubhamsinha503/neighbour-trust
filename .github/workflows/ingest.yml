@@ -64,6 +64,13 @@ jobs:
       DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+      # Free-tier fallback for the headline classifier. The classifier is the
+      # only per-item cost here, and exhausting it stops the news pipeline dead
+      # — which it did, leaving 802 headlines unjudged and every safety card
+      # reading "0% assessed". With this set, a spent Anthropic budget slows the
+      # work instead of halting it.
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_MODEL: ${{ vars.GROQ_MODEL }}
       # Optional. Unset means the classifier's own default (claude-opus-5).
       # Worth setting deliberately: a full first pass is ~800 headlines, which
       # is a few dollars on Opus and a fraction of that on Haiku, and short
