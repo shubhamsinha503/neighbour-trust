@@ -297,9 +297,22 @@ class GroqClassifier:
     quality turns out to be worse than Claude's.
     """
 
-    # Groq's free tier is rate-limited per minute rather than metered per token,
-    # so the practical limit is request pacing rather than budget.
-    DEFAULT_MODEL = "llama-3.3-70b-versatile"
+    # Chosen by measurement, not reputation. Groq's free tier serves no Llama
+    # models at all — the first default, llama-3.3-70b-versatile, returned 404
+    # "does not exist or you do not have access to it" despite being listed as a
+    # production model in the public docs.
+    #
+    # Scored against seven real headlines including the two Manesar cases the
+    # system prompt was written for ("Monu Manesar" naming a man, an NSG course
+    # at a training academy):
+    #
+    #   qwen/qwen3.8-27b       7/7 correct   0.36 s/call
+    #   openai/gpt-oss-120b    6/7 correct   0.94 s/call
+    #   openai/gpt-oss-20b     5/7 correct   0.72 s/call, 1 undecided
+    #
+    # Override with GROQ_MODEL. `python -m scripts.check_classifier` reports what
+    # an account can actually reach, which is the only reliable source for this.
+    DEFAULT_MODEL = "qwen/qwen3.8-27b"
 
     def __init__(self, model: Optional[str] = None) -> None:
         try:
@@ -365,7 +378,11 @@ class GroqClassifier:
         try:
             response = self._client.chat.completions.create(
                 model=self._model,
-                max_tokens=256,
+                # Generous because several models on Groq reason before
+                # answering, and those tokens count. gpt-oss-20b hit
+                # "max completion tokens reached before generating a valid
+                # document" at 256 — the model was working, the ceiling was not.
+                max_tokens=1024,
                 temperature=0,
                 # JSON mode rather than a free-text answer parsed with a regex.
                 # A classifier whose output format can drift fails silently.
