@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
 import { RegisterServiceWorker } from "@/components/RegisterServiceWorker";
+import { SiteFooter } from "@/components/SiteFooter";
 import "./globals.css";
 
 const SITE_URL =
@@ -72,6 +73,7 @@ export default function RootLayout({
     <html lang="en-IN">
       <body className="min-h-screen bg-page-plane">
         {children}
+        <SiteFooter />
         <RegisterServiceWorker />
       </body>
     </html>
