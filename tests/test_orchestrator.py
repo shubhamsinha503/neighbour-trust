@@ -272,3 +272,47 @@ class TestPartialClassification:
             "news": {"incidents_12m": 3, "characterisation": "Mostly property crime."}
         }))
         assert "undercounts" not in summary
+
+
+class TestEnvelopeSelection:
+    """Which stored envelope gets served.
+
+    This one reached production. `latest_envelope` ordered by data_vintage, and
+    a crime envelope written during a failed run had found no incidents — so it
+    stamped its vintage as `now`, there being no other date available. The next
+    day's run found 90 real incidents and stamped the newest of those, an
+    earlier date. The empty envelope sorted first, and every safety card on the
+    site read zero while the correct data sat one row below it in the table.
+
+    The two rows coexist because data_envelope is keyed by
+    (category, source_name, h3_cell) and the runs recorded different sources.
+    """
+
+    def _query(self) -> str:
+        from pathlib import Path
+
+        source = Path("agents/common/db.py").read_text(encoding="utf-8")
+        start = source.index("def latest_envelope(")
+        return source[start : source.index("def ", start + 10)]
+
+    def test_orders_by_write_time_not_vintage(self):
+        """Which row is current is a question about the latest write. How old the
+        underlying data is governs confidence instead, and freshness.py reads
+        data_vintage for exactly that."""
+        assert "ORDER BY fetched_at DESC" in self._query()
+
+    def test_vintage_is_still_a_tiebreak(self):
+        assert "fetched_at DESC, data_vintage DESC" in self._query()
+
+
+class TestEmptyEnvelopeVintage:
+    def test_no_incidents_does_not_claim_todays_data(self):
+        """An envelope reporting nothing must not stamp itself with today's
+        vintage — that made a finding of nothing look like the freshest thing on
+        the site, which is how it outranked real data."""
+        from pathlib import Path
+
+        source = Path("agents/news_monitor/agent.py").read_text(encoding="utf-8")
+        assert "vintage = max(dated) if dated else now" in source
+        # The old form took incidents[0] and fell through to `now` unguarded.
+        assert 'incidents[0]["published_at"]\n        if incidents' not in source

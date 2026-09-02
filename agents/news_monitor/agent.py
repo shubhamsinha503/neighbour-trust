@@ -331,13 +331,15 @@ def build_envelope(
     else:
         payload = WaterPayload(news=news)
 
-    # The most recent incident is the freshest thing this envelope knows. With no
-    # incidents, the fetch itself is the only vintage there is.
-    vintage = (
-        incidents[0]["published_at"]
-        if incidents and incidents[0]["published_at"]
-        else now
-    )
+    # The most recent incident is the freshest thing this envelope knows.
+    #
+    # With no incidents there is no underlying data, and this used to fall back
+    # to `now` — which claims today's vintage for a finding of nothing, and made
+    # an empty envelope look like the freshest thing we had. Falling back to the
+    # oldest article in the window instead keeps the vintage a statement about
+    # the evidence rather than about when we looked.
+    dated = [i["published_at"] for i in incidents if i.get("published_at")]
+    vintage = max(dated) if dated else now
 
     source_name, source_url = attribution(counts.get("sources") or [])
 

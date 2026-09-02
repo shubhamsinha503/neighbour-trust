@@ -274,11 +274,27 @@ def upsert_envelope(
 def latest_envelope(
     conn: psycopg.Connection, *, category: str, h3_cell: str
 ) -> Optional[dict[str, Any]]:
-    """Most recent envelope for a cell, by the age of the underlying data.
+    """The envelope currently representing what we know about a cell.
 
-    Ordered by data_vintage, not fetched_at: a fresh fetch of stale data is still
-    stale data, and ordering by fetch time would let a re-pull of a two-month-old
-    reading outrank a genuinely current one.
+    Ordered by fetched_at — the most recently written row wins.
+
+    It used to order by data_vintage, on the reasoning that a fresh fetch of
+    stale data is still stale data. That conflated two different questions. How
+    old the underlying data is governs *confidence*, and is judged separately by
+    agents/common/freshness.py, which reads data_vintage precisely for that. Which
+    row to serve is a different question: it is the latest thing the agent wrote.
+
+    Ordering by vintage let an envelope outrank a better one for reasons
+    unrelated to quality. A crime envelope written during a failed run found no
+    incidents and therefore stamped its vintage as `now`, because with no
+    incidents there is no other date to use. The next day's run found 90 real
+    incidents and stamped its vintage as the newest of those — an earlier date.
+    The empty envelope sorted first and every safety card on the site read zero,
+    with the correct data sitting in the table one row below.
+
+    They coexist rather than overwrite because data_envelope is keyed by
+    (category, source_name, h3_cell), and the two runs recorded different
+    sources.
     """
     return conn.execute(
         """
@@ -286,7 +302,7 @@ def latest_envelope(
                h3_cell, confidence, payload
         FROM data_envelope
         WHERE category = %s::category_t AND h3_cell = %s
-        ORDER BY data_vintage DESC, fetched_at DESC
+        ORDER BY fetched_at DESC, data_vintage DESC
         LIMIT 1
         """,
         (category, h3_cell),
