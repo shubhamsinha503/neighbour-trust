@@ -365,17 +365,33 @@ class GroqClassifier:
             return None
 
         raw = (response.choices[0].message.content or "").strip()
+
+        # Smaller models wrap JSON in a markdown fence even when asked not to.
+        # Stripping one is not lenient parsing — the payload inside is still
+        # required to be valid JSON — it just declines to fail over packaging.
+        if raw.startswith("```"):
+            raw = raw.split("```")[1] if "```" in raw[3:] else raw[3:]
+            if raw.lstrip().startswith("json"):
+                raw = raw.lstrip()[4:]
+            raw = raw.strip()
+
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
             self._report(f"returned unparseable JSON: {raw[:160]!r}")
             return None
 
-        verdict = data.get("is_locality_specific")
-        if not isinstance(verdict, bool):
+        verdict = _as_bool(data.get("is_locality_specific"))
+        if verdict is None:
             # A model that will not commit to true or false has not classified
-            # anything, and coercing a string here is how a "maybe" becomes a
-            # number on a safety card.
+            # anything. _as_bool accepts the literal strings "true" and "false",
+            # which Llama models emit in JSON mode and which are unambiguous —
+            # but nothing else. General truthiness coercion is how a "maybe"
+            # becomes a number on a safety card.
+            self._report(
+                f"gave no usable verdict: is_locality_specific="
+                f"{data.get('is_locality_specific')!r}"
+            )
             return None
 
         return Judgement(
@@ -384,6 +400,22 @@ class GroqClassifier:
             reason=str(data.get("reason") or "")[:400],
             classifier=self.name,
         )
+
+
+def _as_bool(raw: object) -> Optional[bool]:
+    """A verdict, or None if the model did not give one.
+
+    Accepts a real boolean, and the exact strings "true"/"false" — which models
+    in JSON mode emit routinely and which mean exactly one thing. Everything
+    else, including 1, 0, "yes" and "maybe", is treated as no answer: an
+    unclassified mention is excluded from every count, which is the right cost
+    for ambiguity here.
+    """
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str) and raw.strip().lower() in ("true", "false"):
+        return raw.strip().lower() == "true"
+    return None
 
 
 def _clean_type(raw: object) -> Optional[str]:

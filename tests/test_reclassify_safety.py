@@ -169,3 +169,44 @@ class TestFallbackProbesRatherThanAssumes:
         spent balance; they look identical from the outside otherwise."""
         assert "could not answer a test headline" in self.SOURCE
         assert "exhausted credit balance" in self.SOURCE
+
+
+class TestVerdictParsing:
+    """What counts as an answer from a model.
+
+    A verdict decides whether an article becomes an incident on a safety card,
+    so the parsing has to be forgiving about packaging and strict about meaning.
+    """
+
+    def test_real_booleans(self):
+        from agents.news_monitor.classify import _as_bool
+
+        assert _as_bool(True) is True
+        assert _as_bool(False) is False
+
+    def test_string_booleans_are_accepted(self):
+        """Models in JSON mode emit these routinely, and they mean exactly one
+        thing. Rejecting them silently discards good classifications."""
+        from agents.news_monitor.classify import _as_bool
+
+        assert _as_bool("true") is True
+        assert _as_bool("FALSE") is False
+        assert _as_bool("  True  ") is True
+
+    def test_anything_ambiguous_is_no_answer(self):
+        """1, 0, "yes" and "maybe" are not verdicts. General truthiness coercion
+        is how a model's hedge becomes a number on a safety card."""
+        from agents.news_monitor.classify import _as_bool
+
+        for value in (1, 0, "yes", "no", "maybe", None, "", [], {}):
+            assert _as_bool(value) is None, value
+
+    def test_markdown_fences_are_stripped(self):
+        """Smaller models fence their JSON even when told not to. The payload
+        inside is still required to be valid JSON — this only declines to fail
+        over packaging."""
+        source = __import__("pathlib").Path(
+            "agents/news_monitor/classify.py"
+        ).read_text(encoding="utf-8")
+        groq = source[source.index("class GroqClassifier") :]
+        assert 'raw.startswith("```")' in groq
