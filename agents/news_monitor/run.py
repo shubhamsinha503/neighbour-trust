@@ -81,34 +81,21 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
 
     if args.reclassify or args.reclassify_from:
-        # Prove the classifier can answer before queueing anything for it.
+        # Prove a classifier can answer before queueing thousands of headlines
+        # for it. build_classifier probes each tier, so a heuristic result here
+        # means every language model available is out of quota or misconfigured.
         #
-        # The first version cleared first and classified afterwards. Run against
-        # an account with no quota left, it cleared 3,031 verdicts and judged
-        # none of them. Clearing no longer destroys the old verdict, so that is
-        # survivable now — but queueing 3,000 re-judgements that will all fail is
-        # still a wasted run, and the operator should be told why rather than
-        # discovering it in a summary of zeroes.
+        # Clearing no longer destroys the old verdict, so proceeding would be
+        # survivable — but it would clear the queue, judge nothing, and leave
+        # every card reading "0% assessed" until the next successful run. That
+        # is what happened before this check existed.
         probe = classify_mod.build_classifier(prefer_claude=not args.no_claude)
         if probe.name.startswith("heuristic"):
             print(
-                "Refusing to re-classify: no Claude classifier available "
-                "(ANTHROPIC_API_KEY unset, or --no-claude given). The heuristic "
-                "would replace considered verdicts with keyword matches.",
-                file=sys.stderr,
-            )
-            return 1
-
-        if probe.classify(
-            title="Two held for chain snatching near the market",
-            locality="Koramangala",
-            city="Bengaluru",
-            category="crime",
-        ) is None:
-            print(
-                "Refusing to re-classify: the classifier could not answer a test "
-                "headline. Usually an exhausted quota or an invalid key. Check the "
-                "account before spending a run on it. Nothing was changed.",
+                "Refusing to re-classify: no language-model classifier can "
+                "answer. Check that ANTHROPIC_API_KEY or GROQ_API_KEY is set and "
+                "has quota — a valid key with no credit left fails this too. "
+                "Nothing was changed.",
                 file=sys.stderr,
             )
             return 1
@@ -118,7 +105,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             cleared = db.clear_classifications(conn, classifier_prefix=prefix)
             conn.commit()
         scope = f"judged by {prefix}*" if prefix else "previously judged"
-        print(f"Re-classifying: queued {cleared} mentions {scope}.")
+        print(f"Re-classifying with {probe.name}: queued {cleared} mentions {scope}.")
         print("Existing verdicts stand until a new judgement replaces each one.")
         print("These are re-judged below at full classification cost.\n")
 

@@ -126,3 +126,40 @@ class TestClassifierFallbackOrder:
         body = groq[: groq.index("def _clean_type")]
         assert "JSONDecodeError" in body
         assert "isinstance(verdict, bool)" in body
+
+
+class TestFallbackProbesRatherThanAssumes:
+    """A tier is only used if it can answer, not if it can be constructed.
+
+    An Anthropic key with no credit left builds a perfectly valid client and
+    fails on every call. A fallback keyed on construction failure therefore never
+    fires — which is exactly what happened: a run refused to proceed because
+    Claude could not answer, while a working Groq key sat unused in the same
+    environment.
+    """
+
+    SOURCE = __import__("pathlib").Path(
+        "agents/news_monitor/classify.py"
+    ).read_text(encoding="utf-8")
+
+    def test_each_tier_is_probed(self):
+        build = self.SOURCE[self.SOURCE.index("def build_classifier") :]
+        # Both language-model tiers are gated on actually answering.
+        assert build.count("_works(") >= 2
+
+    def test_probe_calls_the_classifier(self):
+        works = self.SOURCE[self.SOURCE.index("def _works(") :]
+        body = works[: works.index("def build_classifier")]
+        assert "classifier.classify(**PROBE)" in body
+        assert "is not None" in body
+
+    def test_probe_failure_falls_through_rather_than_raising(self):
+        works = self.SOURCE[self.SOURCE.index("def _works(") :]
+        body = works[: works.index("def build_classifier")]
+        assert "except Exception" in body and "return False" in body
+
+    def test_a_built_but_unusable_claude_is_reported_as_such(self):
+        """The operator needs to know the difference between a missing key and a
+        spent balance; they look identical from the outside otherwise."""
+        assert "could not answer a test headline" in self.SOURCE
+        assert "exhausted credit balance" in self.SOURCE

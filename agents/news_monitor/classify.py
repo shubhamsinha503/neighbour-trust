@@ -385,37 +385,73 @@ def _clean_type(raw: object) -> Optional[str]:
     return slug[:40] or None
 
 
+# A headline with an obvious answer, used to check that a classifier can
+# actually answer before a run depends on it.
+PROBE = {
+    "title": "Two held for chain snatching near the market",
+    "locality": "Koramangala",
+    "city": "Bengaluru",
+    "category": "crime",
+}
+
+
+def _works(classifier: Classifier) -> bool:
+    """Whether this classifier can answer a question, not merely be constructed.
+
+    The distinction is the whole point. An Anthropic key with no credit left
+    builds a perfectly valid client and fails on every call, so a fallback that
+    triggers on construction failure never triggers at all. That is exactly what
+    happened: a run refused to proceed because Claude could not answer, while a
+    working Groq key sat unused in the environment.
+
+    Costs one classification. Cheap against a run that would otherwise judge
+    nothing.
+    """
+    try:
+        return classifier.classify(**PROBE) is not None
+    except Exception:
+        return False
+
+
 def build_classifier(prefer_claude: bool = True) -> Classifier:
-    """The best classifier available, falling back loudly rather than silently.
+    """The best classifier that actually answers, falling back loudly.
 
-    Claude, then Groq, then the heuristic. The first two are both language models
-    reading the same system prompt; the third is keyword matching that declines to
-    decide most of the time, and dropping to it is a material loss of quality
-    rather than a graceful degradation — which is why each step down says so.
+    Claude, then Groq, then the heuristic. The first two are language models
+    reading the same system prompt; the third is keyword matching that declines
+    to decide most of the time, so dropping to it is a material loss of quality
+    rather than graceful degradation — which is why each step down says so.
 
-    Groq is in the middle because it is free. The classifier is the only
-    per-item cost in this system, and exhausting it stops the news pipeline dead:
-    that happened, leaving 802 headlines unjudged and every safety card reading
-    "0% assessed". A free second tier means a spent budget slows the work instead
-    of halting it.
+    Each tier is probed rather than assumed. The classifier is the only per-item
+    cost in this system and exhausting it stops the news pipeline dead: that
+    happened, leaving 802 headlines unjudged and every safety card reading
+    "0% assessed". A free second tier only helps if the code reaches it.
     """
     if prefer_claude and os.environ.get("ANTHROPIC_API_KEY"):
         try:
-            return ClaudeClassifier()
+            claude = ClaudeClassifier()
+            if _works(claude):
+                return claude
+            log.warning(
+                "Claude built but could not answer a test headline — usually an "
+                "exhausted credit balance. Trying Groq."
+            )
         except Exception as exc:
             log.warning("Claude classifier unavailable (%s); trying Groq", exc)
 
     if os.environ.get("GROQ_API_KEY"):
         try:
-            classifier = GroqClassifier()
-            log.info("Using %s (free tier)", classifier.name)
-            return classifier
+            groq = GroqClassifier()
+            if _works(groq):
+                log.info("Using %s (free tier)", groq.name)
+                return groq
+            log.warning("Groq built but could not answer a test headline.")
         except Exception as exc:
             log.warning("Groq classifier unavailable (%s); using heuristic", exc)
 
     log.warning(
-        "No language-model classifier available (set ANTHROPIC_API_KEY or "
-        "GROQ_API_KEY) — falling back to the heuristic. It leaves ambiguous "
-        "headlines unclassified, so incident counts will under-report."
+        "No language-model classifier could answer (set ANTHROPIC_API_KEY or "
+        "GROQ_API_KEY, and check both have quota) — falling back to the "
+        "heuristic. It leaves ambiguous headlines unclassified, so incident "
+        "counts will under-report."
     )
     return HeuristicClassifier()
