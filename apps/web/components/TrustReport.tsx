@@ -5,7 +5,7 @@
  * docs/strategy.md, and is the part most worth not rearranging:
  *
  *   1. Verdict + score meter — interpretation before the number.
- *   2. Biggest watch-out — loss aversion: a flagged risk is weighed about twice
+ *   2. Flags — loss aversion: a flagged risk is weighed about twice
  *      as heavily as an equivalent gain, so it gets its own callout instead of
  *      being one tile among six.
  *   3. Honesty banner — the pratfall effect works only *after* competence is
@@ -21,7 +21,7 @@
 import Link from "next/link";
 import type { Confidence } from "@schema/envelope";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
-import type { Disagreement, LocalityReport, ReportCategory } from "@/lib/api";
+import type { Disagreement, Flag, LocalityReport, ReportCategory } from "@/lib/api";
 
 const SCORE_COLORS: Array<[number, string]> = [
   [75, "var(--color-status-good)"],
@@ -66,33 +66,24 @@ export function TrustReport({ report }: { report: LocalityReport }) {
           </div>
         </div>
 
-        {/* 2 — biggest watch-out */}
-        {report.biggestWatchout && (
-          <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-[rgba(250,178,25,0.35)] bg-[rgba(250,178,25,0.10)] px-3 py-2.5">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#c9860a"
-              strokeWidth="2.3"
-              className="mt-0.5 shrink-0"
-              aria-hidden="true"
-            >
-              <path d="M12 9v4" />
-              <path d="M12 17h.01" />
-              <path d="M10.3 3.9L2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
-            </svg>
-            <div>
-              <b className="text-[12px]">
-                Biggest watch-out: {report.biggestWatchout.label}
-              </b>
-              <p className="mt-0.5 text-[11.5px] leading-[1.45] text-ink-secondary">
-                {report.biggestWatchout.detail}
-              </p>
-            </div>
+        {/* 2 — flags: what was actually found here.
+          *
+          * Replaces the single "biggest watch-out", which could only fire for a
+          * *scored* category — so safety and water, the two things a buyer most
+          * wants flagged, were structurally incapable of being flagged and
+          * showed a grey dash instead. See agents/orchestrator/flags.py.
+          *
+          * These are not scores. A flag fires on the presence of something,
+          * never its absence, so a locality nobody reports on is not awarded a
+          * clean bill of health for being ignored. */}
+        {report.flags.length > 0 && (
+          <div className="mt-4 space-y-2">
+            {report.flags.slice(0, 3).map((flag) => (
+              <FlagCard key={`${flag.category}-${flag.headline}`} flag={flag} />
+            ))}
           </div>
         )}
+
 
         {/* 6 — source strip, kept with the score where it does its work */}
         {report.sourcesUsed.length > 0 && (
@@ -147,15 +138,26 @@ export function TrustReport({ report }: { report: LocalityReport }) {
           {trust.categoriesCounted} scored · {trust.categoriesTotal - trust.categoriesCounted} not yet
         </span>
       </h3>
+      {/* Categories we have something for get a card. Categories we have nothing
+        * for get one line between them, rather than a full card each saying
+        * "no source yet" — four of those turned the page into a wall and pushed
+        * the parts that carry information below the fold. They stay listed,
+        * because a grid that silently shows two of six is a different claim than
+        * one that shows six and admits four are empty. */}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        {report.categories.map((category) => (
-          <CategoryCard
-            key={category.category}
-            category={category}
-            slug={locality.slug}
-          />
-        ))}
+        {report.categories
+          .filter((category) => category.available)
+          .map((category) => (
+            <CategoryCard
+              key={category.category}
+              category={category}
+              slug={locality.slug}
+            />
+          ))}
       </div>
+      <EmptyCategories
+        categories={report.categories.filter((c) => !c.available)}
+      />
 
       {/* 5 — disagreements */}
       {report.disagreements.length > 0 && (
@@ -174,6 +176,28 @@ export function TrustReport({ report }: { report: LocalityReport }) {
   );
 }
 
+/**
+ * The categories with no data, as one line rather than a card each.
+ *
+ * Still shown. Leaving them out entirely would let the page imply we looked at
+ * everything, and what we do not cover is part of what the reader is owed.
+ */
+function EmptyCategories({ categories }: { categories: ReportCategory[] }) {
+  if (categories.length === 0) return null;
+
+  return (
+    <div className="mt-2.5 rounded-2xl border border-dashed border-hairline px-3.5 py-3">
+      <p className="text-[11.5px] leading-[1.5] text-ink-secondary">
+        <span className="font-semibold text-ink-primary">
+          No data yet for {categories.map((c) => c.label).join(", ")}.
+        </span>{" "}
+        We leave these empty rather than estimating them.
+      </p>
+    </div>
+  );
+}
+
+
 /** The categories actually behind the number, lowercased for inline use. */
 function countedLabels(report: LocalityReport): string {
   const labels = report.categories
@@ -182,6 +206,43 @@ function countedLabels(report: LocalityReport): string {
   if (labels.length === 0) return "";
   if (labels.length === 1) return labels[0];
   return labels.slice(0, -1).join(", ") + " and " + labels[labels.length - 1];
+}
+
+
+/** One thing found in this locality, raised out of the category grid. */
+function FlagCard({ flag }: { flag: Flag }) {
+  const serious = flag.severity === "serious";
+
+  return (
+    <div
+      className={
+        serious
+          ? "flex items-start gap-2.5 rounded-2xl border border-[rgba(214,69,45,0.30)] bg-[rgba(214,69,45,0.07)] px-3.5 py-3"
+          : "flex items-start gap-2.5 rounded-2xl border border-[rgba(250,178,25,0.35)] bg-[rgba(250,178,25,0.10)] px-3.5 py-3"
+      }
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={serious ? "#c0442c" : "#c9860a"}
+        strokeWidth="2.3"
+        className="mt-[3px] shrink-0"
+        aria-hidden="true"
+      >
+        <path d="M12 9v4" />
+        <path d="M12 17h.01" />
+        <path d="M10.3 3.9L2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+      </svg>
+      <div>
+        <b className="text-[12.5px] leading-[1.4]">{flag.headline}</b>
+        <p className="mt-1 text-[11.5px] leading-[1.5] text-ink-secondary">
+          {flag.detail}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 

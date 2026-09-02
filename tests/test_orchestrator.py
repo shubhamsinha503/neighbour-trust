@@ -316,3 +316,79 @@ class TestEmptyEnvelopeVintage:
         assert "vintage = max(dated) if dated else now" in source
         # The old form took incidents[0] and fell through to `now` unguarded.
         assert 'incidents[0]["published_at"]\n        if incidents' not in source
+
+
+class TestFlags:
+    """Flags exist because the watch-out mechanism could not reach the two
+    categories a buyer most wants flagged.
+
+    It considered only *scored* categories, and crime and water are deliberately
+    never scored — so a locality with violent incidents in the press showed a
+    grey dash where a score would be, and the incidents sat in a tile among six.
+    """
+
+    def _find(self, envelopes, categories=None):
+        from agents.orchestrator import flags as flags_mod
+
+        return flags_mod.find(envelopes, categories or [])
+
+    def _news(self, types):
+        return envelope({"news": {"recent": [{"incident_type": t} for t in types]}})
+
+    def test_violence_is_flagged(self):
+        found = self._find({"crime": self._news(["assault", "theft", "murder"])})
+        assert any(f["category"] == "crime" and f["severity"] == "serious" for f in found)
+
+    def test_recurrent_waterlogging_is_flagged(self):
+        found = self._find({"water": self._news(["waterlogging", "waterlogging"])})
+        flag = next(f for f in found if f["category"] == "water")
+        assert flag["severity"] == "serious"
+        assert "2 times" in flag["headline"]
+
+    def test_contamination_is_flagged(self):
+        found = self._find({"water": self._news(["contamination"])})
+        assert any("Contamination" in f["headline"] for f in found)
+
+    def test_absence_never_produces_a_reassuring_flag(self):
+        """The rule that keeps this honest. An under-reported locality must not
+        be awarded a clean bill of health for being ignored, so nothing fires on
+        the absence of incidents."""
+        assert self._find({"crime": self._news([])}) == []
+        assert self._find({}) == []
+
+    def test_property_crime_flag_does_not_claim_safety(self):
+        found = self._find({"crime": self._news(["theft", "snatching"])})
+        flag = next(f for f in found if f["category"] == "crime")
+        assert flag["severity"] == "notable"
+        assert "not the same as none having happened" in flag["detail"]
+
+    def test_excluded_incident_types_do_not_raise_flags(self):
+        """Self-harm and policing complaints are excluded from safety cards, and
+        must not reappear as a flag."""
+        assert self._find({"crime": self._news(["suicide", "illegal arrest"])}) == []
+
+    def test_poor_air_is_flagged(self):
+        found = self._find({
+            "air_quality": envelope({"aqi_band": "very_poor", "current_aqi": 312.0})
+        })
+        assert any(f["category"] == "air_quality" for f in found)
+
+    def test_good_air_is_not_flagged(self):
+        found = self._find({
+            "air_quality": envelope({"aqi_band": "good", "current_aqi": 24.0})
+        })
+        assert not any(f["category"] == "air_quality" for f in found)
+
+    def test_serious_flags_sort_first(self):
+        found = self._find({
+            "crime": self._news(["theft", "snatching"]),
+            "water": self._news(["contamination"]),
+        })
+        assert found[0]["severity"] == "serious"
+
+    def test_headline_flag_is_the_first(self):
+        from agents.orchestrator import flags as flags_mod
+
+        found = self._find({"crime": self._news(["assault", "murder"])})
+        assert flags_mod.headline_flag(found) is found[0]
+        assert flags_mod.headline_flag([]) is None

@@ -28,7 +28,7 @@ from typing import Any, Optional
 from neighbour_trust_schema.envelope import Confidence
 
 from agents.common import db, freshness
-from agents.orchestrator import reconcile, score as score_mod
+from agents.orchestrator import flags as flags_mod, reconcile, score as score_mod
 
 log = logging.getLogger(__name__)
 
@@ -64,6 +64,7 @@ class LocalityReport:
     sources_used: list[str]
     generated_at: datetime
     envelopes: dict[str, Any] = field(default_factory=dict)
+    flags: list[dict[str, str]] = field(default_factory=list)
 
 
 def _load_envelopes(conn, h3_cell: str) -> dict[str, Any]:
@@ -276,11 +277,14 @@ def build_report(conn, locality: dict[str, Any]) -> LocalityReport:
         }
     )
 
+    found_flags = flags_mod.find(envelopes, categories)
+
     return LocalityReport(
         locality=locality,
         trust_score=trust,
         verdict=_verdict_sentence(trust, categories),
-        biggest_watchout=_biggest_watchout(categories),
+        flags=found_flags,
+        biggest_watchout=flags_mod.headline_flag(found_flags),
         disagreements=reconcile.find(envelopes, scoreable=score_mod.SCOREABLE),
         categories=categories,
         sources_used=sources,

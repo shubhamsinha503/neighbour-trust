@@ -454,6 +454,7 @@ class ReportResponse(BaseModel):
     trust_score: TrustScoreOut
     verdict: str
     biggest_watchout: Optional[dict[str, Any]] = None
+    flags: list[Flag] = []
     disagreements: list[ReportDisagreement]
     categories: list[ReportCategory]
     sources_used: list[str]
@@ -486,6 +487,7 @@ def get_report(slug: str) -> dict[str, Any]:
         },
         "verdict": report.verdict,
         "biggest_watchout": report.biggest_watchout,
+        "flags": report.flags,
         "disagreements": [
             {
                 "category": d.category,

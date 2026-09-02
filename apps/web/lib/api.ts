@@ -271,6 +271,14 @@ export interface ReportCategory {
   dataVintage?: string;
 }
 
+export interface Flag {
+  category: string;
+  /** "serious" | "notable" — how much weight to give it, not a measurement. */
+  severity: string;
+  headline: string;
+  detail: string;
+}
+
 export interface Disagreement {
   category: string;
   headline: string;
@@ -291,7 +299,8 @@ export interface LocalityReport {
   locality: Locality;
   trustScore: TrustScore;
   verdict: string;
-  biggestWatchout: { category: string; label: string; score: number; detail: string } | null;
+  biggestWatchout: { category: string; severity: string; headline: string; detail: string } | null;
+  flags: Flag[];
   disagreements: Disagreement[];
   categories: ReportCategory[];
   sourcesUsed: string[];
@@ -317,6 +326,7 @@ export async function fetchReport(slug: string): Promise<LocalityReport> {
     },
     verdict: raw.verdict,
     biggestWatchout: raw.biggest_watchout ?? null,
+    flags: raw.flags ?? [],
     disagreements: raw.disagreements ?? [],
     categories: ((raw.categories ?? []) as Array<Record<string, any>>).map(
       (c): ReportCategory => ({
