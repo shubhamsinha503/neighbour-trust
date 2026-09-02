@@ -131,7 +131,9 @@ class TestClassifierFallbackOrder:
         groq = self.SOURCE[self.SOURCE.index("class GroqClassifier") :]
         body = groq[: groq.index("def _clean_type")]
         assert "JSONDecodeError" in body
-        assert "isinstance(verdict, bool)" in body
+        # The verdict goes through _as_bool, which accepts a boolean or the
+        # exact strings "true"/"false" and treats everything else as no answer.
+        assert "_as_bool(" in body
 
 
 class TestFallbackProbesRatherThanAssumes:
