@@ -437,6 +437,23 @@ class ReportDisagreement(BaseModel):
     severity: str
 
 
+class Flag(BaseModel):
+    """Something specific found in this locality, raised out of the category grid.
+
+    Not a score. See agents/orchestrator/flags.py — a flag fires only on the
+    presence of something, never on its absence, so a locality nobody reports on
+    is never awarded a clean bill of health for being ignored.
+    """
+
+    category: str
+    severity: str = Field(
+        ..., description='"serious" or "notable" — how much weight to give it, '
+        "not a measurement."
+    )
+    headline: str
+    detail: str
+
+
 class TrustScoreOut(BaseModel):
     score: Optional[int] = Field(
         None, description="None when too few categories have data to justify one number."
