@@ -463,7 +463,7 @@ class OpenAICompatibleClassifier:
             return
         self._reported_failure = True
         log.warning(
-            "Groq (%s) failed: %s\n"
+            "%s (%s) failed: %s\n"
             "  If this names a decommissioned model, set the GROQ_MODEL "
             "repository variable to a current id from "
             "https://console.groq.com/docs/models",
@@ -491,7 +491,12 @@ class OpenAICompatibleClassifier:
                 # answering, and those tokens count. gpt-oss-20b hit
                 # "max completion tokens reached before generating a valid
                 # document" at 256 — the model was working, the ceiling was not.
-                max_tokens=1024,
+                # Below Groq's free-tier ceiling of 1000 output tokens per
+                # minute. A request *declaring* more than the limit is
+                # refused outright, so max_tokens=1024 meant every call came
+                # back 429 before generating a thing. Measured output is 74
+                # tokens; 800 lets a reasoning model think and still fits.
+                max_tokens=800,
                 temperature=0,
                 # JSON mode rather than a free-text answer parsed with a regex.
                 # A classifier whose output format can drift fails silently.

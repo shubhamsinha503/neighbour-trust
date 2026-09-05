@@ -406,3 +406,83 @@ class TestEmptyEnvVarsDoNotOverrideDefaults:
         monkeypatch.delenv("CLASSIFIER_CALLS_PER_MINUTE", raising=False)
         monkeypatch.setenv("GROQ_CALLS_PER_MINUTE", "")
         assert GroqClassifier()._min_interval > 0
+
+
+class TestOutputTokenCeiling:
+    """max_tokens must sit under the tightest free-tier cap we target.
+
+    Groq's free tier limits output tokens per minute to 1000 and refuses a
+    request that *declares* more than that, before generating anything. With
+    max_tokens=1024 every single call returned:
+
+      429 - Request too large ... on output tokens per minute (OTPM):
+            Limit 1000, Requested 1024
+
+    which reads as rate limiting and was actually a fixed, permanent rejection.
+    """
+
+    SOURCE = __import__("pathlib").Path(
+        "agents/news_monitor/classify.py"
+    ).read_text(encoding="utf-8")
+
+    def test_max_tokens_is_under_the_groq_ceiling(self):
+        import ast
+
+        limits = [
+            kw.value.value
+            for node in ast.walk(ast.parse(self.SOURCE))
+            if isinstance(node, ast.Call)
+            for kw in node.keywords
+            if kw.arg == "max_tokens" and isinstance(kw.value, ast.Constant)
+        ]
+        assert limits, "no max_tokens found"
+        assert max(limits) < 1000, limits
+
+    def test_it_still_leaves_room_to_answer(self):
+        """Measured output is 74 tokens, and a reasoning model needs headroom to
+        think before it answers — gpt-oss-20b ran out mid-JSON at 256."""
+        import ast
+
+        limits = [
+            kw.value.value
+            for node in ast.walk(ast.parse(self.SOURCE))
+            if isinstance(node, ast.Call)
+            for kw in node.keywords
+            if kw.arg == "max_tokens" and isinstance(kw.value, ast.Constant)
+        ]
+        assert max(limits) >= 500, limits
+
+
+class TestFailureReportingIsWellFormed:
+    """A log line that raises while reporting a failure hides the failure.
+
+    _report passed three arguments to a format string carrying two, so every
+    Groq error surfaced as "--- Logging error --- TypeError: not all arguments
+    converted" with the real message buried in a traceback.
+    """
+
+    def test_placeholders_match_arguments(self):
+        import logging
+
+        from agents.news_monitor.classify import OpenAICompatibleClassifier
+
+        records = []
+
+        class Capture(logging.Handler):
+            def emit(self, record):
+                # Formatting is where the mismatch raises.
+                records.append(record.getMessage())
+
+        log = logging.getLogger("agents.news_monitor.classify")
+        handler = Capture()
+        log.addHandler(handler)
+        try:
+            paced = object.__new__(OpenAICompatibleClassifier)
+            paced._reported_failure = False
+            paced._provider = "groq"
+            paced._model = "test-model"
+            paced._report(RuntimeError("boom"))
+        finally:
+            log.removeHandler(handler)
+
+        assert records and "groq" in records[0] and "boom" in records[0]

@@ -29,15 +29,12 @@ PROBE = classify_mod.PROBE
 def check(name: str, build) -> bool:
     print(f"\n{name}")
 
-    key_env = {"Claude": "ANTHROPIC_API_KEY", "Groq": "GROQ_API_KEY"}.get(name)
-    if key_env and not os.environ.get(key_env):
-        print(f"  skipped — {key_env} is not set")
-        return False
-
     try:
         classifier = build()
     except Exception as exc:
-        print(f"  cannot build: {exc}")
+        # A missing key raises here, and that is a normal state rather than a
+        # fault — most deployments will have one provider configured.
+        print(f"  unavailable: {str(exc).splitlines()[0]}")
         return False
 
     print(f"  built: {classifier.name}")
@@ -71,10 +68,15 @@ def main() -> int:
     print(f'Probe headline: "{PROBE["title"]}"')
     print(f'  as: {PROBE["locality"]}, {PROBE["city"]} / {PROBE["category"]}')
 
-    results = {
-        "Claude": check("Claude", classify_mod.ClaudeClassifier),
-        "Groq": check("Groq", classify_mod.GroqClassifier),
-    }
+    # Every provider, not just the two that existed when this was written. The
+    # script reported "no language model is usable" during a run that was
+    # classifying happily through DeepSeek, because DeepSeek was not on the list.
+    results = {"Claude": check("Claude", classify_mod.ClaudeClassifier)}
+    for provider in classify_mod.OpenAICompatibleClassifier.PROVIDERS:
+        results[provider] = check(
+            provider,
+            lambda p=provider: classify_mod.OpenAICompatibleClassifier(p),
+        )
 
     print("\n" + "-" * 60)
     chosen = classify_mod.build_classifier()
