@@ -327,3 +327,70 @@ class TestGroqPacing:
 
         # Seven gaps between eight calls, allowing for scheduler slop.
         assert elapsed >= 0.05 * 7 * 0.8, elapsed
+
+
+class TestEmptyEnvVarsDoNotOverrideDefaults:
+    """An unset GitHub Actions variable arrives as an empty string.
+
+    `${{ vars.GROQ_MODEL }}` with no such variable defined passes "" rather than
+    nothing, so os.environ.get("GROQ_MODEL", DEFAULT) returns "" and the default
+    never applies. A run asked Groq for a model named nothing, got "The model ``
+    does not exist", fell back to the heuristic, and confirmed almost no power
+    incidents across all 44 localities.
+    """
+
+    SOURCE = __import__("pathlib").Path(
+        "agents/news_monitor/classify.py"
+    ).read_text(encoding="utf-8")
+
+    def test_no_dict_style_defaults_remain_for_env_lookups(self):
+        """`get(KEY, default)` is the shape that breaks; `get(KEY) or default`
+        treats empty and absent alike, which is what a config value wants.
+
+        Scanned from the parsed source rather than the raw text, so the comment
+        that documents the broken pattern is not itself reported as it.
+        An empty-string default is exempt: it already behaves the same whether
+        the variable is unset or blank.
+        """
+        import ast
+
+        offenders = []
+        for node in ast.walk(ast.parse(self.SOURCE)):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if not (isinstance(func, ast.Attribute) and func.attr == "get"):
+                continue
+            if not (isinstance(func.value, ast.Attribute) and func.value.attr == "environ"):
+                continue
+            if len(node.args) != 2:
+                continue
+            default = node.args[1]
+            if isinstance(default, ast.Constant) and default.value == "":
+                continue
+            offenders.append(ast.unparse(node))
+
+        assert not offenders, offenders
+
+    def test_an_empty_model_falls_through_to_the_default(self, monkeypatch):
+        from agents.news_monitor.classify import GroqClassifier
+
+        monkeypatch.setenv("GROQ_API_KEY", "test-key")
+        monkeypatch.setenv("GROQ_MODEL", "")
+        assert GroqClassifier().name == f"groq:{GroqClassifier.DEFAULT_MODEL}"
+
+    def test_an_explicit_model_still_wins(self, monkeypatch):
+        from agents.news_monitor.classify import GroqClassifier
+
+        monkeypatch.setenv("GROQ_API_KEY", "test-key")
+        monkeypatch.setenv("GROQ_MODEL", "openai/gpt-oss-120b")
+        assert GroqClassifier().name == "groq:openai/gpt-oss-120b"
+
+    def test_an_empty_rate_does_not_raise(self, monkeypatch):
+        """int("") raises ValueError, which would take down construction rather
+        than degrade."""
+        from agents.news_monitor.classify import GroqClassifier
+
+        monkeypatch.setenv("GROQ_API_KEY", "test-key")
+        monkeypatch.setenv("GROQ_CALLS_PER_MINUTE", "")
+        assert GroqClassifier()._min_interval > 0

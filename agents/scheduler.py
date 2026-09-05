@@ -142,7 +142,7 @@ JOBS: list[tuple[str, Callable[[], None], dict[str, Any]]] = [
 
 def main() -> int:
     logging.basicConfig(
-        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        level=(os.environ.get("LOG_LEVEL") or "INFO").upper(),
         format="%(asctime)s %(levelname)-7s %(name)s %(message)s",
     )
     # One INFO line per HTTP request buries everything else — a news run makes
@@ -168,7 +168,7 @@ def main() -> int:
     # Run once at boot unless told not to. A fresh deploy should not wait up to an
     # hour before it has any data, and after a restart the gap wants filling
     # immediately.
-    if os.environ.get("RUN_ON_STARTUP", "true").lower() in ("1", "true", "yes"):
+    if (os.environ.get("RUN_ON_STARTUP") or "true").lower() in ("1", "true", "yes"):
         log.info("running all jobs once at startup")
         for name, func, _cron in JOBS:
             func()

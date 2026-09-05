@@ -204,7 +204,7 @@ class ClaudeClassifier:
                 "Then add it to .env at the repo root."
             )
 
-        self._model = model or os.environ.get("NEWS_CLASSIFIER_MODEL", "claude-opus-5")
+        self._model = model or os.environ.get("NEWS_CLASSIFIER_MODEL") or "claude-opus-5"
 
         # Identity-linked API keys (the kind issued to a user rather than to an
         # organisation) must name the workspace each request acts in, otherwise
@@ -341,6 +341,12 @@ class GroqClassifier:
     CALLS_PER_MINUTE = 14
 
     def __init__(self, model: Optional[str] = None) -> None:
+        # `or` rather than a dict default throughout this file. An unset GitHub
+        # Actions variable arrives as an empty string, not as absent, so
+        # os.environ.get("GROQ_MODEL", DEFAULT) returns "" and the default never
+        # applies — a run asked Groq for a model named nothing and got
+        # "The model `` does not exist", then fell back to the heuristic and
+        # confirmed almost no power incidents.
         try:
             from openai import OpenAI  # Groq speaks the OpenAI protocol
         except ImportError as exc:  # pragma: no cover
@@ -356,7 +362,7 @@ class GroqClassifier:
                 "Then add it to .env at the repo root."
             )
 
-        self._model = model or os.environ.get("GROQ_MODEL", self.DEFAULT_MODEL)
+        self._model = model or os.environ.get("GROQ_MODEL") or self.DEFAULT_MODEL
         self._client = OpenAI(api_key=key, base_url="https://api.groq.com/openai/v1")
         self.name = f"groq:{self._model}"
 
@@ -372,7 +378,7 @@ class GroqClassifier:
         self._pace_lock = threading.Lock()
         self._next_call_at = 0.0
         self._min_interval = 60.0 / max(
-            1, int(os.environ.get("GROQ_CALLS_PER_MINUTE", self.CALLS_PER_MINUTE))
+            1, int(os.environ.get("GROQ_CALLS_PER_MINUTE") or self.CALLS_PER_MINUTE)
         )
 
     def _wait_turn(self) -> None:
