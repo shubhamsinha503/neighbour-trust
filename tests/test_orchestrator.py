@@ -417,7 +417,9 @@ class TestFlagsAgreeWithCards:
         })
         headline = found[0]["headline"]
         assert "9 of 18" in headline, headline
-        assert "of 1" not in headline
+        # The display sample holds a single theft; a flag derived from it
+        # would have read "of 1".
+        assert not headline.endswith("of 1 incidents)")
 
     def test_excluded_types_leave_the_denominator(self):
         """Self-harm and policing complaints are excluded from safety cards, so
