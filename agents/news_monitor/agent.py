@@ -23,6 +23,7 @@ caveat as text so the UI cannot quietly drop it.
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -304,6 +305,9 @@ def build_envelope(
     news = NewsCoverage(
         incidents_12m=len(incidents),
         incident_types=sorted({i["incident_type"] for i in incidents if i["incident_type"]}),
+        incident_type_counts=dict(
+            Counter(i["incident_type"] for i in incidents if i["incident_type"])
+        ),
         recent=[
             NewsIncident(
                 title=i["title"],

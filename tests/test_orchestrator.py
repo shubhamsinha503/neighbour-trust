@@ -392,3 +392,46 @@ class TestFlags:
         found = self._find({"crime": self._news(["assault", "murder"])})
         assert flags_mod.headline_flag(found) is found[0]
         assert flags_mod.headline_flag([]) is None
+
+
+class TestFlagsAgreeWithCards:
+    """A flag and the card beside it must describe the same evidence.
+
+    They did not. Flags read payload.news.recent, which is a five-item display
+    sample, so Indiranagar showed "Violence reported in local press (1 of 5
+    incidents shown)" directly above "a notable share involve violence (9 of
+    18)" — two numbers about the same locality, disagreeing, on one screen.
+    """
+
+    def _find(self, payload):
+        from agents.orchestrator import flags as flags_mod
+
+        return flags_mod.find({"crime": envelope(payload)}, [])
+
+    def test_counts_come_from_the_whole_year_not_the_sample(self):
+        found = self._find({
+            "news": {
+                "incident_type_counts": {"assault": 5, "harassment": 4, "theft": 9},
+                "recent": [{"incident_type": "theft"}],  # the display sample
+            }
+        })
+        headline = found[0]["headline"]
+        assert "9 of 18" in headline, headline
+        assert "of 1" not in headline
+
+    def test_excluded_types_leave_the_denominator(self):
+        """Self-harm and policing complaints are excluded from safety cards, so
+        they must not swell the total a flag reports either."""
+        found = self._find({
+            "news": {"incident_type_counts": {"assault": 2, "suicide": 10}}
+        })
+        assert "2 of 2" in found[0]["headline"]
+
+    def test_older_envelopes_still_produce_flags(self):
+        """Envelopes written before the counts existed carry only `recent`.
+        They age out within a day, but must not blank the page meanwhile."""
+        found = self._find({"news": {"recent": [{"incident_type": "assault"}]}})
+        assert found and found[0]["category"] == "crime"
+
+    def test_no_incident_data_produces_no_flag(self):
+        assert self._find({"news": {}}) == []

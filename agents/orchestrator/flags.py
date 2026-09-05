@@ -51,14 +51,27 @@ RECURRENT_FLOODING = 2
 POOR_AIR_BANDS = ("poor", "very_poor", "severe")
 
 
+def _incident_types(news: dict[str, Any]) -> list[str]:
+    """Every confirmed incident type, not the five kept for display.
+
+    `recent` is a sample sized for the card, and deriving a flag from it makes a
+    statement about the sample while appearing to make one about the locality.
+    That shipped: "Violence reported in local press (1 of 5 incidents shown)"
+    sat directly above "a notable share involve violence (9 of 18)" on the same
+    page, disagreeing with it.
+
+    Falls back to `recent` only for envelopes written before the counts existed,
+    which age out within a day of ingestion.
+    """
+    counts = news.get("incident_type_counts") or {}
+    if counts:
+        return [t for t, n in counts.items() for _ in range(int(n))]
+    return [i.get("incident_type") for i in (news.get("recent") or [])]
+
+
 def _crime_flags(payload: dict[str, Any]) -> list[dict[str, str]]:
     news = payload.get("news") or {}
-    recent = news.get("recent") or []
-    types = [
-        i.get("incident_type")
-        for i in recent
-        if not is_excluded(i.get("incident_type") or "")
-    ]
+    types = [t for t in _incident_types(news) if not is_excluded(t or "")]
     if not types:
         return []
 
@@ -75,7 +88,7 @@ def _crime_flags(payload: dict[str, Any]) -> list[dict[str, str]]:
                 "category": "crime",
                 "severity": "serious",
                 "headline": f"Violence reported in local press ({violent} of "
-                f"{len(types)} incidents shown)",
+                f"{len(types)} incidents)",
                 "detail": "Press coverage is not a crime rate, and this is not a "
                 "count of everything that happened. It is what local reporting "
                 "described in the last year.",
@@ -89,7 +102,7 @@ def _crime_flags(payload: dict[str, Any]) -> list[dict[str, str]]:
                 "category": "crime",
                 "severity": "notable",
                 "headline": f"Reported incidents are property crime "
-                f"({property_crime} of {len(types)} shown)",
+                f"({property_crime} of {len(types)})",
                 "detail": "No violent incidents appeared among the reports we "
                 "read. That is not the same as none having happened.",
             }
@@ -100,8 +113,7 @@ def _crime_flags(payload: dict[str, Any]) -> list[dict[str, str]]:
 
 def _water_flags(payload: dict[str, Any]) -> list[dict[str, str]]:
     news = payload.get("news") or {}
-    recent = news.get("recent") or []
-    types = [i.get("incident_type") for i in recent]
+    types = _incident_types(news)
     if not types:
         return []
 

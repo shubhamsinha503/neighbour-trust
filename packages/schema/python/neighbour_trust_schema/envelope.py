@@ -175,6 +175,14 @@ class NewsCoverage(BaseModel):
         "largely a fact about media attention, but whether those incidents are "
         "chain-snatchings or murders is a fact about the place.",
     )
+    incident_type_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="How many confirmed incidents of each type, over the whole "
+        "12 months. Distinct from `recent`, which is a display sample of five: "
+        "anything derived from `recent` describes the sample rather than the "
+        "locality, and a flag built that way contradicted the card beside it — "
+        "'violence (1 of 5)' next to 'violence (9 of 18)' on the same page.",
+    )
     recent: list[NewsIncident] = Field(default_factory=list)
 
     # The funnel, exposed rather than hidden. Keyword search finds far more than
