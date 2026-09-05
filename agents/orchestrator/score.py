@@ -30,6 +30,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from agents.orchestrator import press_score
+
 # Weights over the six categories. These are a product judgement, not a
 # measurement — they encode what a typical Indian home buyer weighs, with the
 # categories that affect daily life every single day (air, water, power) and the
@@ -46,7 +48,7 @@ CATEGORY_WEIGHTS: dict[str, float] = {
 
 # Categories that can currently produce a score. The rest appear on the report
 # with their status, contributing nothing to the number.
-SCOREABLE = ("air_quality", "schools")
+SCOREABLE = ("air_quality", "schools", "crime", "water", "power")
 
 # Display names, so copy generated here matches the labels on the cards.
 LABELS = {
@@ -118,8 +120,10 @@ def category_score(category: str, payload: dict[str, Any]) -> Optional[int]:
             payload.get("median_pupil_teacher_ratio"),
         )
 
-    # crime, water: press coverage only — see the module docstring.
-    # power, infrastructure: no agent yet.
+    if category in press_score.SCORERS:
+        return press_score.score(category, payload)
+
+    # infrastructure: no agent yet.
     return None
 
 
@@ -156,9 +160,9 @@ class TrustScore:
 STATUS_TEXT = {
     "air_quality": "no live reading — upstream feed unavailable",
     "schools": "no data",
-    "crime": "press coverage only — not scored, see below",
-    "water": "press coverage only — not scored, see below",
-    "power": "no source yet — community reporting planned",
+    "crime": "no local press coverage found in 12 months",
+    "water": "no local press coverage found in 12 months",
+    "power": "no local press coverage found in 12 months",
     "infrastructure": "no source yet — RERA scraping planned",
 }
 

@@ -59,12 +59,17 @@ class TestSchoolsScore:
 
 
 class TestCategoryScore:
-    def test_crime_and_water_never_score(self):
-        """Press coverage is a function of media-market size, not incident rate.
-        Folding it into a number would make well-covered areas look dangerous."""
+    def test_a_bare_incident_count_never_becomes_a_score(self):
+        """Volume alone is what coverage bias distorts most, so a count with no
+        composition behind it produces nothing. Scoring these categories reads
+        the mix of incident types instead — see press_score.py."""
         payload = {"news": {"incidents_12m": 12}}
         assert score_mod.category_score("crime", payload) is None
         assert score_mod.category_score("water", payload) is None
+
+    def test_composition_does_produce_a_score(self):
+        counts = {"news": {"incident_type_counts": {"theft": 6, "assault": 2}}}
+        assert score_mod.category_score("crime", counts) is not None
 
     def test_unbuilt_categories_never_score(self):
         assert score_mod.category_score("power", {}) is None

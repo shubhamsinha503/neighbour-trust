@@ -265,12 +265,25 @@ class TestPower:
             assert "per week" not in result and "per month" not in result
 
 
-class TestPowerIsNeverScored:
-    def test_power_stays_out_of_the_composite(self):
-        """Same reason crime and water are excluded: press coverage tracks media
-        attention, and a well-covered locality would look less reliable than an
-        identical one nobody writes about."""
-        from agents.orchestrator.score import SCOREABLE, category_score
+class TestPowerScoring:
+    """Power is scored, but from the mix rather than the volume.
 
-        assert "power" not in SCOREABLE
+    This class asserted the opposite until scoring was extended to the
+    press-derived categories. The reason it changed is worth recording: refusing
+    to score them was right about the danger and wrong about the consequence —
+    it left 21 of 44 localities with no Trust Score, which was most of the
+    product. See agents/orchestrator/press_score.py.
+    """
+
+    def test_power_is_scoreable(self):
+        from agents.orchestrator.score import SCOREABLE
+
+        assert "power" in SCOREABLE
+
+    def test_a_bare_count_still_produces_nothing(self):
+        """incidents_12m alone carries no composition, and composition is the
+        part that survives coverage bias. A count on its own is exactly what
+        must not become a score."""
+        from agents.orchestrator.score import category_score
+
         assert category_score("power", {"news": {"incidents_12m": 9}}) is None
