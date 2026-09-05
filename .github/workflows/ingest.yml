@@ -23,6 +23,11 @@ on:
     - cron: "17 * * * *"
     # Sundays 03:47 UTC — schools. Off-peak for Overpass, donated infrastructure.
     - cron: "47 3 * * 0"
+    # Sundays 05:13 UTC — connectivity. Also Overpass, and deliberately well
+    # clear of the schools pass rather than queued behind it: both are slow, and
+    # two long jobs sharing the concurrency group would push one into the next
+    # hour's air quality run.
+    - cron: "13 5 * * 0"
     # Daily 04:23 UTC — news, after Indian morning editions are indexed.
     - cron: "23 4 * * *"
   workflow_dispatch:
@@ -32,7 +37,7 @@ on:
         required: true
         default: air_quality
         type: choice
-        options: [air_quality, schools, news_monitor, all]
+        options: [air_quality, schools, news_monitor, connectivity, all]
       reclassify:
         description: >-
           Re-judge every stored headline (news_monitor only). Needed after a
@@ -100,6 +105,7 @@ jobs:
           case "${{ github.event.schedule }}" in
             "17 * * * *")  echo "agent=air_quality"  >> "$GITHUB_OUTPUT" ;;
             "47 3 * * 0")  echo "agent=schools"      >> "$GITHUB_OUTPUT" ;;
+            "13 5 * * 0")  echo "agent=connectivity" >> "$GITHUB_OUTPUT" ;;
             "23 4 * * *")  echo "agent=news_monitor" >> "$GITHUB_OUTPUT" ;;
             *)             echo "agent=${{ inputs.agent || 'air_quality' }}" >> "$GITHUB_OUTPUT" ;;
           esac
@@ -119,6 +125,13 @@ jobs:
       - name: Run schools
         if: steps.which.outputs.agent == 'schools' || steps.which.outputs.agent == 'all'
         run: python -m agents.schools.run
+
+      - name: Run connectivity
+        # The slowest job here: Overpass takes 20s-4min per locality, so a full
+        # pass can approach the timeout. Partial passes are normal and safe —
+        # each locality is written as it completes.
+        if: steps.which.outputs.agent == 'connectivity' || steps.which.outputs.agent == 'all'
+        run: python -m agents.infrastructure.run
 
       - name: Check the classifier
         # Only for news runs, and never fatal. It names *why* a classifier is

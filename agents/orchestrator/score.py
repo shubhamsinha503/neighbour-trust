@@ -48,7 +48,7 @@ CATEGORY_WEIGHTS: dict[str, float] = {
 
 # Categories that can currently produce a score. The rest appear on the report
 # with their status, contributing nothing to the number.
-SCOREABLE = ("air_quality", "schools", "crime", "water", "power")
+SCOREABLE = ("air_quality", "schools", "crime", "water", "power", "infrastructure")
 
 # Display names, so copy generated here matches the labels on the cards.
 LABELS = {
@@ -57,7 +57,7 @@ LABELS = {
     "air_quality": "Air quality",
     "water": "Water",
     "power": "Power",
-    "infrastructure": "Infrastructure",
+    "infrastructure": "Connectivity",
 }
 
 # Below this share of total weight, no composite is published at all. Two
@@ -120,6 +120,11 @@ def category_score(category: str, payload: dict[str, Any]) -> Optional[int]:
             payload.get("median_pupil_teacher_ratio"),
         )
 
+    if category == "infrastructure":
+        # Computed by the agent, which has the distances; the orchestrator only
+        # stores what the source measured rather than re-deriving it here.
+        return payload.get("connectivity_score")
+
     if category in press_score.SCORERS:
         return press_score.score(category, payload)
 
@@ -163,7 +168,7 @@ STATUS_TEXT = {
     "crime": "no local press coverage found in 12 months",
     "water": "no local press coverage found in 12 months",
     "power": "no local press coverage found in 12 months",
-    "infrastructure": "no source yet — RERA scraping planned",
+    "infrastructure": "not enough mapped nearby to describe the area",
 }
 
 

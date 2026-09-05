@@ -49,7 +49,7 @@ CATEGORY_LABELS = {
     "air_quality": "Air quality",
     "water": "Water",
     "power": "Power",
-    "infrastructure": "Infrastructure",
+    "infrastructure": "Connectivity",
 }
 
 
@@ -211,6 +211,9 @@ def _category_summary(category: str, envelope: Optional[dict[str, Any]]) -> str:
         if ptr is not None:
             return f"{near} schools within 2 km · median {round(ptr)}:1 pupil–teacher"
         return f"{near} schools within 2 km · staffing data for {payload.get('schools_with_staffing_data', 0)}"
+
+    if category == "infrastructure":
+        return payload.get("summary") or ""
 
     if category in ("crime", "water", "power"):
         news = payload.get("news") or {}
