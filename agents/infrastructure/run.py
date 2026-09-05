@@ -66,7 +66,9 @@ def main(argv: Optional[list[str]] = None) -> int:
                 print(f"Unknown locality: {args.locality}", file=sys.stderr)
                 return 1
 
-            run_id = db.start_ingest_run(conn, category="infrastructure")
+            run_id = db.start_ingest_run(
+                conn, category="infrastructure", sources={osm.SOURCE_NAME: True}
+            )
             conn.commit()
 
             for index, locality in enumerate(localities):
@@ -87,9 +89,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 print("\nDry run — all writes rolled back.")
             else:
                 db.finish_ingest_run(
-                    conn, run_id, status="ok",
-                    localities_ok=ok, localities_skipped=skipped,
-                    sources={osm.SOURCE_NAME: True},
+                    conn, run_id, status="ok", ok=ok, skipped=skipped
                 )
                 conn.commit()
     finally:
