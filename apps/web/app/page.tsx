@@ -1,22 +1,22 @@
 import { HomeIntro } from "@/components/HomeIntro";
 import { LocalitySearch } from "@/components/LocalitySearch";
 import {
-  fetchLocalities,
+  fetchLocalitySummaries,
   fetchStats,
   type CoverageStats,
-  type Locality,
+  type LocalitySummary,
 } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  let localities: Locality[] = [];
+  let localities: LocalitySummary[] = [];
   let stats: CoverageStats | null = null;
   let error: string | null = null;
 
   // Fetched together — the page needs both and they are independent.
   const [localityResult, statsResult] = await Promise.allSettled([
-    fetchLocalities(),
+    fetchLocalitySummaries(),
     fetchStats(),
   ]);
 
@@ -37,15 +37,31 @@ export default async function HomePage() {
     <main className="mx-auto max-w-3xl px-4 py-10">
       <MapHero />
 
-      <HomeIntro stats={stats} />
+      <h1 className="mt-6 text-[26px] font-bold leading-[1.2] tracking-[-0.02em]">
+        Know the neighbourhood
+        <br />
+        before you commit to it.
+      </h1>
 
-      {error ? (
-        <div className="mt-6 rounded-2xl border border-hairline bg-surface-1 p-4 text-[12px] text-ink-secondary">
-          {error}
-        </div>
-      ) : (
-        <LocalitySearch localities={localities} />
-      )}
+      {/* Search first. Someone arrives having already chosen the area they care
+        * about, so the first thing on the page should take that name and answer
+        * it — not offer a menu of forty-four to pick from. The case for
+        * trusting the answer sits below it, where it reads as support rather
+        * than as preamble. */}
+      <div className="mt-5">
+        {error ? (
+          <div className="rounded-2xl border border-hairline bg-surface-1 p-4 text-[12px] text-ink-secondary">
+            {error}
+          </div>
+        ) : (
+          <LocalitySearch localities={localities} />
+        )}
+      </div>
+
+      <div className="mt-9 border-t border-hairline pt-7">
+        <HomeIntro stats={stats} />
+      </div>
+
     </main>
   );
 }

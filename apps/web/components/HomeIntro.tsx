@@ -27,13 +27,11 @@ import type { CoverageStats } from "@/lib/api";
 export function HomeIntro({ stats }: { stats: CoverageStats | null }) {
   return (
     <>
-      <h1 className="mt-6 text-[26px] font-bold leading-[1.2] tracking-[-0.02em]">
-        Know the neighbourhood
-        <br />
-        before you commit to it.
-      </h1>
+      <h2 className="text-[17px] font-bold tracking-[-0.01em]">
+        Why you can check our working
+      </h2>
 
-      <p className="mt-2.5 text-[13px] leading-[1.6] text-ink-secondary">
+      <p className="mt-2 text-[13px] leading-[1.6] text-ink-secondary">
         Air quality, schools and what local press reports about safety and water
         — for {stats ? stats.localities : "44"} localities across Bengaluru and
         Gurugram. Every number says where it came from, how old it is, and how

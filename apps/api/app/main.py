@@ -260,6 +260,60 @@ def get_classification_state() -> dict[str, Any]:
         return db.classification_state(conn)
 
 
+class LocalitySummary(BaseModel):
+    """One locality, with enough of its report to answer a search.
+
+    Exists so a search result can state what the place is like rather than only
+    name it. Listing forty-four names and making someone click to find out is a
+    directory; the product is supposed to answer the question they typed.
+    """
+
+    slug: str
+    name: str
+    city: str
+    state: str
+    pincode: Optional[str] = None
+    categories_with_data: int = 0
+    score: Optional[int] = Field(
+        None, description="None when too few categories can be scored — shown as "
+        "such rather than as a zero or a blank."
+    )
+    top_flag: Optional[Flag] = Field(
+        None, description="The most serious thing found here, if anything was."
+    )
+
+
+@app.get("/api/v1/localities/summary", response_model=list[LocalitySummary])
+def get_locality_summaries() -> list[dict[str, Any]]:
+    """Every locality with its score and worst flag.
+
+    Builds each report rather than storing a summary: the scoring rules and flag
+    thresholds change often, and a stored copy would drift from the reports it
+    claims to summarise. Cached at the edge instead — see the frontend's
+    revalidate — so the cost is paid once every few minutes rather than per
+    visitor.
+    """
+    out: list[dict[str, Any]] = []
+    with db.connect() as conn:
+        coverage = db.coverage_by_cell(conn)
+        for locality in db.list_localities(conn):
+            report = orchestrator.build_report(conn, locality)
+            flags = report.flags
+            out.append(
+                {
+                    "slug": locality["slug"],
+                    "name": locality["name"],
+                    "city": locality["city"],
+                    "state": locality["state"],
+                    "pincode": locality.get("pincode"),
+                    "categories_with_data": coverage.get(locality["h3_cell"], 0),
+                    "score": report.trust_score.score,
+                    "top_flag": flags[0] if flags else None,
+                }
+            )
+    return out
+
+
 @app.get("/api/v1/localities", response_model=list[Locality])
 def get_localities() -> list[dict[str, Any]]:
     with db.connect() as conn:

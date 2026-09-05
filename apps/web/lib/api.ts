@@ -122,9 +122,9 @@ function toLocality(raw: Record<string, any>): Locality {
     city: raw.city,
     state: raw.state,
     pincode: raw.pincode ?? undefined,
-    h3Cell: raw.h3_cell,
-    lat: raw.lat,
-    lon: raw.lon,
+    h3Cell: raw.h3_cell ?? "",
+    lat: raw.lat ?? 0,
+    lon: raw.lon ?? 0,
     categoriesWithData: raw.categories_with_data ?? 0,
   };
 }
@@ -389,4 +389,39 @@ export async function fetchStats(): Promise<CoverageStats> {
     categoriesLive: raw.categories_live ?? 0,
     lastUpdate: raw.last_update ?? undefined,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Locality summaries — what a search result needs to answer, not just link
+// ---------------------------------------------------------------------------
+
+export interface LocalitySummary extends Locality {
+  /** null when too few categories can be scored. Never rendered as zero. */
+  score: number | null;
+  topFlag: Flag | null;
+}
+
+export async function fetchLocalitySummaries(): Promise<LocalitySummary[]> {
+  // Builds 44 reports server-side, so it is cached rather than paid per visitor.
+  // Five minutes matches the report pages' own revalidate, so a search result
+  // and the page it opens can never disagree by more than one refresh.
+  const response = await fetch(`${API_BASE}/api/v1/localities/summary`, {
+    next: { revalidate: 300 },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load localities (${response.status})`);
+  }
+  const raw = (await response.json()) as Array<Record<string, any>>;
+  return raw.map((entry) => ({
+    ...toLocality(entry),
+    score: entry.score ?? null,
+    topFlag: entry.top_flag
+      ? {
+          category: entry.top_flag.category,
+          severity: entry.top_flag.severity,
+          headline: entry.top_flag.headline,
+          detail: entry.top_flag.detail,
+        }
+      : null,
+  }));
 }
