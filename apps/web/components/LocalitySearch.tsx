@@ -170,20 +170,38 @@ function ScoreChip({ score }: { score: number | null }) {
           : "#c0442c";
 
   return (
-    <div
-      className="flex h-[42px] w-[42px] shrink-0 flex-col items-center justify-center rounded-xl"
-      style={{
-        background: score === null ? "transparent" : `color-mix(in srgb, ${colour} 12%, transparent)`,
-        border: score === null ? "1px dashed var(--color-hairline)" : "none",
-      }}
-      title={score === null ? "Not enough data for a score" : `Trust Score ${score} of 100`}
-    >
-      <span
-        className="text-[16px] font-bold leading-none tabular-nums"
-        style={{ color: colour }}
+    <div className="flex w-[46px] shrink-0 flex-col items-center gap-1">
+      <div
+        className="flex h-[42px] w-[42px] items-center justify-center rounded-xl"
+        style={{
+          background:
+            score === null ? "transparent" : `color-mix(in srgb, ${colour} 12%, transparent)`,
+          border: score === null ? "1px dashed var(--color-hairline)" : "none",
+        }}
+        title={
+          score === null
+            ? "Not enough data for a score"
+            : `Trust Score ${score} of 100, from air quality and schools only`
+        }
       >
-        {score ?? "—"}
-      </span>
+        <span
+          className="text-[16px] font-bold leading-none tabular-nums"
+          style={{ color: colour }}
+        >
+          {score ?? "—"}
+        </span>
+      </div>
+
+      {/* What the number covers, beside the number.
+        *
+        * Without this a green 95 sits directly next to "Violence reported in
+        * local press" and reads as though the 95 had weighed it. It has not:
+        * the score is air quality and schools, and safety is deliberately never
+        * scored. A confident figure next to a contradicting flag, with nothing
+        * reconciling them, is worse than either alone. */}
+      {score !== null && (
+        <span className="text-[8.5px] leading-none text-ink-muted">air+schools</span>
+      )}
     </div>
   );
 }
