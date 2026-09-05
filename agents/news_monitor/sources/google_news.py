@@ -63,6 +63,13 @@ CATEGORY_TERMS: dict[str, list[str]] = {
         "water", "waterlogging", "flooding", "tanker",
         "sewage", "borewell", "contamination",
     ],
+    # The discom names matter more than the words. Indian outage coverage says
+    # "BESCOM announces" or "DHBVN" far more often than "power cut", and a
+    # search without them misses most of what is published.
+    "power": [
+        "power cut", "power outage", "electricity", "load shedding",
+        "BESCOM", "DHBVN", "transformer", "no power supply",
+    ],
 }
 
 # Google News RSS has no published rate limit, but it is a free endpoint being

@@ -301,8 +301,24 @@ class WaterPayload(BaseModel):
 
 
 class PowerPayload(BaseModel):
-    avg_outage_hours_per_week_reported: Optional[float] = None
-    official_data_available: bool = False
+    """Power supply. The category with no official source at all.
+
+    NCRB is late and district-level; UDISE is stale but real. For outages there
+    is simply nothing — no Indian body publishes them at locality level — so
+    press coverage is not a supplement here, it is the whole record until
+    residents report.
+    """
+
+    avg_outage_hours_per_week_reported: Optional[float] = Field(
+        None,
+        description="Intentionally never populated from press coverage. A weekly "
+        "average implies a measured rate, and counting articles measures what was "
+        "written about rather than what happened.",
+    )
+    official_data_available: bool = Field(
+        False, description="Always False today, and stated rather than implied."
+    )
+    news: Optional[NewsCoverage] = None
 
 
 class InfraProject(BaseModel):

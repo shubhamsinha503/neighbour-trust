@@ -54,6 +54,14 @@ QUALITY = ("contamina", "sewage", "pollut", "quality", "dirty")
 
 # Monsoon months in India. Waterlogging outside these is a different and more
 # alarming signal than waterlogging during them.
+# Power incident groups. The distinction that matters to someone deciding where
+# to live is planned versus unplanned: a scheduled maintenance shutdown is an
+# inconvenience you can work around, and a transformer that failed without
+# warning is a different fact about the supply.
+PLANNED = ("planned", "scheduled", "maintenance", "shutdown", "notice")
+UNPLANNED = ("outage", "cut", "failure", "fault", "blackout", "tripped", "breakdown")
+INFRA_FAULT = ("transformer", "feeder", "cable", "substation", "line")
+
 MONSOON_MONTHS = (6, 7, 8, 9)
 
 # Below this, a distribution is not a pattern. Three thefts is a character;
@@ -219,9 +227,56 @@ def _month(published_at: Any) -> Optional[int]:
     return None
 
 
+def characterise_power(incidents: list[dict[str, Any]]) -> Optional[str]:
+    """Describe the kind of outage reported, not a rate.
+
+    A count of articles is not a reliability figure and must never read as one.
+    What the reporting can honestly support is the character of the disruption:
+    whether it was scheduled or not, and whether the same equipment keeps
+    failing.
+    """
+    if len(incidents) < MIN_FOR_PATTERN:
+        return None
+
+    # Equipment first, because _bucket returns the first group that matches and
+    # the specific test has to run before the general one. "transformer_failure"
+    # contains "failure", so with unplanned checked first every equipment fault
+    # was silently counted as a generic outage and the repeated-fault flag could
+    # never fire.
+    groups = {"equipment": INFRA_FAULT, "planned": PLANNED, "unplanned": UNPLANNED}
+    types = [i.get("incident_type") for i in incidents]
+    buckets = Counter(_bucket(t, groups) for t in types)
+
+    planned = buckets.get("planned", 0)
+    unplanned = buckets.get("unplanned", 0)
+    equipment = buckets.get("equipment", 0)
+
+    detail = _top_types(types)
+
+    if equipment >= 2:
+        return (
+            f"Equipment failures rather than scheduled work — {detail}. Repeated "
+            f"faults on the same infrastructure are a supply problem, not a "
+            f"maintenance calendar."
+        )
+    if unplanned > planned:
+        return (
+            f"Outages here were mostly unplanned ({unplanned} of "
+            f"{len(incidents)} reports) — {detail}."
+        )
+    if planned:
+        return (
+            f"Reported outages were mostly scheduled maintenance "
+            f"({planned} of {len(incidents)}) — {detail}."
+        )
+    return f"Power disruption reported {len(incidents)} times — {detail}."
+
+
 def characterise(category: str, incidents: list[dict[str, Any]]) -> Optional[str]:
     if category == "crime":
         return characterise_crime(incidents)
     if category == "water":
         return characterise_water(incidents)
+    if category == "power":
+        return characterise_power(incidents)
     return None

@@ -81,7 +81,15 @@ INCIDENT_TERMS: dict[str, dict[str, tuple[str, ...]]] = {
         "waterlogging": ("waterlog", "flooded", "flooding", "inundat"),
         "infrastructure": ("pipeline burst", "pipe burst", "leak"),
     },
+    "power": {
+        "power_outage": ("power cut", "power outage", "no power", "blackout",
+                         "load shedding", "electricity cut"),
+        "transformer_failure": ("transformer", "feeder", "substation", "cable fault"),
+        "scheduled_maintenance": ("scheduled", "maintenance", "shutdown notice",
+                                  "planned outage"),
+    },
 }
+
 
 # Headlines about policy, budgets and announcements are city or state level even
 # when they name a locality. These are the strongest single signal of a

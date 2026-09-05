@@ -30,6 +30,9 @@ from typing import Any, Optional
 
 from agents.news_monitor.characterise import (
     FLOODING,
+    INFRA_FAULT,
+    PLANNED,
+    UNPLANNED,
     PROPERTY,
     QUALITY,
     SUPPLY,
@@ -173,6 +176,42 @@ def _water_flags(payload: dict[str, Any]) -> list[dict[str, str]]:
     return flags
 
 
+def _power_flags(payload: dict[str, Any]) -> list[dict[str, str]]:
+    news = payload.get("news") or {}
+    types = _incident_types(news)
+    if not types:
+        return []
+
+    # Equipment first, because _bucket returns the first group that matches and
+    # the specific test has to run before the general one. "transformer_failure"
+    # contains "failure", so with unplanned checked first every equipment fault
+    # was silently counted as a generic outage and the repeated-fault flag could
+    # never fire.
+    groups = {"equipment": INFRA_FAULT, "planned": PLANNED, "unplanned": UNPLANNED}
+    buckets = Counter(_bucket(t, groups) for t in types)
+    unplanned = buckets.get("unplanned", 0)
+    equipment = buckets.get("equipment", 0)
+
+    if equipment >= 2:
+        return [{
+            "category": "power",
+            "severity": "serious",
+            "headline": f"Repeated equipment failures reported ({equipment} times)",
+            "detail": "Transformer and feeder faults recur on the same "
+            "infrastructure. No official outage record exists for any Indian "
+            "locality, so this is press reporting rather than a measured rate.",
+        }]
+    if unplanned >= 2:
+        return [{
+            "category": "power",
+            "severity": "notable",
+            "headline": f"Unplanned outages reported ({unplanned} times in the year)",
+            "detail": "Counted from local press. Scheduled maintenance is "
+            "excluded from this figure.",
+        }]
+    return []
+
+
 def _air_flags(payload: dict[str, Any]) -> list[dict[str, str]]:
     band = payload.get("aqi_band")
     if band not in POOR_AIR_BANDS:
@@ -213,6 +252,7 @@ def find(
     for category, builder in (
         ("crime", _crime_flags),
         ("water", _water_flags),
+        ("power", _power_flags),
         ("air_quality", _air_flags),
     ):
         envelope = envelopes.get(category)

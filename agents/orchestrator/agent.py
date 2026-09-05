@@ -212,7 +212,7 @@ def _category_summary(category: str, envelope: Optional[dict[str, Any]]) -> str:
             return f"{near} schools within 2 km · median {round(ptr)}:1 pupil–teacher"
         return f"{near} schools within 2 km · staffing data for {payload.get('schools_with_staffing_data', 0)}"
 
-    if category in ("crime", "water"):
+    if category in ("crime", "water", "power"):
         news = payload.get("news") or {}
         n = news.get("incidents_12m", 0)
 

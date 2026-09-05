@@ -34,6 +34,7 @@ from neighbour_trust_schema.envelope import (
     Confidence,
     CrimePayload,
     DataEnvelope,
+    PowerPayload,
     NewsCoverage,
     NewsIncident,
     WaterPayload,
@@ -48,8 +49,18 @@ from agents.news_monitor.sources import google_news as gnews_src
 
 log = logging.getLogger(__name__)
 
-# The two categories news feeds. Not a category itself — see the module docstring.
-CATEGORIES = ("crime", "water")
+# The categories news feeds. Not a category itself — see the module docstring.
+#
+# Power was added last and is the clearest case for why this agent exists: there
+# is no official record of outages at locality level anywhere in India, so press
+# coverage is not a supplement to official data here, it is the only data.
+#
+# It is also the noisiest. Most outage coverage is a city-wide utility notice
+# listing affected areas in the article body, and we classify headlines alone —
+# so those are correctly rejected and the confirmed rate is low. What survives is
+# the locality-specific reporting: a transformer that failed, an area left dark
+# for a day.
+CATEGORIES = ("crime", "water", "power")
 
 # How far back the counts look. A year smooths seasonal reporting spikes
 # (Bengaluru water stories cluster in summer, waterlogging in monsoon) that a
@@ -325,15 +336,26 @@ def build_envelope(
         classifier=incidents[0]["classifier"] if incidents else None,
     )
 
-    if category == "crime":
+    if category == "power":
+        payload = PowerPayload(
+            # Deliberately None. A weekly average implies a measured rate, and
+            # press coverage cannot produce one — it counts what was written
+            # about, not what happened.
+            avg_outage_hours_per_week_reported=None,
+            official_data_available=False,
+            news=news,
+        )
+    elif category == "crime":
         payload = CrimePayload(
             official_crime_rate_district=None,  # NCRB not wired up yet
             resident_reports_90d_count=0,       # resident reporting is Phase 2 too
             blended_safety_perception_score=None,  # deliberately — see the model
             news=news,
         )
-    else:
+    elif category == "water":
         payload = WaterPayload(news=news)
+    else:
+        raise ValueError(f"no payload for category {category!r}")
 
     # The most recent incident is the freshest thing this envelope knows.
     #

@@ -149,7 +149,20 @@ class TestWater:
 
 class TestDispatch:
     def test_unknown_category_returns_none(self):
-        assert characterise("power", [incident("outage")] * 5) is None
+        """Categories with no source produce no sentence. This asserted on
+        "power" until power gained a news feed, at which point it was asserting
+        the opposite of the intended behaviour."""
+        assert characterise("infrastructure", [incident("metro")] * 5) is None
+        assert characterise("schools", [incident("anything")] * 5) is None
+
+    def test_the_three_news_categories_are_all_handled(self):
+        found = [
+            c for c in ("crime", "water", "power")
+            if characterise(c, [incident("theft" if c == "crime" else
+                                        "waterlogging" if c == "water" else
+                                        "power_outage")] * 4)
+        ]
+        assert found == ["crime", "water", "power"]
 
     def test_threshold_is_shared(self):
         assert MIN_FOR_PATTERN >= 3
@@ -197,3 +210,67 @@ class TestSourceAttribution:
         assert attribution(["GDELT", "Google News"])[0] == attribution(
             ["Google News", "GDELT"]
         )[0]
+
+
+class TestPower:
+    """Power is the category with no official source at all.
+
+    NCRB is late and district-level; UDISE is stale but real. For outages no
+    Indian body publishes anything at locality level, so press coverage is not a
+    supplement here — it is the entire record until residents report.
+    """
+
+    def test_too_few_gives_nothing(self):
+        from agents.news_monitor.characterise import characterise_power
+
+        assert characterise_power([incident("power_outage")] * 2) is None
+
+    def test_equipment_failure_beats_the_generic_outage_label(self):
+        """"transformer_failure" contains "failure", which also appears in the
+        unplanned vocabulary. With the general test running first every
+        equipment fault was counted as a generic outage and the repeated-fault
+        case could never be reported."""
+        from agents.news_monitor.characterise import characterise_power
+
+        result = characterise_power(
+            [incident("transformer_failure")] * 3 + [incident("power_outage")] * 2
+        )
+        assert result and "Equipment failures" in result
+
+    def test_unplanned_is_distinguished_from_scheduled(self):
+        from agents.news_monitor.characterise import characterise_power
+
+        result = characterise_power(
+            [incident("power_outage")] * 4 + [incident("scheduled_maintenance")]
+        )
+        assert result and "unplanned" in result
+
+    def test_scheduled_maintenance_is_not_called_an_outage_problem(self):
+        """A maintenance calendar is an inconvenience you can plan around, and
+        reporting it as unreliability would overstate what the press said."""
+        from agents.news_monitor.characterise import characterise_power
+
+        result = characterise_power([incident("scheduled_maintenance")] * 4)
+        assert result and "scheduled maintenance" in result
+
+    def test_no_rate_is_ever_claimed(self):
+        """Counting articles measures what was written about, not what happened.
+        Nothing here may read as hours-per-week or a reliability percentage."""
+        from agents.news_monitor.characterise import characterise_power
+
+        for types in (["power_outage"] * 5, ["transformer_failure"] * 5):
+            result = characterise_power([incident(t) for t in types])
+            assert result
+            assert "%" not in result
+            assert "per week" not in result and "per month" not in result
+
+
+class TestPowerIsNeverScored:
+    def test_power_stays_out_of_the_composite(self):
+        """Same reason crime and water are excluded: press coverage tracks media
+        attention, and a well-covered locality would look less reliable than an
+        identical one nobody writes about."""
+        from agents.orchestrator.score import SCOREABLE, category_score
+
+        assert "power" not in SCOREABLE
+        assert category_score("power", {"news": {"incidents_12m": 9}}) is None
