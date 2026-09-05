@@ -122,3 +122,46 @@ class TestUnmappedIsNotEmpty:
         assert "MIN_FEATURES_FOR_DATA" in source
         # The check must precede scoring, or it is decoration.
         assert source.index("MIN_FEATURES_FOR_DATA:") < source.index("score_amenities(found)")
+
+
+class TestRunsResume:
+    """A timed-out connectivity run must continue, not restart.
+
+    Overpass takes 20 seconds to four minutes per locality and rate-limits, so a
+    full pass of 44 can exceed the job timeout. Without a freshness skip the job
+    restarts at the first locality every time, spends its whole budget
+    re-fetching what it already has, and never reaches the tail — incomplete
+    forever rather than incomplete once.
+    """
+
+    SOURCE = __import__("pathlib").Path(
+        "agents/infrastructure/run.py"
+    ).read_text(encoding="utf-8")
+
+    def test_a_freshness_window_exists(self):
+        from agents.infrastructure.run import FRESH_FOR
+
+        assert FRESH_FOR.days >= 1
+
+    def test_the_window_does_not_outlast_the_weekly_cadence(self):
+        """Longer than the schedule and a locality would be skipped forever."""
+        from agents.infrastructure.run import FRESH_FOR
+
+        assert FRESH_FOR.days < 7
+
+    def test_recent_localities_are_skipped(self):
+        assert "latest_envelope_by_source" in self.SOURCE
+        assert "FRESH_FOR" in self.SOURCE
+
+    def test_force_overrides_the_skip(self):
+        assert "--force" in self.SOURCE
+
+    def test_the_pause_is_not_spent_on_skipped_localities(self):
+        """Sleeping before a skip would burn the run's budget on localities it
+        is not even querying."""
+        assert "if fetched:" in self.SOURCE
+
+    def test_an_all_skipped_run_is_a_success(self):
+        """Everything already current is the healthy steady state, not a
+        failure that should redden CI and block later steps."""
+        assert "return 0 if (ok or skipped) else 1" in self.SOURCE

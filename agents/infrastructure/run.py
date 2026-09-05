@@ -18,6 +18,7 @@ import logging
 import pathlib
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -33,10 +34,27 @@ from agents.infrastructure.sources import osm_amenities as osm  # noqa: E402
 # were the service pushing back.
 PAUSE_SECONDS = 3.0
 
+# A locality whose connectivity was fetched inside this window is skipped.
+#
+# Without it a timed-out run is not merely incomplete, it is unable to progress:
+# the job restarts at the first locality every time, spends its whole budget
+# re-fetching what it already has, and the tail is never reached. Six days keeps
+# the weekly cadence intact while making every run resume where the last one
+# stopped.
+#
+# What is built near a locality changes on the order of years, so re-fetching it
+# weekly is already generous toward a volunteer-run service.
+FRESH_FOR = timedelta(days=6)
+
 
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Fetch what is built near each locality.")
     parser.add_argument("--locality", help="Run for a single locality slug.")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-fetch localities that already have recent connectivity data.",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args(argv)
@@ -71,9 +89,27 @@ def main(argv: Optional[list[str]] = None) -> int:
             )
             conn.commit()
 
-            for index, locality in enumerate(localities):
-                if index:
+            fetched = 0
+            for locality in localities:
+                if not args.force:
+                    existing = db.latest_envelope_by_source(
+                        conn,
+                        category="infrastructure",
+                        h3_cell=locality["h3_cell"],
+                        source_name=osm.SOURCE_NAME,
+                    )
+                    if existing and existing["fetched_at"] > datetime.now(
+                        timezone.utc
+                    ) - FRESH_FOR:
+                        skipped += 1
+                        continue
+
+                # Only between real fetches — pausing before a skip would spend
+                # the run's budget on localities it is not even querying.
+                if fetched:
                     time.sleep(PAUSE_SECONDS)
+                fetched += 1
+
                 result = infra_agent.build_envelope(conn, locality, client=client)
                 if result.ok:
                     ok += 1
@@ -96,10 +132,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         client.close()
 
     print(f"\n{ok} stored, {skipped} skipped.")
-    # Non-zero only when nothing was stored. A partial pass is the normal shape
-    # of a run against a service that rate-limits, and failing CI for it would
-    # block every later step for no reason.
-    return 0 if ok else 1
+    # Non-zero only when nothing was stored *and* nothing was already fresh. A
+    # partial pass is the normal shape of a run against a service that
+    # rate-limits, and a run that skipped everything because the data is current
+    # is a success rather than a failure.
+    return 0 if (ok or skipped) else 1
 
 
 if __name__ == "__main__":
