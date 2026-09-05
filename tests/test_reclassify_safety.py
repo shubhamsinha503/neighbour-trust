@@ -106,29 +106,34 @@ class TestClassifierFallbackOrder:
         "agents/news_monitor/classify.py"
     ).read_text(encoding="utf-8")
 
-    def test_groq_is_tried_before_the_heuristic(self):
+    def test_a_language_model_is_tried_before_the_heuristic(self):
         build = self.SOURCE[self.SOURCE.index("def build_classifier") :]
-        assert build.index("GROQ_API_KEY") < build.index("HeuristicClassifier()")
+        assert build.index("CLASSIFIER_PROVIDER") < build.index("HeuristicClassifier()")
 
-    def test_claude_is_tried_before_groq(self):
+    def test_claude_is_tried_first(self):
         build = self.SOURCE[self.SOURCE.index("def build_classifier") :]
-        assert build.index("ANTHROPIC_API_KEY") < build.index("GROQ_API_KEY")
+        assert build.index("ANTHROPIC_API_KEY") < build.index("CLASSIFIER_PROVIDER")
+
+    def test_provider_order_is_configurable(self):
+        """Which provider leads is a deployment decision — the free tier while
+        it lasts, a paid one when it runs out — not a code change."""
+        assert "CLASSIFIER_PROVIDER" in self.SOURCE
 
     def test_both_models_share_one_system_prompt(self):
         """The prompt encodes judgements about the task, not about a model —
         that "Monu Manesar" names a man, that a labour dispute at an industrial
         estate is not a neighbourhood incident. A lesson learned from one
         classifier's mistake should improve both."""
-        groq = self.SOURCE[self.SOURCE.index("class GroqClassifier") :]
+        groq = self.SOURCE[self.SOURCE.index("class OpenAICompatibleClassifier") :]
         assert "SYSTEM_PROMPT" in groq[: groq.index("def _clean_type")]
 
     def test_verdicts_record_which_model_made_them(self):
         """So a mixed corpus stays auditable and --reclassify-from can revisit
         one classifier's work without paying to redo the other's."""
-        assert 'self.name = f"groq:{self._model}"' in self.SOURCE
+        assert 'self.name = f"{provider}:{self._model}"' in self.SOURCE
 
     def test_an_unparseable_answer_declines_rather_than_guesses(self):
-        groq = self.SOURCE[self.SOURCE.index("class GroqClassifier") :]
+        groq = self.SOURCE[self.SOURCE.index("class OpenAICompatibleClassifier") :]
         body = groq[: groq.index("def _clean_type")]
         assert "JSONDecodeError" in body
         # The verdict goes through _as_bool, which accepts a boolean or the
@@ -210,7 +215,7 @@ class TestVerdictParsing:
         source = __import__("pathlib").Path(
             "agents/news_monitor/classify.py"
         ).read_text(encoding="utf-8")
-        groq = source[source.index("class GroqClassifier") :]
+        groq = source[source.index("class OpenAICompatibleClassifier") :]
         assert 'raw.startswith("```")' in groq
 
 
@@ -286,12 +291,12 @@ class TestGroqPacing:
     ).read_text(encoding="utf-8")
 
     def test_a_rate_is_declared(self):
-        from agents.news_monitor.classify import GroqClassifier
+        from agents.news_monitor.classify import OpenAICompatibleClassifier
 
-        assert 0 < GroqClassifier.CALLS_PER_MINUTE <= 15
+        assert 0 < OpenAICompatibleClassifier.CALLS_PER_MINUTE <= 15
 
     def test_every_call_waits_its_turn(self):
-        groq = self.SOURCE[self.SOURCE.index("class GroqClassifier") :]
+        groq = self.SOURCE[self.SOURCE.index("class OpenAICompatibleClassifier") :]
         body = groq[: groq.index("def _as_bool")]
         assert body.index("self._wait_turn()") < body.index(
             "self._client.chat.completions.create"
@@ -312,10 +317,10 @@ class TestGroqPacing:
         import time
         from concurrent.futures import ThreadPoolExecutor
 
-        from agents.news_monitor.classify import GroqClassifier
+        from agents.news_monitor.classify import OpenAICompatibleClassifier
 
         # Exercise the pacing without constructing a client or needing a key.
-        paced = object.__new__(GroqClassifier)
+        paced = object.__new__(OpenAICompatibleClassifier)
         paced._pace_lock = threading.Lock()
         paced._next_call_at = 0.0
         paced._min_interval = 0.05
@@ -373,16 +378,22 @@ class TestEmptyEnvVarsDoNotOverrideDefaults:
         assert not offenders, offenders
 
     def test_an_empty_model_falls_through_to_the_default(self, monkeypatch):
-        from agents.news_monitor.classify import GroqClassifier
+        from agents.news_monitor.classify import (
+            GroqClassifier,
+            OpenAICompatibleClassifier,
+        )
 
         monkeypatch.setenv("GROQ_API_KEY", "test-key")
         monkeypatch.setenv("GROQ_MODEL", "")
-        assert GroqClassifier().name == f"groq:{GroqClassifier.DEFAULT_MODEL}"
+        monkeypatch.delenv("CLASSIFIER_MODEL", raising=False)
+        default = OpenAICompatibleClassifier.PROVIDERS["groq"][1]
+        assert GroqClassifier().name == f"groq:{default}"
 
     def test_an_explicit_model_still_wins(self, monkeypatch):
         from agents.news_monitor.classify import GroqClassifier
 
         monkeypatch.setenv("GROQ_API_KEY", "test-key")
+        monkeypatch.delenv("CLASSIFIER_MODEL", raising=False)
         monkeypatch.setenv("GROQ_MODEL", "openai/gpt-oss-120b")
         assert GroqClassifier().name == "groq:openai/gpt-oss-120b"
 
@@ -392,5 +403,6 @@ class TestEmptyEnvVarsDoNotOverrideDefaults:
         from agents.news_monitor.classify import GroqClassifier
 
         monkeypatch.setenv("GROQ_API_KEY", "test-key")
+        monkeypatch.delenv("CLASSIFIER_CALLS_PER_MINUTE", raising=False)
         monkeypatch.setenv("GROQ_CALLS_PER_MINUTE", "")
         assert GroqClassifier()._min_interval > 0

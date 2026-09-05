@@ -75,7 +75,14 @@ jobs:
       # reading "0% assessed". With this set, a spent Anthropic budget slows the
       # work instead of halting it.
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      GROQ_MODEL: ${{ vars.GROQ_MODEL }}
+      # Paid fallback for when the free tier's 8,000 tokens a minute runs out.
+      # About a dollar a month at current volumes.
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      # Which providers to try and in what order; blank means groq,deepseek.
+      # An unset repository variable arrives as an empty string rather than as
+      # absent, so every reader of these uses `or` and not a dict default.
+      CLASSIFIER_PROVIDER: ${{ vars.CLASSIFIER_PROVIDER }}
+      CLASSIFIER_MODEL: ${{ vars.CLASSIFIER_MODEL }}
       # Optional. Unset means the classifier's own default (claude-opus-5).
       # Worth setting deliberately: a full first pass is ~800 headlines, which
       # is a few dollars on Opus and a fraction of that on Haiku, and short

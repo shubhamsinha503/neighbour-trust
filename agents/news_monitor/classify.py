@@ -155,6 +155,11 @@ class HeuristicClassifier:
 # Claude
 # ---------------------------------------------------------------------------
 
+def GroqClassifier(model: Optional[str] = None) -> "OpenAICompatibleClassifier":
+    """Groq, kept as a name because build_classifier and the tests use it."""
+    return OpenAICompatibleClassifier("groq", model=model)
+
+
 SYSTEM_PROMPT = """You classify Indian local-news headlines for a neighbourhood \
 data product used by home buyers.
 
@@ -285,8 +290,8 @@ class ClaudeClassifier:
         )
 
 
-class GroqClassifier:
-    """Judges headlines through Groq's API.
+class OpenAICompatibleClassifier:
+    """Judges headlines through any OpenAI-protocol endpoint.
 
     Exists because the classifier is the one part of this system with a per-item
     cost, and running out of credit stops the news pipeline dead — which it did,
@@ -299,13 +304,29 @@ class GroqClassifier:
     incident — and those are properties of the task, not of the model. Keeping one
     prompt means a lesson learned from one classifier's mistake improves both.
 
-    The API is OpenAI-compatible, so this uses the `openai` client pointed at
-    Groq's base URL rather than another SDK.
+    Written against the protocol rather than one vendor, because everything that
+    differs between Groq, DeepSeek, OpenRouter, Cerebras and a local Ollama is a
+    base URL, a key and a model name. Adding a provider is three environment
+    variables, not a new class — which matters when the one you are on caps you
+    at 8,000 tokens a minute and its paid tier is closed to new signups.
 
-    Verdicts record which model produced them (`groq:<model>`), so a mixed corpus
-    stays auditable and `--reclassify-from groq` can revisit just these if the
-    quality turns out to be worse than Claude's.
+    Verdicts record the provider and model (`groq:qwen/qwen3.8-27b`), so a mixed
+    corpus stays auditable and `--reclassify-from deepseek` can revisit one
+    provider's work without paying to redo another's.
     """
+
+    # A preset is a base URL and a default model. The key always comes from the
+    # environment; nothing here is ever hardcoded.
+    PROVIDERS = {
+        "groq": ("https://api.groq.com/openai/v1", "qwen/qwen3.8-27b", "GROQ_API_KEY"),
+        # Cheap rather than free — roughly seventy cents to judge the whole
+        # corpus at off-peak rates, against Groq's fifteen calls a minute.
+        "deepseek": ("https://api.deepseek.com", "deepseek-v4-flash", "DEEPSEEK_API_KEY"),
+        "openrouter": ("https://openrouter.ai/api/v1", "", "OPENROUTER_API_KEY"),
+        "cerebras": ("https://api.cerebras.ai/v1", "", "CEREBRAS_API_KEY"),
+        # A model you host yourself. No key, no rate limit, no bill.
+        "ollama": ("http://localhost:11434/v1", "qwen2.5:7b", "OLLAMA_KEY"),
+    }
 
     # Chosen by measurement, not reputation. Groq's free tier serves no Llama
     # models at all — the first default, llama-3.3-70b-versatile, returned 404
@@ -340,7 +361,13 @@ class GroqClassifier:
     # per call and far faster overall.
     CALLS_PER_MINUTE = 14
 
-    def __init__(self, model: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        provider: str = "groq",
+        model: Optional[str] = None,
+        base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+    ) -> None:
         # `or` rather than a dict default throughout this file. An unset GitHub
         # Actions variable arrives as an empty string, not as absent, so
         # os.environ.get("GROQ_MODEL", DEFAULT) returns "" and the default never
@@ -354,17 +381,37 @@ class GroqClassifier:
                 "The openai package is not installed. Run: pip install openai"
             ) from exc
 
-        key = os.environ.get("GROQ_API_KEY")
-        if not key:
+        preset = self.PROVIDERS.get(provider)
+        if preset is None and not (base_url and model):
             raise RuntimeError(
-                "GROQ_API_KEY is not set.\n"
-                "Get a free key at: https://console.groq.com/keys\n"
-                "Then add it to .env at the repo root."
+                f"Unknown provider {provider!r}. Either name one of "
+                f"{', '.join(self.PROVIDERS)}, or pass base_url and model."
+            )
+        default_url, default_model, key_env = preset or ("", "", "")
+
+        key = api_key or (os.environ.get(key_env) if key_env else None)
+        # A self-hosted model needs no key; every hosted one does.
+        if not key and provider != "ollama":
+            raise RuntimeError(
+                f"{key_env} is not set — needed to classify news mentions "
+                f"with {provider}."
             )
 
-        self._model = model or os.environ.get("GROQ_MODEL") or self.DEFAULT_MODEL
-        self._client = OpenAI(api_key=key, base_url="https://api.groq.com/openai/v1")
-        self.name = f"groq:{self._model}"
+        self._provider = provider
+        self._model = (
+            model or os.environ.get("CLASSIFIER_MODEL")
+            or os.environ.get("GROQ_MODEL") or default_model
+        )
+        if not self._model:
+            raise RuntimeError(
+                f"No model for {provider}. Set CLASSIFIER_MODEL — providers like "
+                f"OpenRouter and Cerebras have no single sensible default."
+            )
+        self._client = OpenAI(
+            api_key=key or "not-needed",
+            base_url=base_url or default_url,
+        )
+        self.name = f"{provider}:{self._model}"
 
         # A classifier that declines is indistinguishable from one that is
         # broken, and both look like "could not answer a test headline". The
@@ -378,7 +425,12 @@ class GroqClassifier:
         self._pace_lock = threading.Lock()
         self._next_call_at = 0.0
         self._min_interval = 60.0 / max(
-            1, int(os.environ.get("GROQ_CALLS_PER_MINUTE") or self.CALLS_PER_MINUTE)
+            1,
+            int(
+                os.environ.get("CLASSIFIER_CALLS_PER_MINUTE")
+                or os.environ.get("GROQ_CALLS_PER_MINUTE")
+                or self.CALLS_PER_MINUTE
+            ),
         )
 
     def _wait_turn(self) -> None:
@@ -407,7 +459,7 @@ class GroqClassifier:
         does not bury its own summary.
         """
         if self._reported_failure:
-            log.debug("groq: %s", problem)
+            log.debug("%s: %s", self._provider, problem)
             return
         self._reported_failure = True
         log.warning(
@@ -415,6 +467,7 @@ class GroqClassifier:
             "  If this names a decommissioned model, set the GROQ_MODEL "
             "repository variable to a current id from "
             "https://console.groq.com/docs/models",
+            self._provider,
             self._model,
             problem,
         )
@@ -575,15 +628,28 @@ def build_classifier(prefer_claude: bool = True) -> Classifier:
         except Exception as exc:
             log.warning("Claude classifier unavailable (%s); trying Groq", exc)
 
-    if os.environ.get("GROQ_API_KEY"):
+    # Providers are tried in the order named by CLASSIFIER_PROVIDER, so which
+    # one leads is a deployment decision rather than a code change. Default order
+    # puts the free tier first and a paid one behind it, which is the shape you
+    # want when the free tier has a hard ceiling rather than a bill.
+    order = [
+        name.strip()
+        for name in (os.environ.get("CLASSIFIER_PROVIDER") or "groq,deepseek").split(",")
+        if name.strip()
+    ]
+    for provider in order:
+        preset = OpenAICompatibleClassifier.PROVIDERS.get(provider)
+        key_env = preset[2] if preset else None
+        if key_env and provider != "ollama" and not os.environ.get(key_env):
+            continue
         try:
-            groq = GroqClassifier()
-            if _works(groq):
-                log.info("Using %s (free tier)", groq.name)
-                return groq
-            log.warning("Groq built but could not answer a test headline.")
+            classifier = OpenAICompatibleClassifier(provider)
+            if _works(classifier):
+                log.info("Using %s", classifier.name)
+                return classifier
+            log.warning("%s built but could not answer a test headline.", provider)
         except Exception as exc:
-            log.warning("Groq classifier unavailable (%s); using heuristic", exc)
+            log.warning("%s classifier unavailable (%s)", provider, exc)
 
     log.warning(
         "No language-model classifier could answer (set ANTHROPIC_API_KEY or "
