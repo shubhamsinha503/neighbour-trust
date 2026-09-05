@@ -238,7 +238,16 @@ def _category_summary(category: str, envelope: Optional[dict[str, Any]]) -> str:
         described = news.get("characterisation")
         if described:
             return described
-        return f"{n} incident(s) in local press (12 months) · not scored"
+        # "not scored" meant a refusal when these categories were excluded from
+        # the composite on principle. They are scored now, and below three
+        # incidents there is simply too little to read a pattern from — a
+        # different statement, and the old wording implies a policy that no
+        # longer exists.
+        if n == 0:
+            return "Nothing reported in local press in the last 12 months"
+        return (
+            f"{n} incident(s) in local press (12 months) — too few to score"
+        )
 
     return ""
 
