@@ -461,6 +461,70 @@ class ReportResponse(BaseModel):
     generated_at: str
 
 
+@app.get("/debug/report/{slug}")
+def debug_report(slug: str) -> dict[str, Any]:
+    """Build one report and return the traceback if it raises.
+
+    Operational, and added while every /report was returning 500 with no way to
+    see why from outside the process. A stack trace beats another round of
+    reasoning about which field might be missing — that approach has been wrong
+    twice today.
+
+    Returns the failure as data rather than raising, so the answer survives the
+    trip through the error handler.
+    """
+    import traceback
+
+    try:
+        with db.connect() as conn:
+            locality = db.get_locality(conn, slug)
+            if locality is None:
+                return {"ok": False, "error": f"unknown locality: {slug}"}
+            report = orchestrator.build_report(conn, locality)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "stage": "build_report",
+            "error": f"{type(exc).__name__}: {exc}",
+            "traceback": traceback.format_exc().splitlines()[-12:],
+        }
+
+    # Serialisation is the other candidate: the response model is strict about
+    # shapes the dataclass is not.
+    try:
+        ReportResponse(
+            locality=report.locality,
+            trust_score={
+                "score": report.trust_score.score,
+                "coverage_pct": report.trust_score.coverage_pct,
+                "categories_counted": report.trust_score.categories_counted,
+                "categories_total": report.trust_score.categories_total,
+                "reason_unavailable": report.trust_score.reason_unavailable,
+            },
+            verdict=report.verdict,
+            biggest_watchout=report.biggest_watchout,
+            flags=report.flags,
+            disagreements=[
+                {"category": d.category, "headline": d.headline,
+                 "detail": d.detail, "severity": d.severity}
+                for d in report.disagreements
+            ],
+            categories=report.categories,
+            sources_used=report.sources_used,
+            generated_at=report.generated_at.isoformat(),
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "stage": "response_model",
+            "error": f"{type(exc).__name__}: {exc}"[:1500],
+            "flags": report.flags[:3],
+            "biggest_watchout": report.biggest_watchout,
+        }
+
+    return {"ok": True, "flags": len(report.flags)}
+
+
 @app.get("/api/v1/localities/{slug}/report", response_model=ReportResponse)
 def get_report(slug: str) -> dict[str, Any]:
     """Everything known about one locality, merged and reconciled.
