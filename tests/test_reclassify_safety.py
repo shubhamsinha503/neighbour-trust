@@ -486,3 +486,50 @@ class TestFailureReportingIsWellFormed:
             log.removeHandler(handler)
 
         assert records and "groq" in records[0] and "boom" in records[0]
+
+
+class TestPacingIsPerProvider:
+    """Provider limits differ by two orders of magnitude.
+
+    Groq's free tier meters 8,000 tokens a minute against 524 per
+    classification — fifteen calls. DeepSeek allows 2,500 concurrent requests
+    and is metered by spend. Applying Groq's rate to DeepSeek turned a run
+    DeepSeek finishes in about thirty seconds into twenty minutes of waiting,
+    and made the whole job take half an hour.
+    """
+
+    def test_every_provider_declares_a_rate(self):
+        from agents.news_monitor.classify import OpenAICompatibleClassifier
+
+        for name, preset in OpenAICompatibleClassifier.PROVIDERS.items():
+            assert len(preset) == 4, name
+            assert preset[3] > 0, name
+
+    def test_groq_stays_under_its_token_ceiling(self, monkeypatch):
+        """8,000 output-plus-input tokens a minute at 524 per call is fifteen."""
+        from agents.news_monitor.classify import OpenAICompatibleClassifier
+
+        monkeypatch.setenv("GROQ_API_KEY", "test-key")
+        monkeypatch.delenv("CLASSIFIER_CALLS_PER_MINUTE", raising=False)
+        monkeypatch.delenv("GROQ_CALLS_PER_MINUTE", raising=False)
+        rate = 60 / OpenAICompatibleClassifier("groq")._min_interval
+        assert rate <= 15
+
+    def test_deepseek_is_not_throttled_to_groqs_rate(self, monkeypatch):
+        from agents.news_monitor.classify import OpenAICompatibleClassifier
+
+        monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+        monkeypatch.delenv("CLASSIFIER_CALLS_PER_MINUTE", raising=False)
+        monkeypatch.delenv("GROQ_CALLS_PER_MINUTE", raising=False)
+        rate = 60 / OpenAICompatibleClassifier("deepseek")._min_interval
+        assert rate >= 100, rate
+
+    def test_an_explicit_rate_still_overrides(self, monkeypatch):
+        """Limits change and an account may differ; a wrong constant should not
+        need a code change."""
+        from agents.news_monitor.classify import OpenAICompatibleClassifier
+
+        monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+        monkeypatch.setenv("CLASSIFIER_CALLS_PER_MINUTE", "30")
+        rate = 60 / OpenAICompatibleClassifier("deepseek")._min_interval
+        assert round(rate) == 30

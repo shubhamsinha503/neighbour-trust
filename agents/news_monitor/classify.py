@@ -317,15 +317,23 @@ class OpenAICompatibleClassifier:
 
     # A preset is a base URL and a default model. The key always comes from the
     # environment; nothing here is ever hardcoded.
+    # base URL, default model, key variable, calls per minute.
+    #
+    # The rate is per provider because their limits differ by two orders of
+    # magnitude, and applying the tightest one to all of them made a
+    # thirty-minute run out of what DeepSeek finishes in about one. Groq's free
+    # tier meters 8,000 tokens a minute against 524 per classification, which is
+    # fifteen; DeepSeek allows 2,500 concurrent requests and is metered by spend
+    # instead, so the only reason to pace it is politeness.
     PROVIDERS = {
-        "groq": ("https://api.groq.com/openai/v1", "qwen/qwen3.8-27b", "GROQ_API_KEY"),
+        "groq": ("https://api.groq.com/openai/v1", "qwen/qwen3.8-27b", "GROQ_API_KEY", 14),
         # Cheap rather than free — roughly seventy cents to judge the whole
-        # corpus at off-peak rates, against Groq's fifteen calls a minute.
-        "deepseek": ("https://api.deepseek.com", "deepseek-v4-flash", "DEEPSEEK_API_KEY"),
-        "openrouter": ("https://openrouter.ai/api/v1", "", "OPENROUTER_API_KEY"),
-        "cerebras": ("https://api.cerebras.ai/v1", "", "CEREBRAS_API_KEY"),
+        # corpus at off-peak rates, and no meaningful rate ceiling.
+        "deepseek": ("https://api.deepseek.com", "deepseek-v4-flash", "DEEPSEEK_API_KEY", 600),
+        "openrouter": ("https://openrouter.ai/api/v1", "", "OPENROUTER_API_KEY", 60),
+        "cerebras": ("https://api.cerebras.ai/v1", "", "CEREBRAS_API_KEY", 30),
         # A model you host yourself. No key, no rate limit, no bill.
-        "ollama": ("http://localhost:11434/v1", "qwen2.5:7b", "OLLAMA_KEY"),
+        "ollama": ("http://localhost:11434/v1", "qwen2.5:7b", "OLLAMA_KEY", 600),
     }
 
     # Chosen by measurement, not reputation. Groq's free tier serves no Llama
@@ -387,7 +395,7 @@ class OpenAICompatibleClassifier:
                 f"Unknown provider {provider!r}. Either name one of "
                 f"{', '.join(self.PROVIDERS)}, or pass base_url and model."
             )
-        default_url, default_model, key_env = preset or ("", "", "")
+        default_url, default_model, key_env, default_rate = preset or ("", "", "", 14)
 
         key = api_key or (os.environ.get(key_env) if key_env else None)
         # A self-hosted model needs no key; every hosted one does.
@@ -429,7 +437,7 @@ class OpenAICompatibleClassifier:
             int(
                 os.environ.get("CLASSIFIER_CALLS_PER_MINUTE")
                 or os.environ.get("GROQ_CALLS_PER_MINUTE")
-                or self.CALLS_PER_MINUTE
+                or default_rate
             ),
         )
 
