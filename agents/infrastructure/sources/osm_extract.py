@@ -107,6 +107,13 @@ class Amenities:
 
     names: dict[str, list[str]] = field(default_factory=dict)
 
+    # Every matched feature as {kind, lat, lon, name}. Kept so a distance can be
+    # re-measured from an address the reader gives us: "nearest station 0.2 km"
+    # is measured from the locality centroid, which is a point standing in for
+    # an area two or three kilometres across, and the station nearest that point
+    # is often not the station nearest their flat.
+    features: list[dict[str, Any]] = field(default_factory=list)
+
 
 class ExtractError(RuntimeError):
     pass
@@ -320,6 +327,11 @@ class OsmExtractClient:
             setattr(found, kind, getattr(found, kind) + 1)
             if kind not in nearest or distance < nearest[kind]:
                 nearest[kind] = distance
+
+            found.features.append(
+                {"kind": kind, "lat": round(plat, 6), "lon": round(plon, 6),
+                 "name": name}
+            )
 
             if name and kind in NAMED_KINDS:
                 names.setdefault(kind, [])

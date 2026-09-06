@@ -300,7 +300,13 @@ function CategoryCard({
   slug: string;
   localityName: string;
 }) {
-  const hasDetailPage = category.category === "air_quality" || category.category === "schools";
+  // Connectivity earned a detail page when its distances became re-measurable
+  // from an address — the tile can only show one line, and "nearest station
+  // 0.21 km" is measured from the locality centre until someone says otherwise.
+  const hasDetailPage =
+    category.category === "air_quality" ||
+    category.category === "schools" ||
+    category.category === "infrastructure";
   const color =
     category.score !== null ? colorForScore(category.score) : "var(--color-gridline)";
 
@@ -395,13 +401,29 @@ function CategoryCard({
 
   if (hasDetailPage && category.available) {
     return (
-      <Link href={`/${slug}/${category.category.replace("_", "-")}`} className="block">
+      <Link href={`/${slug}/${DETAIL_PATH[category.category]}`} className="block">
         {body}
       </Link>
     );
   }
   return body;
 }
+
+/**
+ * Category name to URL segment.
+ *
+ * Explicit rather than derived from the category name. The internal name is
+ * "infrastructure" and the page a reader sees is "connectivity" — the category
+ * is scoped in docs/strategy.md to RERA and upcoming projects, while what we
+ * actually ship is what is already built. Deriving the path would have produced
+ * a link to a route that does not exist, silently, on the one category where
+ * the two names disagree.
+ */
+const DETAIL_PATH: Record<string, string> = {
+  air_quality: "air-quality",
+  schools: "schools",
+  infrastructure: "connectivity",
+};
 
 function DisagreementCard({ disagreement }: { disagreement: Disagreement }) {
   const notable = disagreement.severity === "notable";

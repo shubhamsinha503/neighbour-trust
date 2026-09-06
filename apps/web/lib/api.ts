@@ -442,3 +442,109 @@ export async function fetchLocalitySummaries(): Promise<LocalitySummary[]> {
       : null,
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Connectivity — what is already built nearby
+// ---------------------------------------------------------------------------
+
+/** One mapped feature, with the coordinates that let it be re-measured. */
+export interface ConnectivityFeature {
+  kind:
+    | "metro_rail"
+    | "hospitals"
+    | "clinics"
+    | "parks"
+    | "markets"
+    | "industrial_sites";
+  lat: number;
+  lon: number;
+  name?: string;
+}
+
+export interface ConnectivityView {
+  locality: Locality;
+  sourceName: string;
+  sourceUrl?: string;
+  fetchedAt: string;
+  dataVintage: string;
+  confidence: Confidence;
+  score?: number;
+  summary: string;
+  scopeNote: string;
+  /** Counts within the search radius of the locality centroid. */
+  counts: {
+    metroRail: number;
+    hospitals: number;
+    clinics: number;
+    parks: number;
+    markets: number;
+    industrialSites: number;
+  };
+  /** Distances from the centroid, as stored. */
+  nearest: {
+    stationKm?: number;
+    hospitalKm?: number;
+    parkKm?: number;
+    industryKm?: number;
+  };
+  features: ConnectivityFeature[];
+}
+
+export async function fetchConnectivity(slug: string): Promise<ConnectivityView> {
+  // What is built near a locality changes on the order of years; an hour of
+  // cache is still far fresher than the weekly ingest behind it.
+  const response = await fetch(
+    `${API_BASE}/api/v1/localities/${slug}/connectivity`,
+    { next: { revalidate: 3600 } },
+  );
+
+  if (response.status === 404) {
+    const body = await response.json().catch(() => null);
+    const detail = body?.detail;
+    throw new NoDataError(
+      typeof detail === "string"
+        ? detail
+        : (detail?.reason ?? "No connectivity data for this locality yet."),
+    );
+  }
+  if (!response.ok) {
+    throw new Error(`Failed to load connectivity (${response.status})`);
+  }
+
+  const raw = (await response.json()) as Record<string, any>;
+  const p = raw.payload ?? {};
+  return {
+    locality: toLocality(raw.locality),
+    sourceName: raw.source_name,
+    sourceUrl: raw.source_url ?? undefined,
+    fetchedAt: raw.fetched_at,
+    dataVintage: raw.data_vintage,
+    confidence: raw.confidence as Confidence,
+    score: p.connectivity_score ?? undefined,
+    summary: p.summary ?? "",
+    scopeNote: p.scope_note ?? "",
+    counts: {
+      metroRail: p.metro_rail_stations ?? 0,
+      hospitals: p.hospitals ?? 0,
+      clinics: p.clinics ?? 0,
+      parks: p.parks ?? 0,
+      markets: p.markets ?? 0,
+      industrialSites: p.industrial_sites ?? 0,
+    },
+    nearest: {
+      stationKm: p.nearest_station_km ?? undefined,
+      hospitalKm: p.nearest_hospital_km ?? undefined,
+      parkKm: p.nearest_park_km ?? undefined,
+      industryKm: p.nearest_industry_km ?? undefined,
+    },
+    // Absent on envelopes written before coordinates were stored. The card
+    // falls back to the centroid distances and says the address box is
+    // unavailable, rather than silently offering a control that does nothing.
+    features: ((p.features ?? []) as Array<Record<string, any>>).map((f) => ({
+      kind: f.kind,
+      lat: f.lat,
+      lon: f.lon,
+      name: f.name ?? undefined,
+    })),
+  };
+}

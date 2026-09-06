@@ -13,6 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 import { haversineKm } from "@/components/MeasureFrom";
+import { nearestOf } from "@/components/ConnectivityCard";
 
 // Measured points, not invented ones.
 const BTM_CENTROID = { lat: 12.9166, lon: 77.6101 };
@@ -97,5 +98,43 @@ describe("re-measuring the closest schools", () => {
     expect(ordered).toHaveLength(4);
     expect(ordered[ordered.length - 1].name).toBe("Older record");
     expect(ordered[ordered.length - 1].distanceKm).toBeUndefined();
+  });
+});
+
+/**
+ * Connectivity re-measures "nearest station" from the reader's address too, and
+ * the nearest station to an address is often not the nearest to the centroid.
+ */
+describe("nearest feature of a kind", () => {
+  const features = [
+    { kind: "metro_rail" as const, lat: 12.9167, lon: 77.6214, name: "Silk Board" },
+    { kind: "metro_rail" as const, lat: 12.9385, lon: 77.6215, name: "Jayadeva" },
+    { kind: "hospitals" as const, lat: 12.9166, lon: 77.6102, name: "A Hospital" },
+  ];
+
+  it("returns the closest of that kind, with its name", () => {
+    const near = nearestOf(features, "metro_rail", { lat: 12.9167, lon: 77.62 });
+    expect(near?.name).toBe("Silk Board");
+  });
+
+  it("changes which feature is nearest when the origin moves", () => {
+    /* The whole point of the address box. If this ever returns the same station
+       from both ends of a locality, the origin is being ignored. */
+    const south = nearestOf(features, "metro_rail", { lat: 12.9100, lon: 77.6214 });
+    const north = nearestOf(features, "metro_rail", { lat: 12.9500, lon: 77.6215 });
+    expect(south?.name).toBe("Silk Board");
+    expect(north?.name).toBe("Jayadeva");
+  });
+
+  it("never returns a feature of a different kind", () => {
+    const near = nearestOf(features, "parks", { lat: 12.9166, lon: 77.6101 });
+    expect(near).toBeUndefined();
+  });
+
+  it("ignores the hospital when asked for a station", () => {
+    // The hospital sits almost exactly on the origin, so a kind-blind
+    // implementation would return it and look plausible.
+    const near = nearestOf(features, "metro_rail", { lat: 12.9166, lon: 77.6101 });
+    expect(near?.name).toBe("Silk Board");
   });
 });

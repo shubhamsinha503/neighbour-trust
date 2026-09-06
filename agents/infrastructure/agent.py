@@ -178,6 +178,16 @@ def build_envelope(
         "industrial_sites": found.industrial_sites,
         "nearest_industry_km": found.nearest_industry_km,
         "named": found.names,
+        # Every matched feature, so the card can re-measure from an address.
+        #
+        # The counts above stay locality-wide and are not recomputed from a
+        # reader's address, deliberately: they were gathered in a circle around
+        # the centroid, so counting them again from a point offset from it would
+        # undercount everything on the far side and produce a number that looks
+        # measured and is not. Nearest-distances have no such problem — the
+        # nearest thing to an address inside the locality is inside the circle
+        # we already fetched.
+        "features": found.features,
         "connectivity_score": score,
         "summary": describe(found),
         "scope_note": (

@@ -476,6 +476,84 @@ def get_schools(slug: str) -> dict[str, Any]:
     }
 
 
+class ConnectivityResponse(BaseModel):
+    """What is already built near a locality.
+
+    No verdict block, unlike air quality and schools. The agent computes the
+    score with the distances in hand and the card reads the payload directly —
+    there is no second interpretation layer to add, and inventing one here would
+    put the same number behind two different pieces of code.
+    """
+
+    locality: Locality
+    category: str
+    source_name: str
+    source_url: Optional[str] = None
+    fetched_at: str
+    data_vintage: str
+    h3_cell: str
+    confidence: str
+    payload: dict[str, Any]
+
+
+@app.get(
+    "/api/v1/localities/{slug}/connectivity",
+    response_model=ConnectivityResponse,
+    responses={404: {"model": NoDataResponse}},
+)
+def get_connectivity(slug: str) -> dict[str, Any]:
+    """The connectivity envelope, including every mapped feature.
+
+    The features are what let the card re-measure from an address the reader
+    types. Without them the only distance obtainable is the one measured from
+    the locality centroid, which is a point nobody lives at.
+    """
+    with db.connect() as conn:
+        locality = db.get_locality(conn, slug)
+        if locality is None:
+            raise HTTPException(status_code=404, detail=f"unknown locality: {slug}")
+
+        envelope = db.latest_envelope(
+            conn, category="infrastructure", h3_cell=locality["h3_cell"]
+        )
+
+    if envelope is None:
+        # "Not mapped" rather than "nothing here" — the distinction the whole
+        # category guard exists to preserve. Three localities in outer Gurugram
+        # genuinely have too little in OpenStreetMap to describe.
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "locality": locality,
+                "category": "infrastructure",
+                "available": False,
+                "reason": (
+                    "OpenStreetMap has too little mapped around this locality to "
+                    "describe it. That is a gap in the map rather than an empty "
+                    "neighbourhood, so we show nothing instead of a low score."
+                ),
+            },
+        )
+
+    fresh = freshness.evaluate(
+        category="infrastructure",
+        stored_confidence=envelope["confidence"],
+        data_vintage=envelope["data_vintage"],
+    )
+
+    return {
+        "locality": locality,
+        "category": envelope["category"],
+        "source_name": envelope["source_name"],
+        "source_url": envelope["source_url"],
+        "fetched_at": envelope["fetched_at"].isoformat(),
+        "data_vintage": envelope["data_vintage"].isoformat(),
+        "h3_cell": envelope["h3_cell"],
+        "confidence": fresh.confidence.value,
+        "payload": envelope["payload"],
+    }
+
+
 # ---------------------------------------------------------------------------
 # The locality report — the composite view, and the actual product.
 # ---------------------------------------------------------------------------
