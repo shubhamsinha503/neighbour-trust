@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * The schools card.
  *
@@ -13,12 +15,34 @@
  * its own stat tile rather than left to a footnote.
  */
 
+import { useState } from "react";
 import type { Confidence } from "@schema/envelope";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL, relativeAge } from "@/lib/aqi";
 import type { SchoolsView } from "@/lib/api";
+import { MeasureFrom, haversineKm, type Origin } from "@/components/MeasureFrom";
 
 export function SchoolsCard({ view }: { view: SchoolsView }) {
-  const { payload, verdict } = view;
+  const { payload, verdict, locality } = view;
+  const [origin, setOrigin] = useState<Origin | null>(null);
+
+  // Re-measured from the reader's address when they give one, and re-sorted:
+  // a list ordered by distance from somewhere else is not a list of the
+  // closest schools, it just looks like one.
+  //
+  // Schools whose coordinates predate this feature keep their stored
+  // distance and sort last, rather than being dropped or shown a number
+  // measured from a point nobody asked about.
+  const schools = origin
+    ? payload.nearestSchools
+        .map((school) => ({
+          ...school,
+          distanceKm:
+            school.lat !== undefined && school.lon !== undefined
+              ? haversineKm(origin.lat, origin.lon, school.lat, school.lon)
+              : undefined,
+        }))
+        .sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity))
+    : payload.nearestSchools;
 
   const staffingGap =
     payload.schoolsWithin2km > 0 &&
@@ -96,8 +120,17 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
           <h3 className="mb-2.5 text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
             Closest schools
           </h3>
+          <div className="mb-3">
+            <MeasureFrom
+              localityName={locality.name}
+              city={locality.city}
+              centroid={{ lat: locality.lat, lon: locality.lon }}
+              origin={origin}
+              onChange={setOrigin}
+            />
+          </div>
           <ul className="flex flex-col gap-2">
-            {payload.nearestSchools.map((school, index) => (
+            {schools.map((school, index) => (
               <li
                 // Index is part of the key because OSM has no stable id in the
                 // payload and genuinely does contain same-name schools at the
