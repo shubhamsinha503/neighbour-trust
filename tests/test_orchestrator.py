@@ -745,3 +745,66 @@ class TestNoReportsBaseline:
         covered = score_mod.compute({"water": loud, "schools": SCHOOLS_GOOD,
                                      "air_quality": AQ_GOOD})
         assert covered.weight_covered > quiet.weight_covered
+
+
+class TestReportsDisplaceTheBaseline:
+    """An accepted resident report withdraws the "nothing reported" baseline.
+
+    The baseline is a claim, not a placeholder: it says nothing was reported in
+    twelve months. Once somebody has reported something, continuing to show 80
+    beside a flag describing what they reported would be the page contradicting
+    itself in two places at once.
+
+    The card then carries no number and the flag speaks. That is the honest
+    state — a handful of accounts is evidence about what happened, never a
+    measurement of how often.
+    """
+
+    QUIET = envelope({"news": {"incidents_12m": 0, "mentions_fetched": 20,
+                               "mentions_classified": 20}})
+
+    @staticmethod
+    def resident(basis="happened_to_me", tie="lives_here"):
+        from datetime import datetime, timezone
+        return {"category": "water", "basis": basis, "tie_to_area": tie,
+                "submitted_at": datetime.now(timezone.utc), "incident_type": "waterlogging"}
+
+    def water(self, reports=None):
+        result = score_mod.compute(
+            {"water": self.QUIET, "schools": SCHOOLS_GOOD}, reports)
+        return next(c for c in result.categories if c.category == "water")
+
+    def test_the_baseline_shows_when_nobody_has_reported(self):
+        card = self.water(reports=None)
+        assert card.is_baseline is True
+        assert card.score == score_mod.press_score.BASELINE_NO_REPORTS
+
+    def test_an_accepted_report_withdraws_it(self):
+        card = self.water(reports={"water": [self.resident()]})
+        assert card.is_baseline is False
+        assert card.score is None
+
+    def test_a_report_about_another_category_leaves_it_alone(self):
+        """Someone reporting a power cut says nothing about the water claim."""
+        power_report = self.resident()
+        power_report["category"] = "power"
+        card = self.water(reports={"power": [power_report]})
+        assert card.is_baseline is True
+
+    def test_one_weak_report_does_not_withdraw_it(self):
+        """Withdrawing on any single unverified account would make the baseline
+        trivially removable by whoever types first."""
+        card = self.water(
+            reports={"water": [self.resident(basis="read_it", tie="visiting")]})
+        assert card.is_baseline is True
+
+    def test_a_withdrawn_baseline_still_does_not_become_a_score(self):
+        """The category must not start counting toward the Trust Score just
+        because residents spoke. They are evidence, not measurement."""
+        result = score_mod.compute(
+            {"water": self.QUIET, "schools": SCHOOLS_GOOD},
+            {"water": [self.resident()]},
+        )
+        water = next(c for c in result.categories if c.category == "water")
+        assert water.counted is False
+        assert result.score == score_mod.compute({"schools": SCHOOLS_GOOD}).score

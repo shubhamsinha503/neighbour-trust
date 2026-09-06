@@ -28,7 +28,12 @@ from typing import Any, Optional
 from neighbour_trust_schema.envelope import Confidence
 
 from agents.common import db, freshness
-from agents.orchestrator import flags as flags_mod, reconcile, score as score_mod
+from agents.orchestrator import (  # noqa: I001
+    flags as flags_mod,
+    reconcile,
+    reports as reports_mod,
+    score as score_mod,
+)
 
 log = logging.getLogger(__name__)
 
@@ -289,7 +294,16 @@ def _category_summary(category: str, envelope: Optional[dict[str, Any]]) -> str:
 def build_report(conn, locality: dict[str, Any]) -> LocalityReport:
     now = datetime.now(timezone.utc)
     envelopes = _load_envelopes(conn, locality["h3_cell"])
-    trust = score_mod.compute(envelopes)
+
+    # Accepted resident reports, grouped by category. Only accepted ones exist
+    # as far as this is concerned — a pending report is not weaker evidence, it
+    # is evidence nobody has looked at yet.
+    accepted = db.accepted_reports(conn, h3_cell=locality["h3_cell"])
+    reports_by_category: dict[str, list[dict[str, Any]]] = {}
+    for report in accepted:
+        reports_by_category.setdefault(report["category"], []).append(report)
+
+    trust = score_mod.compute(envelopes, reports_by_category)
 
     categories: list[dict[str, Any]] = []
     for result in trust.categories:
@@ -326,7 +340,14 @@ def build_report(conn, locality: dict[str, Any]) -> LocalityReport:
         }
     )
 
+    # Resident flags join the ones derived from press and sensors, and are
+    # sorted together by severity rather than appended after: a first-hand
+    # account of an assault outranks a middling category score, and putting
+    # residents in a second-class list below the automated findings would say
+    # the opposite of what this product claims about them.
     found_flags = flags_mod.find(envelopes, categories)
+    found_flags.extend(reports_mod.to_flags(accepted))
+    found_flags.sort(key=lambda f: flags_mod.SEVERITY_ORDER.get(f["severity"], 9))
 
     return LocalityReport(
         locality=locality,

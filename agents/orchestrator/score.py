@@ -294,7 +294,10 @@ def power_penalty(envelopes: dict[str, dict[str, Any]]) -> tuple[int, Optional[s
     return points, f"{worst['headline']} — {points} points"
 
 
-def compute(envelopes: dict[str, dict[str, Any]]) -> TrustScore:
+def compute(
+    envelopes: dict[str, dict[str, Any]],
+    reports: Optional[dict[str, list[dict[str, Any]]]] = None,
+) -> TrustScore:
     """Composite Trust Score from whatever category envelopes exist.
 
     `envelopes` maps category -> the stored envelope (or is missing the key
@@ -325,7 +328,17 @@ def compute(envelopes: dict[str, dict[str, Any]]) -> TrustScore:
         if score is None and envelope is not None and category in press_score.SCORERS:
             fallback = press_score.baseline(payload)
             if fallback is not None:
-                score, is_baseline = fallback, True
+                # The baseline is a claim: "nothing was reported here". Accepted
+                # resident reports make that claim false, so it is withdrawn
+                # rather than shown beside a flag contradicting it. The card then
+                # carries no number and the flag speaks — which is the honest
+                # state, because a handful of accounts is evidence and not a
+                # measurement. See agents/orchestrator/reports.py.
+                from agents.orchestrator import reports as reports_mod
+
+                said_otherwise = (reports or {}).get(category) or []
+                if not reports_mod.displaces_baseline(said_otherwise):
+                    score, is_baseline = fallback, True
 
         if counted:
             weighted_total += score * weight
