@@ -798,3 +798,140 @@ def classification_state(conn: psycopg.Connection) -> dict[str, Any]:
         """
     ).fetchone()
     return dict(row)
+
+
+# ---------------------------------------------------------------------------
+# Resident reports
+#
+# Every read here filters on state = 'accepted'. A pending report is not weaker
+# evidence, it is *no* evidence: nobody has looked at it yet, and the whole
+# reason the table has a moderation state is that an unreviewed report reaching
+# a neighbourhood's score is how this source gets gamed.
+# ---------------------------------------------------------------------------
+
+
+def insert_resident_report(
+    conn: psycopg.Connection,
+    *,
+    locality_id: int,
+    h3_cell: str,
+    category: str,
+    body: str,
+    occurred_window: Optional[str] = None,
+    basis: str = "unstated",
+    tie_to_area: str = "unstated",
+    evidence_url: Optional[str] = None,
+    contact_email: Optional[str] = None,
+    source: str = "google_form",
+    external_id: Optional[str] = None,
+    submitted_at: Optional[datetime] = None,
+) -> Optional[int]:
+    """Store one report, unreviewed. Returns None if it was already imported.
+
+    Never takes a `state`: a report cannot be created already accepted. The
+    only way into the score is through a review, and keeping that out of the
+    insert path means no caller can skip it by accident.
+    """
+    row = conn.execute(
+        """
+        INSERT INTO resident_report
+            (locality_id, h3_cell, category, body, occurred_window, basis,
+             tie_to_area, evidence_url, contact_email, source, external_id,
+             submitted_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, COALESCE(%s, now()))
+        ON CONFLICT (source, external_id) WHERE external_id IS NOT NULL
+            DO NOTHING
+        RETURNING id
+        """,
+        (locality_id, h3_cell, category, body, occurred_window, basis,
+         tie_to_area, evidence_url, contact_email, source, external_id,
+         submitted_at),
+    ).fetchone()
+    return row["id"] if row else None
+
+
+def accepted_reports(
+    conn: psycopg.Connection, *, h3_cell: str, category: Optional[str] = None
+) -> list[dict[str, Any]]:
+    """Reviewed, accepted, not-distrusted reports for one cell."""
+    return conn.execute(
+        """
+        SELECT id, category, body, occurred_window, basis, tie_to_area,
+               evidence_url, incident_type, submitted_at, reviewed_at
+          FROM resident_report
+         WHERE h3_cell = %s
+           AND state = 'accepted'
+           AND NOT distrusted
+           AND (%s::text IS NULL OR category = %s::category_t)
+         ORDER BY submitted_at DESC
+        """,
+        (h3_cell, category, category),
+    ).fetchall()
+
+
+def pending_reports(
+    conn: psycopg.Connection, *, limit: int = 50
+) -> list[dict[str, Any]]:
+    """The moderation queue, oldest first — nothing here counts for anything."""
+    return conn.execute(
+        """
+        SELECT r.id, r.category, r.body, r.occurred_window, r.basis,
+               r.tie_to_area, r.evidence_url, r.submitted_at, l.slug, l.name
+          FROM resident_report r
+          JOIN locality l ON l.id = r.locality_id
+         WHERE r.state = 'pending'
+         ORDER BY r.submitted_at
+         LIMIT %s
+        """,
+        (limit,),
+    ).fetchall()
+
+
+def review_resident_report(
+    conn: psycopg.Connection,
+    *,
+    report_id: int,
+    state: str,
+    reviewed_by: str,
+    incident_type: Optional[str] = None,
+    note: Optional[str] = None,
+) -> bool:
+    """Record a human decision. `reviewed_at` is set here, never by the caller.
+
+    The database refuses any non-pending row without a review timestamp, so
+    setting it in one place is what makes that constraint keepable.
+    """
+    if state not in ("accepted", "rejected", "spam"):
+        raise ValueError(f"not a review outcome: {state!r}")
+    row = conn.execute(
+        """
+        UPDATE resident_report
+           SET state = %s::report_state_t,
+               reviewed_at = now(),
+               reviewed_by = %s,
+               incident_type = COALESCE(%s, incident_type),
+               review_note = COALESCE(%s, review_note)
+         WHERE id = %s
+        RETURNING id
+        """,
+        (state, reviewed_by, incident_type, note, report_id),
+    ).fetchone()
+    return row is not None
+
+
+def forget_report_contact(conn: psycopg.Connection, *, report_id: int) -> bool:
+    """Erase a contact address, keeping what the person told us.
+
+    Someone withdrawing their email should not also withdraw their account of a
+    flooded road. The two are separable and this is the separation.
+    """
+    row = conn.execute(
+        """
+        UPDATE resident_report
+           SET contact_email = NULL, contact_removed_at = now()
+         WHERE id = %s AND contact_email IS NOT NULL
+        RETURNING id
+        """,
+        (report_id,),
+    ).fetchone()
+    return row is not None
