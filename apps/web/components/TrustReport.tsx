@@ -152,6 +152,7 @@ export function TrustReport({ report }: { report: LocalityReport }) {
               key={category.category}
               category={category}
               slug={locality.slug}
+              localityName={locality.name}
             />
           ))}
       </div>
@@ -293,9 +294,11 @@ function ScoreMeter({ trust }: { trust: LocalityReport["trustScore"] }) {
 function CategoryCard({
   category,
   slug,
+  localityName,
 }: {
   category: ReportCategory;
   slug: string;
+  localityName: string;
 }) {
   const hasDetailPage = category.category === "air_quality" || category.category === "schools";
   const color =
@@ -367,7 +370,7 @@ function CategoryCard({
       {/* The invitation belongs on exactly the cards where we admit we know
         * little: nothing measurable, or a baseline standing in for silence. */}
       {(category.score === null || category.isBaseline) && (
-        <ReportLink category={category.label} slug={slug} />
+        <ReportLink category={category.label} localityName={localityName} />
       )}
 
       <div className="mt-1.5 flex items-center justify-between gap-2">
@@ -432,13 +435,57 @@ function DisagreementCard({ disagreement }: { disagreement: Disagreement }) {
  * whole job is to admit a gap — and the destination is a deployment choice
  * rather than something to hardcode, so no contact address ships in the source.
  */
-function ReportLink({ category, slug }: { category: string; slug: string }) {
+/**
+ * Prefill wiring for the intake form at NEXT_PUBLIC_REPORT_URL.
+ *
+ * These field ids belong to that specific form and are meaningless without it —
+ * if the form is ever rebuilt, both must be re-read from the live form's HTML
+ * and changed here together. A stale id prefills nothing rather than filling
+ * the wrong field, so the failure is quiet and harmless, which is also why it
+ * is worth writing down that it can happen.
+ */
+const FORM_FIELD_LOCALITY = "entry.1723945049";
+const FORM_FIELD_CATEGORY = "entry.319282764";
+
+/**
+ * Our card labels are not the form's answer options, and Google Forms only
+ * prefills a choice when the value matches its option text exactly. Mapping
+ * them here keeps the two vocabularies deliberately separate: the card says
+ * "Connectivity" because that is what we measured, while the form asks about
+ * "Roads, transport or nearby construction" because that is what a resident
+ * would actually have witnessed.
+ */
+const FORM_CATEGORY_OPTION: Record<string, string> = {
+  Safety: "Safety or crime",
+  Water: "Water (supply, flooding, quality)",
+  Power: "Power cuts",
+  Schools: "Schools",
+  "Air quality": "Air quality or pollution",
+  Connectivity: "Roads, transport or nearby construction",
+};
+
+function ReportLink({
+  category,
+  localityName,
+}: {
+  category: string;
+  localityName: string;
+}) {
   const base = process.env.NEXT_PUBLIC_REPORT_URL;
   if (!base) return null;
 
-  const url = `${base}${base.includes("?") ? "&" : "?"}locality=${encodeURIComponent(
-    slug,
-  )}&category=${encodeURIComponent(category)}`;
+  const params = new URLSearchParams({
+    // Google's own marker for a prefilled link.
+    usp: "pp_url",
+    [FORM_FIELD_LOCALITY]: localityName,
+  });
+  // Only send a category the form actually offers. An unmapped label would
+  // arrive as a value no option matches, which Google silently drops — the
+  // reporter would then see the question unanswered with no idea why.
+  const option = FORM_CATEGORY_OPTION[category];
+  if (option) params.set(FORM_FIELD_CATEGORY, option);
+
+  const url = `${base}${base.includes("?") ? "&" : "?"}${params.toString()}`;
 
   return (
     <a
