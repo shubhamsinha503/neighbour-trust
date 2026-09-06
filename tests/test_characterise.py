@@ -266,19 +266,29 @@ class TestPower:
 
 
 class TestPowerScoring:
-    """Power is scored, but from the mix rather than the volume.
+    """Power subtracts from the score and never adds to it.
 
-    This class asserted the opposite until scoring was extended to the
-    press-derived categories. The reason it changed is worth recording: refusing
-    to score them was right about the danger and wrong about the consequence —
-    it left 21 of 44 localities with no Trust Score, which was most of the
-    product. See agents/orchestrator/press_score.py.
+    This class has now changed direction twice, and both reasons are worth
+    keeping. It first asserted power could not be scored at all; that was right
+    about the danger of press data and wrong about the consequence, since it
+    left 21 of 44 localities with no Trust Score.
+
+    It then made power a weighted category — and the live site showed what that
+    was actually worth: 42 of 44 localities rendered a dash, one had no card,
+    and one carried a score. Worse, the weighting ran backwards. A locality with
+    three mildly-reported outages scored 86 and *raised* its composite, which is
+    a reward for having had power cuts written about.
+
+    No Indian source publishes supply quality, so this was never a measurement
+    of it. It is detection of reported problems, and detection should only cost.
+    See agents/orchestrator/score.py.
     """
 
-    def test_power_is_scoreable(self):
-        from agents.orchestrator.score import SCOREABLE
+    def test_power_is_not_a_weighted_category(self):
+        from agents.orchestrator.score import CATEGORY_WEIGHTS, SCOREABLE
 
-        assert "power" in SCOREABLE
+        assert "power" not in SCOREABLE
+        assert "power" not in CATEGORY_WEIGHTS
 
     def test_a_bare_count_still_produces_nothing(self):
         """incidents_12m alone carries no composition, and composition is the

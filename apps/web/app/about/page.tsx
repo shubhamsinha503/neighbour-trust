@@ -98,8 +98,8 @@ export default function AboutPage() {
           as though its air were poor.
         </p>
         <p>
-          The score names what it is based on, because it currently rests on two
-          of six categories. Below that threshold no number is published at all,
+          The score names what it is based on, because it rarely rests on all
+          five categories. Below that threshold no number is published at all,
           and the page shows the individual cards instead. A single measurement
           wearing the words &ldquo;Trust Score&rdquo; would be worse than no
           score.

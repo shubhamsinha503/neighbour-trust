@@ -68,7 +68,7 @@ class Locality(BaseModel):
     lon: float
     categories_with_data: int = Field(
         0,
-        description="How many of the six categories hold data here. Shown on the "
+        description="How many categories hold data here. Shown on the "
         "index so a visitor can see what a locality offers before opening it, "
         "rather than discovering it is thin after a click.",
     )
@@ -119,6 +119,12 @@ class AirQualityResponse(BaseModel):
     data_vintage: str
     h3_cell: str
     confidence: str
+    # True when the reading is past its freshness window: real, dated, and no
+    # longer a description of current air. The card leads with the date and the
+    # Trust Score excludes it. Defaults false so a caller that ignores the field
+    # sees the ordinary case.
+    historical: bool = False
+    historical_note: Optional[str] = None
     payload: dict[str, Any]
     verdict: Verdict
 
@@ -384,6 +390,13 @@ def get_air_quality(slug: str) -> dict[str, Any]:
         "data_vintage": envelope["data_vintage"].isoformat(),
         "h3_cell": envelope["h3_cell"],
         "confidence": confidence,
+        # A reading past its freshness window is served with its date rather
+        # than withheld: CPCB stopping publication should not blank the card for
+        # 19 localities that have a real, dated measurement. The flag is what
+        # tells the frontend to lead with the date, and what keeps the value out
+        # of the Trust Score.
+        "historical": fresh.historical,
+        "historical_note": fresh.reason if fresh.historical else None,
         "payload": payload,
         "verdict": build_verdict(payload, confidence),
     }
@@ -478,6 +491,12 @@ class ReportCategory(BaseModel):
     counted: bool = Field(
         ..., description="Whether this category contributed to the Trust Score."
     )
+    is_baseline: bool = Field(
+        False,
+        description="True when `score` is the no-reports baseline rather than a "
+        "measurement. The card must label it as such; it never reaches the "
+        "Trust Score.",
+    )
     status: str
     summary: str = ""
     source_name: Optional[str] = None
@@ -518,6 +537,11 @@ class TrustScoreOut(BaseModel):
     categories_counted: int
     categories_total: int
     reason_unavailable: Optional[str] = None
+    # Points subtracted for reported power problems. Power has no card of its
+    # own, so this is exposed to keep the number explicable: whenever it is
+    # non-zero there is also a power flag saying the same thing in words.
+    power_penalty: int = 0
+    power_penalty_reason: Optional[str] = None
 
 
 class ReportResponse(BaseModel):
@@ -571,6 +595,8 @@ def debug_report(slug: str) -> dict[str, Any]:
                 "categories_counted": report.trust_score.categories_counted,
                 "categories_total": report.trust_score.categories_total,
                 "reason_unavailable": report.trust_score.reason_unavailable,
+                "power_penalty": report.trust_score.power_penalty,
+                "power_penalty_reason": report.trust_score.power_penalty_reason,
             },
             verdict=report.verdict,
             biggest_watchout=report.biggest_watchout,

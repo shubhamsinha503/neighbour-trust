@@ -33,14 +33,21 @@ from agents.orchestrator import flags as flags_mod, reconcile, score as score_mo
 log = logging.getLogger(__name__)
 
 # Categories the report shows, in the order the mockup's grid uses.
+#
+# Power is deliberately absent as of 2026-09-06. On the live site it rendered a
+# dash for 42 of 44 localities and a score for exactly one: a column of dashes
+# that made the page look broken while telling nobody anything. It is still
+# collected and still moves the score — downward only, and only alongside a flag
+# that says why in words. See score.POWER_PENALTIES.
 REPORT_CATEGORIES = (
     "schools",
     "crime",
     "air_quality",
     "water",
-    "power",
     "infrastructure",
 )
+
+# Power keeps its label: it no longer has a card, but its flags still name it.
 
 # Human labels, matching the mockup.
 CATEGORY_LABELS = {
@@ -92,6 +99,13 @@ def _load_envelopes(conn, h3_cell: str) -> dict[str, Any]:
             continue
 
         envelope["confidence"] = fresh.confidence.value
+        if fresh.historical:
+            # Kept, not dropped. The card shows it with its date; score.compute
+            # refuses to count it. See agents/common/freshness.py for why those
+            # are different decisions.
+            log.info("[%s] %s is historical: %s", h3_cell, category, fresh.reason)
+            envelope["historical"] = True
+            envelope["historical_note"] = fresh.reason
         envelopes[category] = envelope
 
     # AQICN is stored as its own envelope under the air_quality category, on the
@@ -175,6 +189,26 @@ def _biggest_watchout(categories: list[dict[str, Any]]) -> Optional[dict[str, st
         "score": worst["score"],
         "detail": worst.get("summary") or "",
     }
+
+
+def _dated_if_historical(summary: str, envelope: Optional[dict[str, Any]]) -> str:
+    """Put the measurement date in front of a reading that is no longer current.
+
+    The tile shows this line under a number. "PM2.5 index 42 (moderate)" reads as
+    today's air whatever the border style around it, so the date has to be in the
+    sentence itself — the tile is small enough that nothing else is guaranteed to
+    be read alongside it.
+
+    Applied at assembly rather than inside each category's branch, so a category
+    that becomes historical later cannot forget to do it.
+    """
+    if not summary or not envelope or not envelope.get("historical"):
+        return summary
+    vintage = envelope.get("data_vintage")
+    if vintage is None:
+        return f"Last known reading · {summary}"
+    # "%-d" is not portable to Windows, where this is developed.
+    return f"Last measured {vintage.strftime('%d %b').lstrip('0')} · {summary}"
 
 
 def _category_summary(category: str, envelope: Optional[dict[str, Any]]) -> str:
@@ -269,8 +303,11 @@ def build_report(conn, locality: dict[str, Any]) -> LocalityReport:
                 "weight": result.weight,
                 "available": result.available,
                 "counted": result.counted,
+                "is_baseline": result.is_baseline,
                 "status": result.status,
-                "summary": _category_summary(result.category, envelope),
+                "summary": _dated_if_historical(
+                    _category_summary(result.category, envelope), envelope
+                ),
                 "source_name": (envelope or {}).get("source_name"),
                 "data_vintage": (
                     envelope["data_vintage"].isoformat() if envelope else None

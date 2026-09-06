@@ -28,7 +28,8 @@ class TestAirQualityDecay:
             data_vintage=datetime(2026, 8, 17, 13, 30, tzinfo=timezone.utc),
             now=NOW,
         )
-        assert result.withhold is True
+        assert result.confidence == Confidence.LOW
+        assert result.historical is True
         assert result.reason is not None and "13 days" in result.reason
 
     def test_fresh_reading_keeps_its_stored_confidence(self):
@@ -61,14 +62,37 @@ class TestAirQualityDecay:
         )
         assert result.confidence == Confidence.LOW
 
-    def test_past_a_week_is_withheld(self):
+    def test_past_a_week_becomes_historical_rather_than_hidden(self):
+        """Changed deliberately on 2026-09-06. This asserted the reading was
+        withheld, and that would have blanked the air card for 19 localities
+        when CPCB's network stopped publishing in late August — while a real,
+        dated 31 August measurement sat in the database.
+
+        "Last measured on 31 August" is more use to a buyer than an empty card,
+        and it is not a lie as long as the date travels with it.
+        """
         result = freshness.evaluate(
             category="air_quality",
             stored_confidence=Confidence.HIGH,
             data_vintage=at(days=8),
             now=NOW,
         )
-        assert result.withhold is True
+        assert result.historical is True
+        assert result.withhold is False
+        assert result.confidence == Confidence.LOW
+
+    def test_a_historical_reading_says_it_is_not_scored(self):
+        """The card can caveat itself in words; a single 0-100 number cannot.
+        The reason string is what the page shows, so it has to say so."""
+        result = freshness.evaluate(
+            category="air_quality",
+            stored_confidence=Confidence.HIGH,
+            data_vintage=at(days=8),
+            now=NOW,
+        )
+        assert result.reason is not None
+        assert "not counted" in result.reason
+        assert "Trust Score" in result.reason
 
     def test_decay_never_raises_confidence(self):
         """A stale LOW reading must not become MEDIUM because the cap is MEDIUM."""

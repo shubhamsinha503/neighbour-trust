@@ -16,9 +16,23 @@ Two rules, applied in this order:
 
   1. **Degrade** — a reading past its category's freshness window cannot claim
      the confidence it had when fresh.
-  2. **Withhold** — past a further limit, it should not be served as current at
-     all. `/api/.../air-quality` returns its no-data response instead, which is a
-     real answer the product is built to give.
+  2. **Historical** — past a further limit, it can no longer be presented as
+     current, but it is still the last thing anybody measured. It is shown with
+     its date attached and excluded from the Trust Score.
+  3. **Withhold** — for data that should not be served at all.
+
+Rules 2 and 3 were one rule until 2026-09-06, and it was the wrong one. CPCB's
+network stopped publishing in late August, so every air reading was about to
+cross the seven-day line and vanish — 19 localities would have shown an empty
+card while a perfectly real 31 August measurement sat in the database. "The last
+reading was on 31 August" is more useful to a buyer than a blank space, and it
+is not a lie as long as the date is on it.
+
+The distinction that makes this honest is between the card and the score. A card
+can carry its own caveat in words: it says what was measured and when. A single
+0-100 Trust Score cannot — it either includes a fortnight-old number or it does
+not, and nothing on screen would tell the reader which. So a historical value is
+displayed and never counted.
 
 Categories differ because their data does. An air quality reading describes a
 moment and is worthless a week later. A UDISE school survey describes a year;
@@ -51,7 +65,12 @@ class FreshnessPolicy:
     degrade_to_medium_after: Optional[timedelta] = None
     # Past this, confidence cannot exceed LOW.
     degrade_to_low_after: Optional[timedelta] = None
-    # Past this, do not serve the value as current at all.
+    # Past this, show the value with its date rather than as a current reading,
+    # and keep it out of the Trust Score.
+    historical_after: Optional[timedelta] = None
+    # Past this, do not serve the value at all. Stronger than historical, and
+    # currently unused — no category has data so stale it is better hidden than
+    # dated.
     withhold_after: Optional[timedelta] = None
 
 
@@ -64,7 +83,11 @@ POLICIES: dict[str, FreshnessPolicy] = {
     "air_quality": FreshnessPolicy(
         degrade_to_medium_after=timedelta(hours=3),
         degrade_to_low_after=timedelta(hours=24),
-        withhold_after=timedelta(days=7),
+        # Not withheld. A week-old reading is a poor description of today's air,
+        # which is why it stops counting toward the score here — but it is still
+        # the last measurement that exists, and shown with its date it tells a
+        # buyer something a blank card does not.
+        historical_after=timedelta(days=7),
     ),
     # Schools describes an academic year and is stored at LOW already — the 2022
     # UDISE snapshot cannot decay below the floor it starts on. No withholding:
@@ -88,6 +111,8 @@ class Freshness:
     withhold: bool
     reason: Optional[str] = None
     degraded_from: Optional[Confidence] = None
+    # Show it, dated, but keep it out of the Trust Score.
+    historical: bool = False
 
 
 def evaluate(
@@ -120,6 +145,21 @@ def evaluate(
                 "stale to present as current. The upstream feed appears to have stopped "
                 "publishing — we would rather show nothing than a number that looks live "
                 "and isn't."
+            ),
+            degraded_from=stored,
+        )
+
+    if policy.historical_after is not None and age > policy.historical_after:
+        return Freshness(
+            confidence=Confidence.LOW,
+            age=age,
+            withhold=False,
+            historical=True,
+            reason=(
+                f"This is the last reading we have and it is {_describe(age)} old — the "
+                "upstream feed has published nothing since. It is shown with its date "
+                "rather than as a current measurement, and it is not counted toward the "
+                "Trust Score."
             ),
             degraded_from=stored,
         )

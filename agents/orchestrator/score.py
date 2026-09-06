@@ -38,17 +38,44 @@ from agents.orchestrator import press_score
 # ones that drive long-term value (schools, infrastructure) both represented.
 # They are deliberately in one visible table so they can be argued with.
 CATEGORY_WEIGHTS: dict[str, float] = {
-    "air_quality": 0.20,
-    "schools": 0.20,
-    "crime": 0.20,
-    "water": 0.15,
-    "power": 0.15,
-    "infrastructure": 0.10,
+    "air_quality": 0.24,
+    "schools": 0.24,
+    "crime": 0.24,
+    "water": 0.17,
+    "infrastructure": 0.11,
 }
 
 # Categories that can currently produce a score. The rest appear on the report
 # with their status, contributing nothing to the number.
-SCOREABLE = ("air_quality", "schools", "crime", "water", "power", "infrastructure")
+SCOREABLE = ("air_quality", "schools", "crime", "water", "infrastructure")
+
+# --- Power ------------------------------------------------------------------
+#
+# Power is not in the table above, and that is a change made on 2026-09-06 after
+# looking at what the live site actually served: of 44 localities, 42 rendered a
+# dash, one had no card at all, and exactly one carried a score. A category that
+# is blank 98% of the time is not informing anyone; it is a column of dashes that
+# makes the page look broken.
+#
+# It was also scored the wrong way round. Under the weighted average, a locality
+# with three mildly-reported outages scored 86 and *raised* its composite — it
+# was being rewarded for having had power cuts written about. We are not
+# measuring supply quality here, because no Indian source publishes it. We are
+# detecting reported problems, and detection should only ever cost.
+#
+# So power now applies a penalty and never a bonus, and only when the same
+# evidence has already produced a visible flag — the reader is told about the
+# outages in words before the number moves. A deduction nothing on the page
+# explains would break the one promise this product makes.
+#
+# Deliberately small and capped. These counts come from press coverage, which
+# tracks media attention rather than incidence, so a well-covered locality must
+# not be able to lose much of its score for being written about. Both thresholds
+# require *repeated* incidents for the same reason.
+POWER_PENALTIES: dict[str, int] = {
+    "serious": 6,   # repeated equipment failures — a fact about the infrastructure
+    "notable": 3,   # repeated unplanned outages
+}
 
 # Display names, so copy generated here matches the labels on the cards.
 LABELS = {
@@ -144,6 +171,12 @@ class CategoryResult:
     available: bool
     status: str  # short phrase the UI shows when there is no score
     counted: bool = False
+    # Present and shown, but too old to count. Distinct from the press-derived
+    # categories, which are excluded for a completely different reason.
+    historical: bool = False
+    # The score is the no-reports baseline rather than something measured. The
+    # card must say so, and the composite must not include it.
+    is_baseline: bool = False
 
 
 @dataclass
@@ -156,6 +189,10 @@ class TrustScore:
     categories_total: int
     categories: list[CategoryResult] = field(default_factory=list)
     reason_unavailable: Optional[str] = None
+    # Points subtracted for reported power problems, and the sentence explaining
+    # them. Always accompanied by a flag saying the same thing in words.
+    power_penalty: int = 0
+    power_penalty_reason: Optional[str] = None
 
     @property
     def coverage_pct(self) -> int:
@@ -187,7 +224,12 @@ def _no_score_reason(results: list[CategoryResult]) -> str:
     """
     available = [r for r in results if r.available]
     scoreable = [r for r in available if r.counted]
-    unscored = [r for r in available if not r.counted]
+    # Two different reasons not to count something, and saying the wrong one is
+    # worse than saying nothing. Press-derived categories are excluded on
+    # principle and always will be; a historical reading is excluded because it
+    # has aged out, and will count again the moment the feed resumes.
+    stale = [r for r in available if not r.counted and r.historical]
+    unscored = [r for r in available if not r.counted and not r.historical]
 
     if not available:
         return (
@@ -210,8 +252,46 @@ def _no_score_reason(results: list[CategoryResult]) -> str:
             f"come from press coverage and are deliberately never scored — how "
             f"often an area is written about is not how often things happen there."
         )
+    if stale:
+        labels = sorted(LABELS.get(r.category, r.category) for r in stale)
+        names = (
+            labels[0] if len(labels) == 1
+            else ", ".join(labels[:-1]) + " and " + labels[-1]
+        )
+        parts.append(
+            f"{names} {'has' if len(stale) == 1 else 'have'} a last known reading "
+            f"shown below, but the source has stopped publishing, so it is too old "
+            f"to count toward a score describing the area today."
+        )
     parts.append("Everything we do know is shown individually below.")
     return " ".join(parts)
+
+
+def power_penalty(envelopes: dict[str, dict[str, Any]]) -> tuple[int, Optional[str]]:
+    """Points to subtract for reported power problems, and why.
+
+    Derived from the same rule that raises the power flag, deliberately: the
+    penalty and the sentence the reader sees are computed from one source, so
+    the number can never move without the page saying so. If the flag rule stops
+    firing, this stops deducting.
+    """
+    # Imported here rather than at module scope purely to keep the dependency
+    # one-directional and obvious; flags does not know about scoring.
+    from agents.orchestrator import flags as flags_mod
+
+    envelope = envelopes.get("power")
+    if envelope is None:
+        return 0, None
+
+    found = flags_mod.power_flags(envelope.get("payload") or {})
+    if not found:
+        return 0, None
+
+    worst = min(found, key=lambda f: flags_mod.SEVERITY_ORDER.get(f["severity"], 9))
+    points = POWER_PENALTIES.get(worst["severity"], 0)
+    if not points:
+        return 0, None
+    return points, f"{worst['headline']} — {points} points"
 
 
 def compute(envelopes: dict[str, dict[str, Any]]) -> TrustScore:
@@ -229,7 +309,24 @@ def compute(envelopes: dict[str, dict[str, Any]]) -> TrustScore:
         payload = (envelope or {}).get("payload") or {}
         score = category_score(category, payload) if envelope else None
 
-        counted = score is not None and category in SCOREABLE
+        # A reading too old to describe the present is shown on its card with a
+        # date attached and kept out of the number. The card can caveat itself in
+        # words; a single 0-100 score cannot, so it must only contain values that
+        # are still true now. See agents/common/freshness.py.
+        historical = bool((envelope or {}).get("historical"))
+
+        counted = score is not None and category in SCOREABLE and not historical
+
+        # Nothing measurable, but nothing reported either: show the baseline so
+        # the card carries a number instead of a dash. Never counted — see
+        # press_score.BASELINE_NO_REPORTS for why silence must not reach the
+        # composite.
+        is_baseline = False
+        if score is None and envelope is not None and category in press_score.SCORERS:
+            fallback = press_score.baseline(payload)
+            if fallback is not None:
+                score, is_baseline = fallback, True
+
         if counted:
             weighted_total += score * weight
             weight_covered += weight
@@ -242,11 +339,16 @@ def compute(envelopes: dict[str, dict[str, Any]]) -> TrustScore:
                 weight=weight,
                 available=envelope is not None,
                 status=(
-                    "scored"
-                    if counted
+                    "scored" if counted
+                    else "last reading shown below — too old to score"
+                    if historical
+                    else "baseline — nothing reported in 12 months"
+                    if is_baseline
                     else STATUS_TEXT.get(category, "no data")
                 ),
                 counted=counted,
+                historical=historical,
+                is_baseline=is_baseline,
             )
         )
 
@@ -264,10 +366,19 @@ def compute(envelopes: dict[str, dict[str, Any]]) -> TrustScore:
 
     # Renormalise over what was actually counted, so the score reads "out of what
     # we can see" rather than being dragged down by absent categories.
+    base = weighted_total / weight_covered
+
+    # Power is applied here rather than as a weighted category: it can only ever
+    # subtract, and only when a flag is already telling the reader why. Floored
+    # at 5 so a locality is never driven to zero by press counts alone.
+    penalty, reason = power_penalty(envelopes)
+
     return TrustScore(
-        score=round(weighted_total / weight_covered),
+        score=max(5, round(base - penalty)),
         weight_covered=weight_covered,
         categories_counted=counted_n,
         categories_total=len(CATEGORY_WEIGHTS),
         categories=results,
+        power_penalty=penalty,
+        power_penalty_reason=reason,
     )

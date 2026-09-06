@@ -7,12 +7,12 @@
  *   1. Verdict + score meter — interpretation before the number.
  *   2. Flags — loss aversion: a flagged risk is weighed about twice
  *      as heavily as an equivalent gain, so it gets its own callout instead of
- *      being one tile among six.
+ *      being one tile among several.
  *   3. Honesty banner — the pratfall effect works only *after* competence is
  *      established, so this sits below the score, never above it.
  *   4. Category grid — including the categories we have nothing for, because a
- *      grid of six that silently shows four is a different claim than one that
- *      shows six and admits two are empty.
+ *      grid that silently shows only what it has is a different claim than one
+ *      that lists every category and admits which are empty.
  *   5. Disagreements — where sources conflict, stated rather than averaged away.
  *   6. Source strip — the credibility engine, in the main flow per
  *      Prominence-Interpretation Theory.
@@ -46,11 +46,11 @@ export function TrustReport({ report }: { report: LocalityReport }) {
           <div>
             {/* What the number is a score *of*.
              *
-             * The score currently rests on two categories, and across the whole
-             * site it lands between 84 and 97 — dense Indian cities have schools
-             * everywhere, and with the regulatory air network down every locality
-             * reads the same low PM2.5. A bare "94" therefore looks like a verdict
-             * on the neighbourhood while being a statement about two things.
+             * The score rarely rests on all five categories, and the ones that
+             * are present are the ones present everywhere — dense Indian cities
+             * have schools on every street, and air readings cluster tightly
+             * within a city. A bare "94" therefore looks like a verdict on the
+             * neighbourhood while being a statement about two or three things.
              *
              * Naming the basis beside the number costs nothing and is the
              * difference between a claim and an overclaim. The honesty banner
@@ -142,8 +142,8 @@ export function TrustReport({ report }: { report: LocalityReport }) {
         * for get one line between them, rather than a full card each saying
         * "no source yet" — four of those turned the page into a wall and pushed
         * the parts that carry information below the fold. They stay listed,
-        * because a grid that silently shows two of six is a different claim than
-        * one that shows six and admits four are empty. */}
+        * because a grid that silently shows two is a different claim than one
+        * that lists them all and admits which are empty. */}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {report.categories
           .filter((category) => category.available)
@@ -309,30 +309,66 @@ function CategoryCard({
           : "border-dashed border-gridline bg-page-plane"
       }`}
     >
+      {/*
+        An unscored category shows no number and no meter at all.
+
+        It used to render an em dash above an empty progress bar, which is the
+        shape of a broken component rather than of an answer — the eye reads a
+        zero-width bar as a score of nothing, which is the one reading this
+        product must never invite. The dashed border already says "no data";
+        drawing an empty meter says it a second time, worse.
+
+        The alternative considered and rejected was giving unscored categories a
+        default number. Silence in the local press is not evidence of safety,
+        and scoring it as though it were would rank the neighbourhoods nobody
+        writes about above the ones that get covered.
+      */}
       <div className="mb-1.5 flex items-start justify-between gap-2">
         <div className="text-[12.5px] font-semibold text-ink-primary">
           {category.label}
         </div>
-        <div
-          className="shrink-0 text-[17px] font-bold leading-none"
-          style={{ color: category.score !== null ? color : "var(--color-ink-muted)" }}
-        >
-          {category.score ?? "—"}
-        </div>
-      </div>
-
-      <div className="mb-2 h-[5px] w-full overflow-hidden rounded-[3px] bg-gridline">
         {category.score !== null && (
-          <div
-            className="h-full rounded-[3px]"
-            style={{ width: `${category.score}%`, background: color }}
-          />
+          <div className="flex shrink-0 items-center gap-1.5">
+            {/* A baseline is not a measurement, so it must not look like one.
+              * It carries the muted ink rather than a status colour, and the
+              * word "baseline" sits beside it — a green 80 next to a measured
+              * green 80 would be the same pixel making two different claims. */}
+            {category.isBaseline && (
+              <span className="rounded bg-page-plane px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-ink-muted">
+                Baseline
+              </span>
+            )}
+            <div
+              className="text-[17px] font-bold leading-none"
+              style={{ color: category.isBaseline ? "var(--color-ink-muted)" : color }}
+            >
+              {category.score}
+            </div>
+          </div>
         )}
       </div>
+
+      {category.score !== null && (
+        <div className="mb-2 h-[5px] w-full overflow-hidden rounded-[3px] bg-gridline">
+          <div
+            className={`h-full rounded-[3px] ${category.isBaseline ? "opacity-40" : ""}`}
+            style={{
+              width: `${category.score}%`,
+              background: category.isBaseline ? "var(--color-ink-muted)" : color,
+            }}
+          />
+        </div>
+      )}
 
       <div className="min-h-[30px] text-[11px] leading-[1.4] text-ink-secondary">
         {category.summary || category.status}
       </div>
+
+      {/* The invitation belongs on exactly the cards where we admit we know
+        * little: nothing measurable, or a baseline standing in for silence. */}
+      {(category.score === null || category.isBaseline) && (
+        <ReportLink category={category.label} slug={slug} />
+      )}
 
       <div className="mt-1.5 flex items-center justify-between gap-2">
         {category.confidence ? (
@@ -379,5 +415,40 @@ function DisagreementCard({ disagreement }: { disagreement: Disagreement }) {
         {disagreement.detail}
       </p>
     </div>
+  );
+}
+
+/**
+ * "Seen something here?" — the only route a resident has into these categories.
+ *
+ * Safety, water and power have no official Indian source at locality level, so
+ * local press is the entire record and press coverage is thin wherever
+ * journalists are. docs/strategy.md calls power a crowd-sourced category "for
+ * the foreseeable future"; this is the first step of that, and it deliberately
+ * appears on exactly the cards where we admit we know nothing.
+ *
+ * Renders only when NEXT_PUBLIC_REPORT_URL is set. A button that goes nowhere
+ * is worse than no button — it reads as a broken promise on the one card whose
+ * whole job is to admit a gap — and the destination is a deployment choice
+ * rather than something to hardcode, so no contact address ships in the source.
+ */
+function ReportLink({ category, slug }: { category: string; slug: string }) {
+  const base = process.env.NEXT_PUBLIC_REPORT_URL;
+  if (!base) return null;
+
+  const url = `${base}${base.includes("?") ? "&" : "?"}locality=${encodeURIComponent(
+    slug,
+  )}&category=${encodeURIComponent(category)}`;
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-2 inline-flex items-center gap-1 text-[10.5px] font-semibold text-brand underline decoration-dotted underline-offset-2 hover:decoration-solid"
+    >
+      Seen something? Tell us
+      <span aria-hidden="true">→</span>
+    </a>
   );
 }

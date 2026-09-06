@@ -119,9 +119,10 @@ export default async function LocalityPage({
       )}
 
       <p className="mt-8 text-[10.5px] leading-relaxed text-ink-muted">
-        Neighbour Trust is in early access. Air quality and schools are wired to
-        live sources; safety and water carry press coverage only; power and
-        infrastructure have no source yet. See docs/build-roadmap.md.
+        Neighbour Trust is in early access. Air quality, schools and
+        connectivity are wired to live sources; safety and water carry press
+        coverage only. Power has no card because no source publishes it at
+        locality level — reported outages appear as a flag instead.
       </p>
     </main>
   );

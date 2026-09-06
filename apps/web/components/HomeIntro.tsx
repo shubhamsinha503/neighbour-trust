@@ -118,9 +118,10 @@ function Honesty({ stats }: { stats: CoverageStats | null }) {
     <div className="mt-5 rounded-2xl border border-hairline bg-surface-1 p-4">
       <p className="text-[12.5px] font-semibold">We show what we don&apos;t know, too</p>
       <p className="mt-1.5 text-[12px] leading-[1.6] text-ink-secondary">
-        {stats ? stats.categoriesLive : 4} of six categories have live data.
-        Power and infrastructure have none yet, and we leave them empty rather
-        than estimating. Safety and water come from local press, which measures{" "}
+        Five categories appear on a report. Schools and connectivity cover
+        almost every locality; air quality only reaches those with a monitoring
+        station near enough, and we leave the rest empty rather than estimating.
+        Safety and water come from local press, which measures{" "}
         <span className="text-ink-primary">
           how much an area gets written about
         </span>{" "}

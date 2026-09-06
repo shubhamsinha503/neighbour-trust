@@ -29,7 +29,7 @@ export interface Locality {
   h3Cell: string;
   lat: number;
   lon: number;
-  /** How many of the six categories hold data here. */
+  /** How many categories hold data here. */
   categoriesWithData: number;
 }
 
@@ -50,6 +50,13 @@ export interface AirQualityView {
   dataVintage: string;
   h3Cell: string;
   confidence: Confidence;
+  /**
+   * True when this is the last reading anybody took rather than a current one.
+   * The card must lead with the measurement date, and the Trust Score already
+   * excludes it server-side. See agents/common/freshness.py.
+   */
+  historical: boolean;
+  historicalNote?: string;
   payload: AirQualityPayload;
   verdict: Verdict;
 }
@@ -103,6 +110,8 @@ export async function fetchAirQuality(slug: string): Promise<AirQualityView> {
     dataVintage: raw.data_vintage,
     h3Cell: raw.h3_cell,
     confidence: raw.confidence as Confidence,
+    historical: raw.historical === true,
+    historicalNote: raw.historical_note ?? undefined,
     payload: toAirQualityPayload(raw.payload),
     verdict: {
       headline: raw.verdict.headline,
@@ -265,6 +274,11 @@ export interface ReportCategory {
   available: boolean;
   /** Whether this category contributed to the Trust Score. */
   counted: boolean;
+  /**
+   * True when `score` is the no-reports baseline rather than a measurement.
+   * Must be labelled on the card; never reaches the Trust Score.
+   */
+  isBaseline: boolean;
   status: string;
   summary: string;
   sourceName?: string;
@@ -337,6 +351,7 @@ export async function fetchReport(slug: string): Promise<LocalityReport> {
         weight: c.weight,
         available: c.available,
         counted: c.counted,
+        isBaseline: c.is_baseline === true,
         status: c.status,
         summary: c.summary ?? "",
         sourceName: c.source_name ?? undefined,

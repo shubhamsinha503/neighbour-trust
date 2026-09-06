@@ -178,6 +178,47 @@ def score_power(payload: dict[str, Any]) -> Optional[int]:
 SCORERS = {"crime": score_crime, "water": score_water, "power": score_power}
 
 
+# A locality with nothing reported in twelve months is shown this instead of a
+# blank card, as a product decision taken on 2026-09-06.
+#
+# It is a *baseline*, not a measurement, and everything downstream is built to
+# keep those apart: it is tagged `is_baseline`, the card labels it in words, and
+# it is deliberately excluded from the Trust Score, which stays a number made
+# only of things that were actually measured.
+#
+# The reason for that separation is the warning at the top of this module. No
+# press coverage is not evidence of safety — it is evidence of no journalists.
+# Letting silence raise a locality's headline number would rank the
+# neighbourhoods nobody writes about above the ones that get covered, which is
+# the coverage bias this whole module exists to keep out. Shown on the card and
+# labelled, a reader can weigh it; folded into the composite, nobody can see it.
+#
+# It is also the entry point for resident reporting: the card that shows this
+# is the card that asks whether anyone has seen otherwise.
+BASELINE_NO_REPORTS = 80
+
+
+def baseline(payload: dict[str, Any]) -> Optional[int]:
+    """The no-reports baseline, or None if silence cannot be trusted here.
+
+    Returns nothing when the locality is only partly classified. A run that hit
+    its classification cap leaves mentions unjudged, so its incident count reads
+    zero for a reason that has nothing to do with the neighbourhood — and
+    awarding a good baseline for a queue we never finished processing would be
+    inventing the very reassurance this module refuses to invent.
+    """
+    news = payload.get("news") or {}
+    if news.get("incidents_12m", 0) != 0:
+        return None
+
+    fetched = news.get("mentions_fetched") or 0
+    classified = news.get("mentions_classified") or 0
+    if fetched and classified < fetched * 0.9:
+        return None
+
+    return BASELINE_NO_REPORTS
+
+
 def score(category: str, payload: dict[str, Any]) -> Optional[int]:
     scorer = SCORERS.get(category)
     return scorer(payload) if scorer else None

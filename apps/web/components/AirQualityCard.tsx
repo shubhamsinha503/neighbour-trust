@@ -33,6 +33,31 @@ export function AirQualityCard({ view }: { view: AirQualityView }) {
 
   return (
     <article className="rounded-[20px] border border-hairline bg-surface-1 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+      {/*
+        0 — the one caveat that runs *before* the verdict.
+        The ordering above is deliberate and the honesty note belongs at step 4,
+        after competence is established. This is the exception, because it is not
+        a caveat about our confidence — it changes what the number below means. A
+        reader who sees "AQI 40 · Good" without knowing it was measured a
+        fortnight ago has been told something false about the air today, and no
+        footnote placed after the meter undoes that first impression.
+      */}
+      {view.historical && (
+        <div
+          className="mb-4 rounded-2xl border border-amber-300/60 bg-amber-50 px-3.5 py-2.5 dark:border-amber-500/30 dark:bg-amber-500/10"
+          role="status"
+        >
+          <div className="text-[10.5px] font-bold uppercase tracking-[0.05em] text-amber-700 dark:text-amber-400">
+            Last known reading
+          </div>
+          <p className="mt-0.5 text-[12.5px] leading-[1.5] text-ink-primary">
+            Measured <b>{formatIst(view.dataVintage)}</b>, {relativeAge(view.dataVintage)}.
+            The monitoring network has published nothing since, so this is not a
+            reading for today and it is left out of the Trust Score.
+          </p>
+        </div>
+      )}
+
       {/* 1 — verdict */}
       <header className="mb-4 flex items-start gap-4">
         <Meter score={verdict.score} color={bandColor} />

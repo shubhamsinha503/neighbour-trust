@@ -176,7 +176,15 @@ def _water_flags(payload: dict[str, Any]) -> list[dict[str, str]]:
     return flags
 
 
-def _power_flags(payload: dict[str, Any]) -> list[dict[str, str]]:
+def power_flags(payload: dict[str, Any]) -> list[dict[str, str]]:
+    """Reported power problems.
+
+    Public, unlike its siblings, because the Trust Score's power penalty is
+    computed from this exact function. Power has no card of its own any more, so
+    this flag is the *only* thing telling a reader why their score moved —
+    keeping the deduction and the explanation on one rule is what guarantees
+    they can never disagree. See score.power_penalty.
+    """
     news = payload.get("news") or {}
     types = _incident_types(news)
     if not types:
@@ -252,7 +260,7 @@ def find(
     for category, builder in (
         ("crime", _crime_flags),
         ("water", _water_flags),
-        ("power", _power_flags),
+        ("power", power_flags),
         ("air_quality", _air_flags),
     ):
         envelope = envelopes.get(category)
