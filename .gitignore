@@ -22,6 +22,10 @@ node_modules/
 out/
 .turbo/
 npm-debug.log*
+# TypeScript's incremental build cache. Machine-local and rewritten by every
+# `tsc` run, so tracking it put a meaningless diff in front of every commit and
+# invited someone to stage a stale one over a colleague's.
+*.tsbuildinfo
 
 # OS
 .DS_Store
