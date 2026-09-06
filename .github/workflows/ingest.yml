@@ -23,10 +23,11 @@ on:
     - cron: "17 * * * *"
     # Sundays 03:47 UTC — schools. Off-peak for Overpass, donated infrastructure.
     - cron: "47 3 * * 0"
-    # Sundays 05:13 UTC — connectivity. Also Overpass, and deliberately well
-    # clear of the schools pass rather than queued behind it: both are slow, and
-    # two long jobs sharing the concurrency group would push one into the next
-    # hour's air quality run.
+    # Sundays 05:13 UTC — connectivity. Reads OpenStreetMap from downloaded
+    # extracts rather than Overpass, but still the longest job here (~10 min of
+    # download and parsing), so it stays well clear of the schools pass rather
+    # than queued behind it: two long jobs sharing the concurrency group would
+    # push one into the next hour's air quality run.
     - cron: "13 5 * * 0"
     # Daily 04:23 UTC — news, after Indian morning editions are indexed.
     - cron: "23 4 * * *"
@@ -134,9 +135,18 @@ jobs:
         run: python -m agents.schools.run
 
       - name: Run connectivity
-        # The slowest job here: Overpass takes 20s-4min per locality, so a full
-        # pass can approach the timeout. Partial passes are normal and safe —
-        # each locality is written as it completes.
+        # Downloads two OpenStreetMap extracts (~780 MB total) and reads them
+        # locally: roughly three minutes of transfer plus six of parsing, after
+        # which all 44 localities are answered from memory.
+        #
+        # Deliberately not cached between runs. The extracts are rebuilt daily
+        # and this job runs weekly, so a restored cache would always be stale
+        # enough to re-download anyway — the cache would cost a restore and save
+        # nothing.
+        #
+        # This replaced the Overpass API, which took 20s-4min per locality and
+        # never completed a pass; partial runs used to be the normal outcome.
+        # They are no longer expected, so a failure here is worth reading.
         if: steps.which.outputs.agent == 'connectivity' || steps.which.outputs.agent == 'all'
         run: python -m agents.infrastructure.run
 

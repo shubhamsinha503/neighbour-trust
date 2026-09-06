@@ -8,6 +8,12 @@ pydantic==2.10.4
 httpx==0.28.1
 psycopg[binary]==3.2.3
 h3==4.1.2
+
+# Reads OpenStreetMap extracts for the connectivity agent. That agent used to
+# query the Overpass API and never finished a run; a local extract answers all
+# 44 localities in one deterministic pass. See
+# agents/infrastructure/sources/osm_extract.py.
+osmium==4.3.1
 python-dotenv==1.0.1
 apscheduler==3.11.0
 

@@ -24,7 +24,9 @@ This is not a "no data" problem, it's a "fragmented, inconsistent, and unevenly 
 
 **Future infrastructure / builder credibility** — RERA project registrations are the key source (project timelines, builder track record, litigation status), but every state runs its own RERA portal with no unified API — this is a scraping/partnership problem, not a data-availability problem. Metro/highway/industrial-corridor plans come from state urban development authority master plans (e.g., DDA, BDA), published as PDFs and GIS shapefiles rather than APIs.
 
-**Geospatial base layer** — good and free: OpenStreetMap (via the Overpass API) and Overture Maps give distances to hospitals, schools, transit, and amenities without needing Google's paid Places API.
+**Geospatial base layer** — good and free: OpenStreetMap and Overture Maps give distances to hospitals, schools, transit, and amenities without needing Google's paid Places API.
+
+> Implementation note (2026-09-06): the connectivity agent reads OpenStreetMap from downloaded Geofabrik regional extracts rather than querying the Overpass API. Overpass is a query layer over the same data, maintained by volunteers, and 44 radius queries a week never completed a pass — our best run covered 3 of 44 localities, and an overloaded mirror once returned an HTML error page with a 200 status, which parses into "this locality has no hospitals". Reading the file answers 41 of 44 in one deterministic pass; the three that remain are genuinely unmapped in outer Gurugram and are reported as such rather than scored. The choice of OpenStreetMap over Google Places is unchanged; only the transport is.
 
 ## Why "just use an LLM" doesn't solve this alone
 

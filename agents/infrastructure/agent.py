@@ -29,7 +29,7 @@ from typing import Any, Optional
 from neighbour_trust_schema.envelope import Category, Confidence, DataEnvelope
 
 from agents.common import db
-from agents.infrastructure.sources import osm_amenities as osm
+from agents.infrastructure.sources import osm_extract as osm
 
 log = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ def describe(a: osm.Amenities) -> str:
 
 
 def build_envelope(
-    conn, locality: dict[str, Any], *, client: osm.OsmAmenityClient,
+    conn, locality: dict[str, Any], *, client: osm.OsmExtractClient,
     now: Optional[datetime] = None,
 ) -> LocalityResult:
     now = now or datetime.now(timezone.utc)
@@ -143,18 +143,26 @@ def build_envelope(
     except Exception as exc:
         return LocalityResult(slug=slug, ok=False, reason=f"Overpass failed: {exc}")
 
-    total = (
+    # Industrial land is deliberately excluded from this count. It is the only
+    # signal here that lowers a score, so counting it toward "we have enough
+    # data" lets a locality qualify on exactly the evidence that condemns it.
+    #
+    # Gurugram Sector 82 shipped a confident 5/100 — the worst score in the
+    # product — on nine features, seven of them industrial polygons. Two mapped
+    # amenities is not a neighbourhood with nothing in it; it is a neighbourhood
+    # nobody has mapped. The next-thinnest locality has forty-eight.
+    amenities = (
         found.metro_rail + found.hospitals + found.clinics
-        + found.parks + found.markets + found.industrial_sites
+        + found.parks + found.markets
     )
-    if total < MIN_FEATURES_FOR_DATA:
+    if amenities < MIN_FEATURES_FOR_DATA:
         # Not "nothing here" — "nothing mapped here". Manesar returned zero
         # industrial sites while sitting beside one of India's largest
         # industrial estates.
         return LocalityResult(
             slug=slug, ok=False,
-            reason=f"OpenStreetMap has only {total} mapped features here — too "
-                   f"few to describe the area rather than the map",
+            reason=f"OpenStreetMap has only {amenities} mapped amenities here — "
+                   f"too few to describe the area rather than the map",
         )
 
     score = score_amenities(found)
@@ -184,9 +192,11 @@ def build_envelope(
         source_name=osm.SOURCE_NAME,
         source_url=osm.SOURCE_URL,
         fetched_at=now,
-        # OpenStreetMap is continuously edited, so what we fetched today is
-        # today's map. Unlike UDISE there is no snapshot date to inherit.
-        data_vintage=now,
+        # The extract stamps the moment OpenStreetMap was sampled, so this is a
+        # real vintage rather than the fetch time standing in for one. The
+        # Overpass path could not know it and recorded `now`, which overstated
+        # freshness by however long the data had been sitting upstream.
+        data_vintage=getattr(client, "data_vintage", None) or now,
         h3_cell=locality["h3_cell"],
         # Community-maintained rather than official. Coverage is uneven across
         # Indian cities and the tag says so.

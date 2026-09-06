@@ -26,3 +26,9 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Downloaded OpenStreetMap extracts for the connectivity agent — hundreds of
+# megabytes, rebuilt daily upstream, and reproducible from
+# osm_extract.EXTRACTS. Committing them would put a stale copy of the map in
+# the history forever.
+.cache/

@@ -10,7 +10,7 @@ meaning what it says.
 import pytest
 
 from agents.infrastructure.agent import MIN_FEATURES_FOR_DATA, describe, score_amenities
-from agents.infrastructure.sources.osm_amenities import Amenities
+from agents.infrastructure.sources.osm_extract import Amenities
 
 
 def area(**kw):
@@ -123,15 +123,37 @@ class TestUnmappedIsNotEmpty:
         # The check must precede scoring, or it is decoration.
         assert source.index("MIN_FEATURES_FOR_DATA:") < source.index("score_amenities(found)")
 
+    def test_industrial_land_cannot_satisfy_the_threshold(self):
+        """Industrial sites are the one signal here that lowers a score, so
+        counting them toward "we have enough data" lets a locality qualify on
+        exactly the evidence that condemns it.
+
+        Gurugram Sector 82 shipped a confident 5/100 — the worst score in the
+        product — on nine mapped features, seven of them industrial polygons.
+        Two amenities is not a neighbourhood with nothing in it, it is a
+        neighbourhood nobody has mapped, and the next-thinnest locality in the
+        launch set has forty-eight.
+        """
+        import pathlib
+
+        source = pathlib.Path("agents/infrastructure/agent.py").read_text(encoding="utf-8")
+        guard = source[source.index("amenities = ("):source.index("MIN_FEATURES_FOR_DATA:")]
+        assert "industrial_sites" not in guard
+
 
 class TestRunsResume:
-    """A timed-out connectivity run must continue, not restart.
+    """A re-run must not rewrite envelopes that have not changed.
 
-    Overpass takes 20 seconds to four minutes per locality and rate-limits, so a
-    full pass of 44 can exceed the job timeout. Without a freshness skip the job
-    restarts at the first locality every time, spends its whole budget
-    re-fetching what it already has, and never reaches the tail — incomplete
-    forever rather than incomplete once.
+    This began as protection against a harsher problem. Overpass took 20 seconds
+    to four minutes per locality and rate-limited, so a full pass of 44 could
+    exceed the job timeout; without a freshness skip the job restarted at the
+    first locality every time and never reached the tail — incomplete forever
+    rather than incomplete once.
+
+    Reading a local extract removed that failure mode: a run now completes in
+    one pass. The window stays because what is built near a locality changes on
+    the order of years, so rewriting an identical envelope every run buys
+    nothing.
     """
 
     SOURCE = __import__("pathlib").Path(
@@ -156,12 +178,48 @@ class TestRunsResume:
     def test_force_overrides_the_skip(self):
         assert "--force" in self.SOURCE
 
-    def test_the_pause_is_not_spent_on_skipped_localities(self):
-        """Sleeping before a skip would burn the run's budget on localities it
-        is not even querying."""
-        assert "if fetched:" in self.SOURCE
+    def test_the_run_no_longer_paces_itself_against_an_api(self):
+        """The inter-request pause existed to be a good citizen toward Overpass.
 
-    def test_an_all_skipped_run_is_a_success(self):
+        Reading a local file has nobody to be polite to, and keeping a sleep
+        per locality would add three quiet minutes to every run for no reason.
+        This asserts the pacing is gone rather than merely unused, because a
+        leftover sleep is the kind of thing that survives a rewrite unnoticed.
+        """
+        assert "PAUSE_SECONDS" not in self.SOURCE
+        assert "time.sleep" not in self.SOURCE
+
+    def test_the_extract_is_read_once_for_the_whole_run(self):
+        """One read answers every locality. Constructing the client inside the
+        loop would re-read hundreds of megabytes 44 times."""
+        assert self.SOURCE.count("OsmExtractClient(") == 1
+        assert self.SOURCE.index("OsmExtractClient(") < self.SOURCE.index(
+            "build_envelope("
+        )
+
+    def test_the_database_is_checked_before_the_extracts_are_read(self):
+        """Reading the extracts takes the better part of ten minutes and is
+        wasted if there is nowhere to write the result. This shipped the other
+        way round once and cost a full read before failing on a database that
+        had been unreachable the whole time."""
+        assert self.SOURCE.index("db.connect()") < self.SOURCE.index(
+            "OsmExtractClient("
+        )
+
+    def test_nothing_to_do_is_not_a_failure(self):
+        """Every locality already current is the healthy steady state."""
+        assert "already current" in self.SOURCE
+
+    def test_an_all_current_run_is_a_success(self):
         """Everything already current is the healthy steady state, not a
         failure that should redden CI and block later steps."""
-        assert "return 0 if (ok or skipped) else 1" in self.SOURCE
+        assert "return 0 if (ok or fresh) else 1" in self.SOURCE
+
+    def test_an_all_unmapped_run_is_not_a_success(self):
+        """"Already current" and "OpenStreetMap has nothing here" were one
+        counter until the extract rewrite, so a run in which every locality came
+        back unmapped exited 0 and looked healthy. Those are opposite outcomes:
+        the first means the data is good, the second means we have none.
+        """
+        exit_line = self.SOURCE[self.SOURCE.index("return 0 if"):]
+        assert "skipped" not in exit_line.split("\n")[0]
