@@ -77,7 +77,19 @@ class SchoolsPayload(BaseModel):
 
     name: str
     board: Optional[str] = None
-    distance_km: Optional[float] = None
+    distance_km: Optional[float] = Field(
+        None,
+        description="Kilometres from the locality centroid — a single point "
+        "standing in for an area two or three kilometres across, so it answers "
+        "'near this neighbourhood' rather than 'near my flat'. When the reader "
+        "gives us an address the card re-measures from `lat`/`lon` instead and "
+        "says which point it used.",
+    )
+    # Carried so a distance can be recomputed from a point the reader supplies.
+    # Without these the stored distance is the only one obtainable, and it is
+    # measured from somewhere nobody actually lives.
+    lat: Optional[float] = None
+    lon: Optional[float] = None
     pupil_teacher_ratio: Optional[float] = None
     infra_score: Optional[float] = None
     pass_rate: Optional[float] = Field(

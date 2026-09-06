@@ -300,6 +300,8 @@ def build_envelope_for_locality(
                 name=s["name"],
                 board=s["board_secondary"] or s["board_higher_sec"],
                 distance_km=round(s["distance_km"], 2),
+                lat=s.get("lat"),
+                lon=s.get("lon"),
                 pupil_teacher_ratio=s["pupil_teacher_ratio"],
                 infra_score=scoring.infra_score(s["students_per_room"], None),
                 pass_rate=None,  # never available from UDISE — see SchoolsPayload

@@ -246,6 +246,8 @@ function toSchoolsPayload(raw: Record<string, any>): SchoolsAreaPayload {
         name: s.name,
         board: s.board ?? undefined,
         distanceKm: s.distance_km ?? undefined,
+        lat: s.lat ?? undefined,
+        lon: s.lon ?? undefined,
         pupilTeacherRatio: s.pupil_teacher_ratio ?? undefined,
         infraScore: s.infra_score ?? undefined,
         passRate: s.pass_rate ?? undefined,

@@ -463,6 +463,12 @@ def schools_near(
         SELECT source, external_id, udise_code, name, management, school_category,
                board_secondary, board_higher_sec, total_students, total_teachers,
                pupil_teacher_ratio, students_per_room, proxy_score,
+               -- Carried through so the card can re-measure from a point the
+               -- reader gives us. distance_km below is from the locality
+               -- centroid, which is a single point standing in for an area two
+               -- or three kilometres across.
+               ST_Y(location::geometry) AS lat,
+               ST_X(location::geometry) AS lon,
                ST_Distance(location, ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography) / 1000.0
                    AS distance_km
         FROM school

@@ -41,7 +41,14 @@ export interface DataEnvelope<TPayload = Record<string, unknown>> {
 export interface SchoolsPayload {
   name: string;
   board?: string;
+  /**
+   * Kilometres from the locality centroid — one point standing in for an area
+   * two or three kilometres across. When the reader gives us an address, the
+   * card recomputes from `lat`/`lon` and says which point it measured from.
+   */
   distanceKm?: number;
+  lat?: number;
+  lon?: number;
   pupilTeacherRatio?: number;
   infraScore?: number;
   /**
