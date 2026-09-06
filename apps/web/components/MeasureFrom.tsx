@@ -77,9 +77,14 @@ export function MeasureFrom({
     setError(null);
     setWarning(null);
     try {
-      const response = await fetch(
-        `/api/geocode?q=${encodeURIComponent(query)}&city=${encodeURIComponent(city)}`,
-      );
+      // POSTed rather than put in the URL: a query string carries the address
+      // into the host's access logs beside an IP, and an address is the most
+      // personal thing this product handles.
+      const response = await fetch("/api/geocode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q: query, city }),
+      });
       const body = await response.json();
       if (!response.ok) {
         setError(body.error ?? "That address could not be found.");

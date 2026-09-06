@@ -62,10 +62,28 @@ function tooSoon(): number {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const query = (searchParams.get("q") ?? "").trim();
-  const city = searchParams.get("city") ?? "";
+/**
+ * POST rather than GET, and the reason is the whole point of the route.
+ *
+ * An address is the most personal thing this product ever handles. In a query
+ * string it lands in Vercel's access logs and in Nominatim's, next to an IP and
+ * a timestamp, where neither we nor the reader can do anything about it. A
+ * request body is not logged by either. It is also why this route exists at all
+ * rather than the browser calling Nominatim directly.
+ *
+ * The address still reaches Nominatim — it has to, to be geocoded — but it
+ * arrives from our server without the visitor's IP attached.
+ */
+export async function POST(request: Request) {
+  let body: { q?: unknown; city?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Expected a JSON body." }, { status: 400 });
+  }
+
+  const query = typeof body.q === "string" ? body.q.trim() : "";
+  const city = typeof body.city === "string" ? body.city : "";
 
   if (query.length < 3) {
     return NextResponse.json(
