@@ -205,3 +205,86 @@ class TestTheDatabaseRefusesShortcuts:
         assert "ON CONFLICT" in __import__("inspect").getsource(
             __import__("agents.common.db", fromlist=["db"]).insert_resident_report
         )
+
+
+class TestFormImport:
+    """Mapping the Google Form's answers onto what the database stores.
+
+    The form is edited by a person and its answer strings are a contract with
+    this code. So the maps are written out in full rather than normalised, and
+    an answer nobody anticipated is reported by name rather than guessed at —
+    the reports most worth reading are the ones the form's own options did not
+    cover.
+    """
+
+    from scripts import import_reports as imp
+
+    def test_every_form_option_maps_to_a_real_category(self):
+        from agents.orchestrator.score import LABELS
+
+        for value in self.imp.CATEGORY_MAP.values():
+            assert value in LABELS, value
+
+    def test_every_basis_and_tie_maps_to_a_stored_enum(self):
+        assert set(self.imp.BASIS_MAP.values()) <= set(reports_mod.BASIS_WEIGHT)
+        assert set(self.imp.TIE_MAP.values()) <= set(reports_mod.TIE_WEIGHT)
+
+    def test_answers_we_cannot_store_are_named_not_dropped(self):
+        """"Something else" and "my locality isn't listed" are real answers with
+        no home in the schema. Losing them silently would discard exactly the
+        reports telling us the form is too narrow."""
+        assert "something else" in self.imp.UNMAPPABLE
+        assert "my locality isn't listed" in self.imp.UNMAPPABLE
+
+    def test_the_same_submission_hashes_the_same_way(self):
+        """Google's CSV has no response id, so re-import safety rests entirely
+        on this being stable."""
+        a = self.imp.external_id("06/09/2026 18:22:14", "The road floods")
+        b = self.imp.external_id("06/09/2026 18:22:14", "The road floods")
+        assert a == b and a.startswith("gform:")
+
+    def test_different_submissions_do_not_collide(self):
+        same_time = "06/09/2026 18:22:14"
+        assert self.imp.external_id(same_time, "The road floods") != \
+               self.imp.external_id(same_time, "The transformer failed")
+        assert self.imp.external_id("06/09/2026 18:22:14", "same text") != \
+               self.imp.external_id("06/09/2026 18:22:15", "same text")
+
+    def test_timestamps_parse_in_the_formats_google_exports(self):
+        for raw in ("06/09/2026 18:22:14", "2026-09-06 18:22:14", "06/09/2026 18:22"):
+            assert self.imp.parse_timestamp(raw) is not None
+
+    def test_an_unparseable_timestamp_is_none_not_a_guess(self):
+        """insert_resident_report defaults to now() when this is None. Inventing
+        a date would age a report wrongly for months."""
+        assert self.imp.parse_timestamp("not a date") is None
+        assert self.imp.parse_timestamp("") is None
+
+    def test_columns_are_matched_loosely_enough_to_survive_a_reword(self):
+        header = ["Timestamp", "Which locality?", "What is this about?",
+                  "What did you see or experience?", "When did this happen?",
+                  "How do you know about it?", "How long have you been in this area?",
+                  "A link or photo, if you have one",
+                  "Your email, only if you want us to follow up"]
+        found = self.imp.resolve_columns(header)
+        assert found["locality"] == "Which locality?"
+        assert found["body"] == "What did you see or experience?"
+        assert found["contact_email"].startswith("Your email")
+
+    def test_a_missing_required_column_fails_loudly(self):
+        """Importing half a sheet quietly is worse than not importing it."""
+        with pytest.raises(SystemExit) as exc:
+            self.imp.resolve_columns(["Timestamp", "Which locality?"])
+        assert "what is this about" in str(exc.value).lower() or \
+               "category" in str(exc.value).lower()
+
+    def test_the_importer_cannot_accept_a_report(self):
+        """It calls the helper that has no state argument. Stated as a test
+        because an importer that could self-accept would make the moderation
+        queue optional."""
+        import inspect
+
+        source = inspect.getsource(self.imp)
+        assert "insert_resident_report" in source
+        assert "review_resident_report" not in source
+        assert "'accepted'" not in source
