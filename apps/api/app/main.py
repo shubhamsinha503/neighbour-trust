@@ -141,7 +141,18 @@ class NoDataResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@app.get("/healthz")
+# HEAD as well as GET, because that is how uptime monitors ask.
+#
+# FastAPI's @app.get registers GET alone — unlike plain Starlette, it does not
+# add HEAD — so a HEAD probe got 405 with `Allow: GET`. UptimeRobot uses HEAD by
+# default, which meant the first monitor pointed at this endpoint reported the
+# service down while it was serving every real request in under a second. An
+# uptime check that reports a healthy service as down is worse than none: it
+# trains you to ignore the alert that matters.
+#
+# HEAD costs the same as GET here — Starlette discards the body — so the health
+# check still does its real database round-trip either way.
+@app.api_route("/healthz", methods=["GET", "HEAD"])
 def healthz() -> dict[str, Any]:
     """Liveness, a real database round-trip, and per-category ingestion health.
 

@@ -70,3 +70,42 @@ def test_report_response_accepts_a_flag():
         sources_used=[],
         generated_at="2026-09-03T00:00:00",
     )
+
+
+class TestHealthzAnswersMonitors:
+    """/healthz must answer the request an uptime monitor actually sends.
+
+    UptimeRobot — and most probes — use HEAD, because it costs a body they do
+    not need. FastAPI's @app.get registers GET alone, unlike plain Starlette, so
+    this endpoint returned 405 with `Allow: GET` to every HEAD request. The
+    first monitor pointed at it reported the service down while it was serving
+    real requests in under a second.
+
+    That is the worst failure mode a health check has: not silence, but a
+    confident wrong answer that teaches you to ignore the alert.
+    """
+
+    def test_head_is_accepted(self):
+        from fastapi.routing import APIRoute
+
+        from apps.api.app.main import app
+
+        route = next(
+            r for r in app.routes
+            if isinstance(r, APIRoute) and r.path == "/healthz"
+        )
+        assert "HEAD" in route.methods, (
+            "uptime monitors probe with HEAD; without it they report a healthy "
+            "service as down"
+        )
+
+    def test_get_still_works(self):
+        from fastapi.routing import APIRoute
+
+        from apps.api.app.main import app
+
+        route = next(
+            r for r in app.routes
+            if isinstance(r, APIRoute) and r.path == "/healthz"
+        )
+        assert "GET" in route.methods
