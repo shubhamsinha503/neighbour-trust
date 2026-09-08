@@ -83,6 +83,25 @@ class TestCityNaming:
         Gurugram."""
         assert "Manesar" in prop.CITIES["Gurugram"]["aliases"]
 
+    def test_electronic_city_counts_as_bengaluru(self):
+        """Same shape as Manesar, and it cost 18 localities. Electronic City is
+        tagged place=town and is its own municipal council, so every layout
+        around it was attributed there and refused — while Electronic City
+        itself sits in the seed list as a Bengaluru locality. Adding it took the
+        Bengaluru proposal from 40 accepted to 55.
+        """
+        assert "Electronic City" in prop.CITIES["Bengaluru"]["aliases"]
+
+    def test_a_town_that_is_genuinely_elsewhere_is_not_aliased(self):
+        """The alias list is for places the product already treats as part of
+        the city, not a way to widen the net. Hoskote, Nelamangala, Bidadi and
+        Devanahalli are separate towns, and their neighbourhoods are correctly
+        refused rather than relabelled as Bengaluru."""
+        aliases = {a.lower() for a in prop.CITIES["Bengaluru"]["aliases"]}
+        for elsewhere in ("hoskote", "nelamangala", "bidadi", "devanahalli",
+                          "sarjapura", "jigani"):
+            assert elsewhere not in aliases
+
     def test_each_city_declares_the_state_that_goes_on_the_page(self):
         assert prop.CITIES["Bengaluru"]["state"] == "Karnataka"
         assert prop.CITIES["Gurugram"]["state"] == "Haryana"

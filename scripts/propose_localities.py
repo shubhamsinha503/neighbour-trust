@@ -90,8 +90,13 @@ CITIES: dict[str, dict[str, Any]] = {
         "extract": "southern-zone",
         "centre": (12.9716, 77.5946),
         "radius_km": 25.0,
-        # OSM carries both spellings, and older data still uses the pre-2014 one.
-        "aliases": ["Bangalore"],
+        # OSM carries both spellings, and older data still uses the pre-2014
+        # one. Electronic City is tagged place=town and is administratively its
+        # own municipal council, but it is already in the seed list as a
+        # Bengaluru locality and nobody searching it means anywhere else —
+        # without it here, 18 neighbouring layouts were refused as "belongs to
+        # Electronic City, not Bengaluru".
+        "aliases": ["Bangalore", "Electronic City"],
     },
     "Gurugram": {
         "state": "Haryana",
@@ -359,8 +364,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     kinds = [k.strip() for k in args.kinds.split(",") if k.strip()]
     result = propose(args.city, kinds, cache_dir=osm_features.DEFAULT_CACHE)
 
+    # Deliberately not called "inside the search radius": this count is taken
+    # after the city attribution too, so saying "in range" alone would credit
+    # the radius with filtering that the attribution actually did.
     print(f"\n{args.city}: {result['considered']} place nodes of kind "
-          f"{'/'.join(kinds)}, {result['in_range']} inside the search radius\n")
+          f"{'/'.join(kinds)} in the extract, {result['in_range']} of them in "
+          f"range and attributed to {args.city}\n")
 
     print(f"{'locality':30s} {'kind':14s} {'schools':>7s} {'amenities':>9s}")
     shown = result["accepted"][:args.limit] if args.limit else result["accepted"]
