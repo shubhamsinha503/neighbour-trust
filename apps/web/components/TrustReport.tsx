@@ -20,6 +20,7 @@
 
 import Link from "next/link";
 import type { Confidence } from "@schema/envelope";
+import { joinCategoryLabels } from "@/lib/categories";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
 import type { Disagreement, Flag, LocalityReport, ReportCategory } from "@/lib/api";
 
@@ -199,14 +200,16 @@ function EmptyCategories({ categories }: { categories: ReportCategory[] }) {
 }
 
 
-/** The categories actually behind the number, lowercased for inline use. */
+/** The categories actually behind the number, lowercased for inline use.
+ *
+ * The joining lives in lib/categories so the search card says the same thing
+ * this does. It did not, once: the card hardcoded "air+schools" while this
+ * derived the real list, and the two pages contradicted each other in public.
+ */
 function countedLabels(report: LocalityReport): string {
-  const labels = report.categories
-    .filter((c) => c.counted)
-    .map((c) => c.label.toLowerCase());
-  if (labels.length === 0) return "";
-  if (labels.length === 1) return labels[0];
-  return labels.slice(0, -1).join(", ") + " and " + labels[labels.length - 1];
+  return joinCategoryLabels(
+    report.categories.filter((c) => c.counted).map((c) => c.label),
+  );
 }
 
 

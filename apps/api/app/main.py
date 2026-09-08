@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field  # noqa: E402
 
 from agents.common import db, freshness  # noqa: E402
 from agents.orchestrator import agent as orchestrator  # noqa: E402
+from agents.orchestrator import score as score_mod  # noqa: E402
 from apps.api.app.schools_verdict import build_verdict as build_schools_verdict  # noqa: E402
 from apps.api.app.verdict import build_verdict  # noqa: E402
 
@@ -295,6 +296,16 @@ class LocalitySummary(BaseModel):
         None, description="None when too few categories can be scored — shown as "
         "such rather than as a zero or a blank."
     )
+    scored_categories: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Labels of the categories actually behind `score`, in report order. "
+            "Sent because the search card has to say what the number covers, and "
+            "the alternative was the frontend guessing — which it did, with a "
+            "hardcoded 'air+schools' that contradicted every locality page once "
+            "safety and connectivity began to count."
+        ),
+    )
     top_flag: Optional[Flag] = Field(
         None, description="The most serious thing found here, if anything was."
     )
@@ -325,6 +336,14 @@ def get_locality_summaries() -> list[dict[str, Any]]:
                     "pincode": locality.get("pincode"),
                     "categories_with_data": coverage.get(locality["h3_cell"], 0),
                     "score": report.trust_score.score,
+                    # From the same report object the locality page renders, so
+                    # the two views cannot disagree about how the number was
+                    # built.
+                    "scored_categories": [
+                        score_mod.LABELS.get(c.category, c.category)
+                        for c in report.trust_score.categories
+                        if c.counted
+                    ],
                     "top_flag": flags[0] if flags else None,
                 }
             )

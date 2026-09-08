@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 
 import type { LocalitySummary } from "@/lib/api";
+import {
+  categoryCoverageLabel,
+  joinCategoryLabels,
+} from "@/lib/categories";
 import { searchLocalities } from "@/lib/search";
 
 /**
@@ -120,7 +124,10 @@ function ResultRow({ locality }: { locality: LocalitySummary }) {
       href={`/${locality.slug}`}
       className="flex items-start gap-3 rounded-2xl border border-hairline bg-surface-1 p-3.5 transition-colors hover:border-brand"
     >
-      <ScoreChip score={locality.score} />
+      <ScoreChip
+        score={locality.score}
+        scoredCategories={locality.scoredCategories}
+      />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
@@ -159,7 +166,13 @@ function ResultRow({ locality }: { locality: LocalitySummary }) {
  * statement from "scores badly", and a blank would let a reader supply whichever
  * they expected.
  */
-function ScoreChip({ score }: { score: number | null }) {
+function ScoreChip({
+  score,
+  scoredCategories,
+}: {
+  score: number | null;
+  scoredCategories: string[];
+}) {
   const colour =
     score === null
       ? "var(--color-ink-muted)"
@@ -181,7 +194,9 @@ function ScoreChip({ score }: { score: number | null }) {
         title={
           score === null
             ? "Not enough data for a score"
-            : `Trust Score ${score} of 100, from air quality and schools only`
+            : `Trust Score ${score} of 100, from ${
+                joinCategoryLabels(scoredCategories) || "partial data"
+              }`
         }
       >
         <span
@@ -195,12 +210,23 @@ function ScoreChip({ score }: { score: number | null }) {
       {/* What the number covers, beside the number.
         *
         * Without this a green 95 sits directly next to "Violence reported in
-        * local press" and reads as though the 95 had weighed it. It has not:
-        * the score is air quality and schools, and safety is deliberately never
-        * scored. A confident figure next to a contradicting flag, with nothing
-        * reconciling them, is worse than either alone. */}
+        * local press" and reads as though the 95 had weighed it. A confident
+        * figure next to a contradicting flag, with nothing reconciling them, is
+        * worse than either alone.
+        *
+        * This read "air+schools", hardcoded. True when written, and false on
+        * almost every card by the time anyone noticed: safety and connectivity
+        * now count for 41 of 44 localities, and Yelahanka's chip was naming air
+        * quality — which Yelahanka has none of. The count comes from the report
+        * itself now, and a count is the one form that cannot misname a
+        * category. The full list is in the tooltip and on the locality page. */}
       {score !== null && (
-        <span className="text-[8.5px] leading-none text-ink-muted">air+schools</span>
+        <span
+          className="text-[8.5px] leading-none text-ink-muted"
+          title={joinCategoryLabels(scoredCategories)}
+        >
+          {categoryCoverageLabel(scoredCategories)}
+        </span>
       )}
     </div>
   );

@@ -415,6 +415,12 @@ export async function fetchStats(): Promise<CoverageStats> {
 export interface LocalitySummary extends Locality {
   /** null when too few categories can be scored. Never rendered as zero. */
   score: number | null;
+  /**
+   * The categories actually behind `score`, from the same report the locality
+   * page renders. Sent by the API rather than inferred here — the card used to
+   * guess, and the guess was wrong on nearly every locality.
+   */
+  scoredCategories: string[];
   topFlag: Flag | null;
 }
 
@@ -432,6 +438,9 @@ export async function fetchLocalitySummaries(): Promise<LocalitySummary[]> {
   return raw.map((entry) => ({
     ...toLocality(entry),
     score: entry.score ?? null,
+    scoredCategories: Array.isArray(entry.scored_categories)
+      ? entry.scored_categories
+      : [],
     topFlag: entry.top_flag
       ? {
           category: entry.top_flag.category,
