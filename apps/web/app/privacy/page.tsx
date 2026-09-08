@@ -16,10 +16,15 @@ export const metadata = {
  * broad rights "just in case" is the kind of document this product exists to be
  * the opposite of.
  *
- * IMPORTANT: this describes a build with no accounts, no analytics, no cookies
- * and no client-side storage. That is verifiable in the source. If any of those
- * change — resident reporting, sign-in, analytics — this page has to change in
- * the same commit, or it becomes a false statement rather than a stale one.
+ * IMPORTANT: this describes a build with no accounts, no cookies and no
+ * client-side storage, and with one cookieless analytics script that counts
+ * page views and cannot identify a reader. That is verifiable in the source. If
+ * any of it changes — resident reporting, sign-in, an analytics tool that sets
+ * cookies or assigns a persistent id — this page has to change in the same
+ * commit, or it becomes a false statement rather than a stale one.
+ *
+ * The analytics script was added on 2026-09-08 in the same commit as the
+ * wording below, which is the rule working rather than the rule being tested.
  *
  * That rule was broken once, on 2026-09-06: an address box and a link to a
  * reporting form both shipped while this page still read "There is no form" and
@@ -41,14 +46,20 @@ export default function PrivacyPage() {
 
       <h1 className="mt-5 text-[24px] font-bold tracking-[-0.01em]">Privacy</h1>
       <p className="mt-1.5 text-[12px] text-ink-muted">
-        Last updated 6 September 2026
+        Last updated 8 September 2026
       </p>
 
       <Section title="The short version">
         <p>
-          Neighbour Trust has no accounts, no sign-in, no cookies, no analytics
-          and no advertising. It stores nothing about you in its database — there
-          is no table of people in it, only tables of places.
+          Neighbour Trust has no accounts, no sign-in, no cookies and no
+          advertising. It stores nothing about you in its database — there is no
+          table of people in it, only tables of places.
+        </p>
+        <p>
+          It counts page views, so we can see which neighbourhoods people look
+          up. That counter sets no cookies, stores nothing in your browser and
+          keeps no identifier for you, so it can tell us a page was opened and
+          never that you opened it. Details below.
         </p>
         <p>
           Two things on the site accept something you type, and both are
@@ -61,10 +72,33 @@ export default function PrivacyPage() {
       <Section title="What we collect from you">
         <p>
           <strong className="font-semibold text-ink-primary">
-            Nothing, unless you type it in yourself.
+            Nothing that identifies you, unless you type it in yourself.
           </strong>{" "}
-          There is no login, no newsletter and no tracking script. Browsing the
-          site tells us nothing about you, and we cannot identify you.
+          There is no login and no newsletter. We cannot identify you, and
+          nothing you do here is tied to a profile, because there is nothing to
+          tie it to.
+        </p>
+        <p className="mt-3">
+          <strong className="font-semibold text-ink-primary">
+            Page-view counting.
+          </strong>{" "}
+          Every page loads a small script from{" "}
+          <strong className="font-semibold text-ink-primary">
+            Vercel Web Analytics
+          </strong>
+          , which records that a page was opened, roughly where in the world the
+          request came from, and which site sent you here if any. It sets no
+          cookies, writes nothing to your browser, and assigns you no identifier
+          — so it cannot follow you between visits, between pages in a way that
+          builds a profile, or onto any other website. We use it to see which
+          localities people look up, which is how we decide where to add data
+          next.
+        </p>
+        <p className="mt-3">
+          It runs on every page. There is no way to switch it off from within
+          the site, and we would rather say that plainly than offer a toggle
+          that does nothing; a browser blocker or Do Not Track extension will
+          stop it loading, and the site works exactly the same without it.
         </p>
         <p className="mt-3">
           <strong className="font-semibold text-ink-primary">
@@ -109,7 +143,10 @@ export default function PrivacyPage() {
         <ul className="mt-2 space-y-1.5 pl-4">
           <Bullet>
             <strong className="font-semibold text-ink-primary">Vercel</strong>{" "}
-            serves the site and records standard access logs.
+            serves the site, records standard access logs, and runs the
+            page-view counter described above. The counter's figures are
+            aggregate — page, country, referrer — and are not joined to those
+            logs by us.
           </Bullet>
           <Bullet>
             <strong className="font-semibold text-ink-primary">Render</strong>{" "}
@@ -190,6 +227,16 @@ export default function PrivacyPage() {
           stored in that window — the address box has never kept anything, and
           the form was hosted elsewhere from the start — but the promise made
           here was that the policy would change first, and it did not.
+        </p>
+        <p>
+          <strong className="font-semibold text-ink-primary">
+            On 8 September 2026 page-view counting was added
+          </strong>{" "}
+          — the wording above changed in the same commit as the script, which is
+          the commitment working rather than being tested again. A cookieless
+          counter was chosen over the usual analytics tools specifically so that
+          the rest of this page stays true: no cookies, no identifier, no
+          consent banner asking you to agree to something you did not want.
         </p>
         <p>
           The commitment stands, and now has a record attached to it. Resident

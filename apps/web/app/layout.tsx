@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 
 import { RegisterServiceWorker } from "@/components/RegisterServiceWorker";
 import { SiteFooter } from "@/components/SiteFooter";
+import { WebAnalytics } from "@/components/WebAnalytics";
 import "./globals.css";
 
 const SITE_URL =
@@ -75,6 +76,7 @@ export default function RootLayout({
         {children}
         <SiteFooter />
         <RegisterServiceWorker />
+        <WebAnalytics />
       </body>
     </html>
   );
