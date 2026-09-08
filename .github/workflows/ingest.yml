@@ -21,7 +21,9 @@ on:
     # Hourly at :17. CPCB publishes near the hour and every naive scraper hits
     # :00; the offset is politeness as much as reliability.
     - cron: "17 * * * *"
-    # Sundays 03:47 UTC — schools. Off-peak for Overpass, donated infrastructure.
+    # Sundays 03:47 UTC — schools. No longer an Overpass query: UDISE plus
+    # OpenStreetMap read from the same downloaded extracts the connectivity run
+    # uses, so this now downloads and parses them too.
     - cron: "47 3 * * 0"
     # Sundays 05:13 UTC — connectivity. Reads OpenStreetMap from downloaded
     # extracts rather than Overpass, but still the longest job here (~10 min of
@@ -131,6 +133,16 @@ jobs:
         run: python -m agents.air_quality.run
 
       - name: Run schools
+        # UDISE for staffing, OpenStreetMap for what is actually there. The OSM
+        # half now reads the same Geofabrik extracts as the connectivity run
+        # rather than querying Overpass, so this step downloads ~780 MB and
+        # parses it — several minutes before any school is written.
+        #
+        # Within a single run the parse is shared: agents/common/osm_features
+        # caches the parsed features, so `agent=all` pays for it once. Across
+        # separately scheduled runs it does not carry over, which is why these
+        # two crons each pay their own parse. Worth revisiting if the weekly
+        # minutes ever matter.
         if: steps.which.outputs.agent == 'schools' || steps.which.outputs.agent == 'all'
         run: python -m agents.schools.run
 

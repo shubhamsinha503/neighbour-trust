@@ -49,27 +49,22 @@ from __future__ import annotations
 import logging
 import math
 import pathlib
-import time
+from datetime import datetime
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import Any, Iterable, Optional, Sequence
 
-import httpx
-import osmium
+from agents.common import osm_features
 
 log = logging.getLogger(__name__)
 
-SOURCE_NAME = "OpenStreetMap"
-SOURCE_URL = "https://www.openstreetmap.org/copyright"
-
-# Geofabrik rebuilds these daily. Between them they cover both launch cities;
-# adding a city means adding its zone here.
-EXTRACTS: dict[str, str] = {
-    "southern-zone": "https://download.geofabrik.de/asia/india/southern-zone-latest.osm.pbf",
-    "northern-zone": "https://download.geofabrik.de/asia/india/northern-zone-latest.osm.pbf",
-}
-
-DEFAULT_CACHE = pathlib.Path(".cache/osm")
+# Re-exported so callers and tests keep their existing import sites.
+SOURCE_NAME = osm_features.SOURCE_NAME
+SOURCE_URL = osm_features.SOURCE_URL
+EXTRACTS = osm_features.EXTRACTS
+DEFAULT_CACHE = osm_features.DEFAULT_CACHE
+ExtractError = osm_features.ExtractError
+download_extract = osm_features.download_extract
+snapshot_time = osm_features.snapshot_time
 
 # How far counts as "nearby" for a walkable amenity. Two and a half kilometres is
 # a short auto ride rather than a walk, which is how these are actually reached
@@ -79,10 +74,6 @@ RADIUS_M = 2500
 # Industrial land is searched wider. A factory does not need to be walkable to
 # put lorries on your road and particulates in your air.
 INDUSTRY_RADIUS_M = 3500
-
-# Only these keys are worth decoding; everything else in the extract is skipped
-# before its tags are read.
-KEYS = ("railway", "station", "amenity", "leisure", "shop", "landuse")
 
 # Names are kept only where the card actually shows them.
 NAMED_KINDS = ("metro_rail", "hospitals", "parks")
@@ -115,10 +106,6 @@ class Amenities:
     features: list[dict[str, Any]] = field(default_factory=list)
 
 
-class ExtractError(RuntimeError):
-    pass
-
-
 def classify(tags: dict[str, str]) -> Optional[str]:
     if tags.get("railway") == "station" or tags.get("station") == "subway":
         return "metro_rail"
@@ -143,124 +130,14 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * r * math.asin(math.sqrt(h))
 
 
-def download_extract(
-    name: str, cache_dir: pathlib.Path = DEFAULT_CACHE, max_age_hours: float = 24.0
-) -> pathlib.Path:
-    """Fetch one Geofabrik extract, reusing a recent copy if there is one.
-
-    These are hundreds of megabytes and rebuilt once a day, so re-downloading
-    within the day buys nothing and spends someone else's bandwidth.
-    """
-    url = EXTRACTS.get(name)
-    if url is None:
-        raise ExtractError(f"unknown extract {name!r}; known: {sorted(EXTRACTS)}")
-
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    dest = cache_dir / f"{name}.osm.pbf"
-
-    if dest.exists():
-        age_hours = (time.time() - dest.stat().st_mtime) / 3600
-        if age_hours < max_age_hours:
-            log.info(
-                "Using cached %s (%.1fh old, %.0f MB)",
-                name, age_hours, dest.stat().st_size / 1e6,
-            )
-            return dest
-
-    log.info("Downloading %s from Geofabrik", name)
-    partial = dest.with_suffix(".partial")
-    # Written to a temporary name and moved into place, so an interrupted
-    # download cannot leave a truncated file that later reads as a valid but
-    # half-empty map.
-    with httpx.stream("GET", url, follow_redirects=True, timeout=120.0) as response:
-        response.raise_for_status()
-        with partial.open("wb") as handle:
-            for chunk in response.iter_bytes(chunk_size=1024 * 1024):
-                handle.write(chunk)
-    partial.replace(dest)
-    log.info("Downloaded %s (%.0f MB)", name, dest.stat().st_size / 1e6)
-    return dest
-
-
-def snapshot_time(path: pathlib.Path) -> Optional[datetime]:
-    """When OpenStreetMap was actually sampled, from the extract's own header.
-
-    Worth reading rather than stamping `now`: the Overpass path had no way to
-    know this and recorded the fetch time as the data vintage, which overstated
-    freshness by however long the extract had been sitting.
-    """
-    stamp = osmium.FileProcessor(str(path)).header.get("osmosis_replication_timestamp")
-    if not stamp:
-        return None
-    return datetime.fromisoformat(stamp.replace("Z", "+00:00")).astimezone(timezone.utc)
-
-
-def _read_extract(path: pathlib.Path) -> list[tuple[str, float, float, Optional[str]]]:
-    """Every feature we care about, as (kind, lat, lon, name)."""
-    pois: list[tuple[str, float, float, Optional[str]]] = []
-    # [kind, name, node_refs] for ways and relations alike; relations start with
-    # an empty ref list that pass 2 fills in.
-    pending: list[list[Any]] = []
-    members: dict[int, list[int]] = {}
-    wanted_ways: set[int] = set()
-    wanted_refs: set[int] = set()
-
-    started = time.time()
-    for obj in osmium.FileProcessor(str(path)).with_filter(osmium.filter.KeyFilter(*KEYS)):
-        kind = classify(dict(obj.tags))
-        if kind is None:
-            continue
-        name = obj.tags.get("name")
-        if obj.is_node():
-            pois.append((kind, obj.location.lat, obj.location.lon, name))
-        elif obj.is_way():
-            refs = [n.ref for n in obj.nodes]
-            if refs:
-                pending.append([kind, name, refs])
-                wanted_refs.update(refs)
-        else:
-            ways = [m.ref for m in obj.members if m.type == "w"]
-            if ways:
-                index = len(pending)
-                pending.append([kind, name, []])
-                for way_id in ways:
-                    members.setdefault(way_id, []).append(index)
-                    wanted_ways.add(way_id)
-
-    if wanted_ways:
-        for obj in osmium.FileProcessor(str(path), osmium.osm.WAY):
-            if obj.id in wanted_ways:
-                refs = [n.ref for n in obj.nodes]
-                wanted_refs.update(refs)
-                for index in members[obj.id]:
-                    pending[index][2].extend(refs)
-
-    locations: dict[int, tuple[float, float]] = {}
-    for obj in osmium.FileProcessor(str(path), osmium.osm.NODE):
-        if obj.id in wanted_refs:
-            locations[obj.id] = (obj.location.lat, obj.location.lon)
-
-    unplaced = 0
-    for kind, name, refs in pending:
-        points = [locations[r] for r in refs if r in locations]
-        if not points:
-            # A way whose nodes fall outside this extract's cut. Counting it at
-            # a guessed position would be worse than not counting it.
-            unplaced += 1
-            continue
-        pois.append((
-            kind,
-            sum(p[0] for p in points) / len(points),
-            sum(p[1] for p in points) / len(points),
-            name,
-        ))
-
-    log.info(
-        "Read %s: %s features in %.0fs%s",
-        path.name, f"{len(pois):,}", time.time() - started,
-        f" ({unplaced} unplaced)" if unplaced else "",
-    )
-    return pois
+def _pois_from(features: Iterable[Any]) -> list[tuple[str, float, float, Optional[str]]]:
+    """Shared features narrowed to the kinds this card shows."""
+    out = []
+    for f in features:
+        kind = classify(f.tags)
+        if kind is not None:
+            out.append((kind, f.lat, f.lon, f.tags.get("name")))
+    return out
 
 
 class OsmExtractClient:
@@ -284,16 +161,23 @@ class OsmExtractClient:
         if paths is not None:
             files = [pathlib.Path(p) for p in paths]
         else:
-            files = [
-                download_extract(name, cache_dir=cache_dir)
-                for name in (extracts if extracts is not None else EXTRACTS)
-            ]
+            # The shared reader parses once and caches, so whichever agent
+            # runs second — schools or this one — pays nothing for the file.
+            names = list(extracts if extracts is not None else EXTRACTS)
+            for name in names:
+                stamp = osm_features.vintage_for(name, cache_dir=cache_dir)
+                if stamp is not None:
+                    self._vintages.append(stamp)
+                self._pois.extend(_pois_from(
+                    osm_features.features_for(name, cache_dir=cache_dir)
+                ))
+            files = []
 
         for path in files:
             stamp = snapshot_time(path)
             if stamp is not None:
                 self._vintages.append(stamp)
-            self._pois.extend(_read_extract(path))
+            self._pois.extend(_pois_from(osm_features.parse_extract(path)))
 
         if not self._pois:
             raise ExtractError("no features read from any extract")

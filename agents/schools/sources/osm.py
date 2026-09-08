@@ -1,4 +1,4 @@
-"""School locations from OpenStreetMap via the Overpass API.
+"""School locations from OpenStreetMap, read from a local regional extract.
 
 Added after UDISE was measured to be spatially incomplete in Bengaluru's urban
 core — 61 OSM schools within 2 km of Indiranagar against 0 in UDISE. OSM answers
@@ -12,51 +12,92 @@ storing and redistributing it is explicitly permitted with attribution. Google
 Places forbids retaining its content beyond ~30 days and forbids building a
 derived database — which is precisely what this pipeline is.
 
-Overpass etiquette matters here. It is donated infrastructure with no API key and
-no quota to hide behind, so this fetches **one bounding box per city** and does
-all per-locality work locally against Postgres, rather than firing a query per
-locality per run. Two requests per refresh, not twenty-two.
+**Why a file rather than the Overpass API.** This fetched one bounding box per
+city, which was already polite — two requests a run rather than one per locality
+— so it was never the per-locality hammering that broke the connectivity agent.
+It had two narrower problems instead.
+
+The first is that a bounding box big enough to matter is a query big enough to
+fail. Overpass answers a large box with 504s under load, and the box here was
+sized to what Overpass would tolerate rather than to where people actually live.
+Widening it to cover more of either metro meant a slower query and a worse
+failure rate, so coverage was capped by the transport rather than by the data.
+
+The second is that it was a single hardcoded endpoint with no fallback, and when
+it went busy the run lost OSM entirely and degraded to UDISE-only counts.
+
+The extract removes both. It is already downloaded for the connectivity agent,
+so this costs nothing extra, and the bounding boxes below are now free to be as
+generous as the cities require — they filter a file we already hold rather than
+sizing a request someone else has to serve.
 """
 
 from __future__ import annotations
 
 import logging
+import pathlib
 import time
 from typing import Any, Iterator, Optional
 
-import httpx
+from agents.common import osm_features
 
-# Public instance. Swap for a self-hosted one if this ever runs often enough to
-# be rude — at a weekly cadence over two cities it is not.
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 SOURCE_NAME = "OpenStreetMap"
 SOURCE_URL = "https://www.openstreetmap.org/copyright"
 
-# (south, west, north, east) — generous enough to cover the metro area, since
-# per-locality filtering happens later in PostGIS anyway.
+# (south, west, north, east) — the metro area each city's schools are drawn
+# from. Per-locality filtering happens later in PostGIS anyway, so these only
+# have to be generous rather than precise.
+#
+# They can now be widened without penalty. Under Overpass every extra square
+# kilometre was another chance of a 504; against a local file the cost of a
+# bigger box is a slightly longer loop over records already in memory.
 CITY_BBOX: dict[str, tuple[float, float, float, float]] = {
-    "Bengaluru": (12.75, 77.35, 13.20, 77.85),
-    "Gurugram": (28.32, 76.82, 28.58, 77.20),
+    "Bengaluru": (12.70, 77.30, 13.25, 77.90),
+    "Gurugram": (28.25, 76.75, 28.65, 77.25),
 }
 
-REQUEST_TIMEOUT = 180.0
-RETRY_WAITS = (10, 30, 60)
+# Which regional extract covers each city.
+CITY_EXTRACT: dict[str, str] = {
+    "Bengaluru": "southern-zone",
+    "Gurugram": "northern-zone",
+}
 
 log = logging.getLogger(__name__)
 
 
 class OverpassError(RuntimeError):
-    pass
+    """Kept under its old name so callers catching it still catch it.
+
+    agents/schools/job.py treats a failure here as non-fatal and degrades to
+    UDISE-only counts. Renaming the exception would have quietly turned that
+    into an unhandled error on the first bad run.
+    """
+
+
+def _in_box(lat: float, lon: float, box: tuple[float, float, float, float]) -> bool:
+    south, west, north, east = box
+    return south <= lat <= north and west <= lon <= east
 
 
 class OsmSchoolsClient:
-    def __init__(self, timeout: float = REQUEST_TIMEOUT) -> None:
-        self._client = httpx.Client(
-            timeout=timeout,
-            # Overpass asks for a descriptive User-Agent so operators can identify
-            # and contact heavy users rather than just blocking them.
-            headers={"User-Agent": "NeighbourTrust/0.1 (neighbourhood data for home buyers)"},
-        )
+    """Same interface as the Overpass client it replaces.
+
+    `schools_for_city` still yields the same record shape, so the agent and its
+    ingest path did not change.
+    """
+
+    def __init__(
+        self,
+        timeout: float = 0.0,  # accepted and unused; kept so callers need no edit
+        *,
+        cache_dir: pathlib.Path = osm_features.DEFAULT_CACHE,
+        paths: Optional[dict[str, pathlib.Path]] = None,
+    ) -> None:
+        self._cache_dir = cache_dir
+        self._paths = paths or {}
+        # Extract name -> parsed schools, so two cities sharing a region read the
+        # file once.
+        self._by_extract: dict[str, list[dict[str, Any]]] = {}
 
     def __enter__(self) -> "OsmSchoolsClient":
         return self
@@ -65,80 +106,85 @@ class OsmSchoolsClient:
         self.close()
 
     def close(self) -> None:
-        self._client.close()
+        self._by_extract.clear()
+
+    def _extract_path(self, name: str) -> pathlib.Path:
+        if name in self._paths:
+            return self._paths[name]
+        return osm_features.download_extract(name, cache_dir=self._cache_dir)
+
+    def _schools_in(self, extract_name: str) -> list[dict[str, Any]]:
+        if extract_name not in self._by_extract:
+            features = osm_features.features_for(
+                extract_name,
+                cache_dir=self._cache_dir,
+                path=self._paths.get(extract_name),
+            )
+            self._by_extract[extract_name] = _schools_from(features)
+        return self._by_extract[extract_name]
+
+    def data_vintage(self, city: str):
+        """When OpenStreetMap was sampled, from the extract's own header."""
+        name = CITY_EXTRACT.get(city)
+        if name is None:
+            return None
+        return osm_features.snapshot_time(self._extract_path(name))
 
     def schools_for_city(self, city: str) -> Iterator[dict[str, Any]]:
-        bbox = CITY_BBOX.get(city)
-        if bbox is None:
+        box = CITY_BBOX.get(city)
+        extract_name = CITY_EXTRACT.get(city)
+        if box is None or extract_name is None:
             raise OverpassError(
-                f"No OSM bounding box for {city!r}. Known: {sorted(CITY_BBOX)}"
+                f"No OSM extract configured for {city!r}. Known: {sorted(CITY_BBOX)}"
             )
 
-        south, west, north, east = bbox
-        box = f"{south},{west},{north},{east}"
-        # `out center` gives ways and relations a single representative point, so
-        # a school mapped as a building outline is usable alongside one mapped as
-        # a node.
-        query = f"""
-            [out:json][timeout:120];
-            (
-              node["amenity"="school"]({box});
-              way["amenity"="school"]({box});
-              relation["amenity"="school"]({box});
-            );
-            out center tags;
-        """
+        try:
+            everything = self._schools_in(extract_name)
+        except Exception as exc:
+            # Wrapped so job.py's existing non-fatal handling still applies: a
+            # missing or unreadable extract degrades this run to UDISE rather
+            # than failing the whole schools job.
+            raise OverpassError(f"could not read {extract_name}: {exc}") from exc
 
-        payload = self._post(query)
-        parsed_records = []
-        dropped = 0
-
-        for element in payload.get("elements", []):
-            parsed = _parse(element)
-            if parsed is None:
-                dropped += 1
-                continue
-            parsed_records.append(parsed)
-
-        deduped = _dedupe(parsed_records)
+        in_city = [r for r in everything if _in_box(r["lat"], r["lon"], box)]
+        deduped = _dedupe(in_city)
         log.info(
-            "OSM %s: %d schools kept, %d dropped, %d merged as duplicates",
-            city, len(deduped), dropped, len(parsed_records) - len(deduped),
+            "OSM %s: %d schools kept, %d merged as duplicates (from %d in %s)",
+            city, len(deduped), len(in_city) - len(deduped), len(everything),
+            extract_name,
         )
         yield from deduped
 
-    def _post(self, query: str) -> dict[str, Any]:
-        """POST with backoff. Overpass answers 429/504 under load routinely, and
-        those are "come back shortly", not failures."""
-        last_error: Optional[Exception] = None
 
-        for attempt, wait in enumerate((0, *RETRY_WAITS)):
-            if wait:
-                log.info("Overpass busy; retrying in %ss", wait)
-                time.sleep(wait)
-            try:
-                response = self._client.post(OVERPASS_URL, data={"data": query})
-                if response.status_code in (429, 504):
-                    last_error = OverpassError(f"Overpass returned {response.status_code}")
-                    continue
-                response.raise_for_status()
-                return response.json()
-            except (httpx.TimeoutException, httpx.HTTPError) as exc:
-                last_error = exc
-
-        raise OverpassError(f"Overpass failed after {len(RETRY_WAITS) + 1} attempts: {last_error}")
+def _schools_from(features: list[Any]) -> list[dict[str, Any]]:
+    """The school records among a shared feature list."""
+    out: list[dict[str, Any]] = []
+    for f in features:
+        if f.tags.get("amenity") != "school":
+            continue
+        record = _record(f.tags, f.osm_type, f.osm_id, f.lat, f.lon)
+        if record:
+            out.append(record)
+    return out
 
 
-def _parse(element: dict[str, Any]) -> Optional[dict[str, Any]]:
-    """One Overpass element to our school shape, or None if unusable."""
-    tags = element.get("tags") or {}
+def _read_schools(path: pathlib.Path) -> list[dict[str, Any]]:
+    """Every amenity=school in one extract, via the shared reader.
 
-    lat = element.get("lat")
-    lon = element.get("lon")
-    if lat is None or lon is None:
-        centre = element.get("center") or {}
-        lat, lon = centre.get("lat"), centre.get("lon")
-    if lat is None or lon is None:
+    The parsing itself lives in agents/common/osm_features because the
+    connectivity agent needs the same three passes over the same file. Passes 2
+    and 3 each scan the whole extract and their cost barely moves with how much
+    is asked for, so asking for schools and amenities together is very nearly
+    free while asking separately costs double.
+    """
+    return _schools_from(osm_features.parse_extract(path))
+
+
+def _record(
+    tags: dict[str, str], osm_type: str, osm_id: int, lat: float, lon: float
+) -> Optional[dict[str, Any]]:
+    """One OSM feature as our school shape, or None if unusable."""
+    if osm_id is None:
         return None
 
     name = (tags.get("name") or tags.get("official_name") or "").strip()
@@ -146,11 +192,6 @@ def _parse(element: dict[str, Any]) -> Optional[dict[str, Any]]:
         # An unnamed school still counts as a school being present, so it is kept
         # for the count with an honest placeholder rather than discarded.
         name = "Unnamed school"
-
-    osm_type = element.get("type") or "node"
-    osm_id = element.get("id")
-    if osm_id is None:
-        return None
 
     return {
         "external_id": f"{osm_type}/{osm_id}",
@@ -214,6 +255,8 @@ def _dedupe(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     from agents.common.geo import haversine_km
 
     kept: list[dict[str, Any]] = []
+    by_name: dict[str, list[dict[str, Any]]] = {}
+
     for record in records:
         key = _normalise_name(record["name"])
         if key is None:
@@ -221,9 +264,11 @@ def _dedupe(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
             continue
 
         duplicate = False
-        for existing in kept:
-            if _normalise_name(existing["name"]) != key:
-                continue
+        # Only same-named records are candidates, so this compares against a
+        # handful rather than every school in the city. The previous version
+        # scanned the whole kept list per record, which was fine at Overpass's
+        # bounding box and quadratic at a region's worth of schools.
+        for existing in by_name.get(key, ()):
             metres = haversine_km(
                 record["lat"], record["lon"], existing["lat"], existing["lon"]
             ) * 1000
@@ -232,6 +277,7 @@ def _dedupe(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 break
         if not duplicate:
             kept.append(record)
+            by_name.setdefault(key, []).append(record)
 
     return kept
 
