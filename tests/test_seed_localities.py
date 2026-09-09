@@ -51,5 +51,31 @@ def test_both_launch_cities_are_represented():
 
 
 def test_pincodes_look_like_pincodes():
+    """A pincode we hold must be a real one. Not holding one is allowed.
+
+    The first forty-four were entered by hand and all had a pincode, so this
+    once required one on every row. Localities proposed from OpenStreetMap
+    mostly cannot: `addr:postcode` appears on seven place nodes out of eleven
+    hundred in Bengaluru.
+
+    The distinction that matters is between absent and wrong. None says we do
+    not have it; an empty string sits in the column looking like a pincode we
+    hold and merely failed to render, which is the kind of quiet falsehood this
+    codebase exists to avoid. The column and the API model are both optional.
+    """
     for slug, _name, _city, _state, pincode, _lat, _lon in LOCALITIES:
+        if pincode is None:
+            continue
+        assert pincode != "", f"{slug}: empty pincode should be None, not ''"
         assert pincode.isdigit() and len(pincode) == 6, f"{slug}: bad pincode {pincode!r}"
+
+
+def test_most_localities_still_carry_a_pincode():
+    """A guard against the None path becoming the default by accident.
+
+    If a future import drops pincodes wholesale this should fail rather than
+    pass quietly, because a pincode is how a reader confirms we mean the same
+    place they do.
+    """
+    with_pincode = sum(1 for row in LOCALITIES if row[4])
+    assert with_pincode >= 40, f"only {with_pincode} localities have a pincode"

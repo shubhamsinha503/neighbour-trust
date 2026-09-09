@@ -328,7 +328,12 @@ def as_seed_rows(result: dict[str, Any], limit: Optional[int]) -> str:
     rows = result["accepted"][:limit] if limit else result["accepted"]
     lines = []
     for p in rows:
-        pincode = f'"{p["pincode"]}"' if p["pincode"] else '""'
+        # None, not "". OpenStreetMap carries addr:postcode on almost no place
+        # node — seven of eleven hundred in Bengaluru — and an empty string sits
+        # in the column looking like a pincode we hold and simply cannot render.
+        # The column and the API model are both optional; absent is the honest
+        # value, and tests/test_seed_localities pins the difference.
+        pincode = f'"{p["pincode"]}"' if p["pincode"] else "None"
         lines.append(
             f'    ("{p["slug"]}", "{p["name"]}", "{result["city"]}", '
             f'"{result["state"]}", {pincode}, {p["lat"]:.4f}, {p["lon"]:.4f}),'

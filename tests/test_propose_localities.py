@@ -177,7 +177,20 @@ class TestSeedRowFormatting:
             }],
         }
         row = prop.as_seed_rows(result, None).strip()
-        assert row == '("sector-51", "Sector 51", "Gurugram", "Haryana", "", 28.4290, 77.0640),'
+        # None rather than "": OpenStreetMap carries addr:postcode on almost no
+        # place node, and an empty string sits in the column looking like a
+        # pincode we hold and failed to render. Absent is the honest value.
+        assert row == '("sector-51", "Sector 51", "Gurugram", "Haryana", None, 28.4290, 77.0640),'
+
+    def test_a_missing_pincode_is_written_as_none_not_empty(self):
+        result = {
+            "city": "Gurugram", "state": "Haryana",
+            "accepted": [{"slug": "x", "name": "X", "lat": 1.0, "lon": 2.0,
+                          "pincode": None}],
+        }
+        row = prop.as_seed_rows(result, None)
+        assert "None" in row
+        assert '""' not in row
 
     def test_a_known_pincode_is_carried_through(self):
         result = {
