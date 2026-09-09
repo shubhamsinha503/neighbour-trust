@@ -12,6 +12,8 @@ wrong is a worse error than getting the position slightly wrong: it is
 confidently, legibly false.
 """
 
+import pathlib
+
 import pytest
 
 from scripts import propose_localities as prop
@@ -199,3 +201,50 @@ class TestSeedRowFormatting:
                           "pincode": "122001"}],
         }
         assert '"122001"' in prop.as_seed_rows(result, None)
+
+class TestHousingDecidesWhatIsWorthAPage:
+    """Coverage should follow where people live, not where the map is dense.
+
+    Measured across Gurugram, only twelve of the top thirty candidates by
+    amenity count were also in the top thirty by mapped homes. The amenity rule
+    admitted New Colony — 111 amenities, two mapped homes, a commercial
+    district — and rejected Sectors 92, 93 and 94, which carry 208, 235 and 214
+    homes apiece and almost nothing else. Those are new residential sectors,
+    where somebody is buying a flat right now with the least to go on.
+    """
+
+    def test_housing_tags_cover_how_osm_records_homes(self):
+        keys = {k for k, _ in prop.HOUSING}
+        assert ("building", "apartments") in prop.HOUSING
+        assert "residential" in keys
+
+    def test_a_residential_threshold_exists_and_is_meaningful(self):
+        # High enough that a handful of stray buildings is not "residential",
+        # low enough to admit a sector that is still being built out.
+        assert 20 <= prop.MIN_HOMES <= 150
+
+    def test_homes_and_amenities_are_counted_over_the_same_radius(self):
+        """Two radii would make the two admission routes incomparable."""
+        place = {"lat": 28.4211, "lon": 77.0995}
+        near = [(28.4215, 77.0999)]
+        far = [(28.9, 77.9)]
+        assert prop._count_near(place, near) == 1
+        assert prop._count_near(place, far) == 0
+
+    def test_counting_is_bounded_by_the_yield_radius(self):
+        place = {"lat": 12.9352, "lon": 77.6245}
+        # Just outside 2 km due north.
+        outside = [(12.9352 + 2.4 / 111.0, 77.6245)]
+        assert prop._count_near(place, outside) == 0
+
+    def test_the_admission_rule_takes_either_kind_of_evidence(self):
+        """Read off the source rather than re-run a full pass: the rule is an
+        `or`, and turning it back into an `and` would silently re-reject every
+        new residential sector."""
+        source = pathlib.Path("scripts/propose_localities.py").read_text(encoding="utf-8")
+        assert "has_amenities or is_residential" in source
+
+    def test_ranking_leads_with_homes(self):
+        source = pathlib.Path("scripts/propose_localities.py").read_text(encoding="utf-8")
+        rank = source[source.index("accepted.sort("):]
+        assert rank.index('"homes"') < rank.index('"schools"')

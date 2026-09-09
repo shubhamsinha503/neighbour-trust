@@ -23,12 +23,21 @@ here is narrow: take the node when its kind is one we asked for, and skip when
 it is missing or tagged as something larger. Both failure modes are visible
 rather than silent.
 
-**A candidate must earn its place.** A locality that renders an empty report is
-worse than one that does not exist: it invites a search, answers nothing, and
-spends the reader's trust. So each candidate is scored on the data it would
-actually produce — schools and amenities already in the extract — and anything
-below the threshold is reported as rejected, with the count, rather than
-quietly dropped.
+**A candidate must earn its place, and housing is what earns it.** A locality
+that renders an empty report is worse than one that does not exist: it invites a
+search, answers nothing, and spends the reader's trust. But amenity density —
+the first rule here — turned out to select the wrong places. Measured across
+Gurugram, only twelve of the top thirty candidates by amenities were also in the
+top thirty by mapped homes. It admitted New Colony, which has 111 amenities and
+two homes, and rejected Sectors 92, 93 and 94, which have over two hundred homes
+each and little else: new residential sectors, where somebody is buying a flat
+right now with least to go on.
+
+So a candidate is admitted on homes *or* amenities and ranked on homes, and
+everything rejected is reported with a count rather than quietly dropped. Homes
+only ever promote: a low count may mean the buildings are unmapped rather than
+absent, and reading an empty measurement as an empty place is the mistake this
+codebase keeps having to correct.
 
 Nothing here writes to the database. `--write` appends to
 agents/common/seed_localities.py for review in a diff; seeding remains a
@@ -43,6 +52,7 @@ import math
 import pathlib
 import re
 import sys
+import time
 from collections import Counter
 from typing import Any, Iterable, Optional
 
@@ -127,6 +137,30 @@ MIN_SCHOOLS = 3
 MIN_AMENITIES = 8
 YIELD_RADIUS_KM = 2.0
 
+# How OpenStreetMap records somewhere people live.
+HOUSING = (
+    ("building", "apartments"),
+    ("building", "residential"),
+    ("residential", "apartments"),
+)
+
+# Enough mapped homes to call a place residential on its own evidence.
+#
+# Amenity density alone was selecting the wrong places, and measurably so. Of
+# the top thirty Gurugram candidates by each measure, only twelve appeared in
+# both. New Colony ranked 18th on amenities with 111 of them and *two* mapped
+# homes — a commercial district, and it is in the seed list because of this.
+# Meanwhile Sectors 92, 93 and 94 carry 208, 235 and 214 homes with almost no
+# amenities, and were rejected outright as "too little mapped nearby": new
+# residential sectors, which is exactly where somebody is buying a flat.
+#
+# **Housing promotes, it never rejects.** A high count is strong evidence people
+# live there. A low count is ambiguous — it may mean the buildings are simply
+# unmapped, which is common in older Indian sectors, and treating that as "no
+# housing" would repeat the mistake this codebase keeps having to correct: an
+# empty measurement read as an empty place.
+MIN_HOMES = 50
+
 # Names that are not neighbourhoods even when tagged as one.
 NAME_NOISE = re.compile(
     r"\b(market|bus stand|bus stop|railway station|metro|circle|junction|"
@@ -209,6 +243,66 @@ def read_places(path: pathlib.Path, kinds: Iterable[str]) -> list[dict[str, Any]
     return out
 
 
+def read_housing(path: pathlib.Path) -> list[tuple[float, float]]:
+    """Every mapped home in the extract, as a point.
+
+    Read here rather than through agents/common/osm_features, deliberately.
+    Housing is an order of magnitude more objects than the amenities that
+    module collects — 33,731 areas to place against roughly 16,000 — so adding
+    it to the shared selectors would roughly double the parse for the schools
+    and connectivity agents, which run weekly and do not want it, to serve a
+    script that runs when somebody is deciding where to expand.
+
+    Two passes rather than three: a building is a way, and relations here are
+    rare enough that resolving them is not worth a full extra scan of the file
+    for a signal used only to rank candidates.
+    """
+    started = time.time()
+    points: list[tuple[float, float]] = []
+    pending: list[list[int]] = []
+    wanted: set[int] = set()
+
+    for obj in osmium.FileProcessor(str(path)).with_filter(
+        osmium.filter.TagFilter(*HOUSING)
+    ):
+        if obj.is_node():
+            points.append((obj.location.lat, obj.location.lon))
+        elif obj.is_way():
+            refs = [n.ref for n in obj.nodes]
+            if refs:
+                pending.append(refs)
+                wanted.update(refs)
+
+    if wanted:
+        locations: dict[int, tuple[float, float]] = {}
+        for obj in osmium.FileProcessor(str(path), osmium.osm.NODE):
+            if obj.id in wanted:
+                locations[obj.id] = (obj.location.lat, obj.location.lon)
+        for refs in pending:
+            pts = [locations[r] for r in refs if r in locations]
+            if pts:
+                points.append((
+                    sum(p[0] for p in pts) / len(pts),
+                    sum(p[1] for p in pts) / len(pts),
+                ))
+
+    log.info("Read %s mapped homes in %.0fs", f"{len(points):,}", time.time() - started)
+    return points
+
+
+def _count_near(
+    candidate: dict[str, Any], points: list[tuple[float, float]]
+) -> int:
+    pad = YIELD_RADIUS_KM / 111.0
+    pad_lon = pad / max(math.cos(math.radians(candidate["lat"])), 0.01)
+    return sum(
+        1 for lat, lon in points
+        if abs(lat - candidate["lat"]) <= pad
+        and abs(lon - candidate["lon"]) <= pad_lon
+        and haversine_km(candidate["lat"], candidate["lon"], lat, lon) <= YIELD_RADIUS_KM
+    )
+
+
 def _yield_for(
     candidate: dict[str, Any], features: list[Any]
 ) -> tuple[int, int]:
@@ -235,6 +329,7 @@ def propose(city: str, kinds: list[str], *, cache_dir: pathlib.Path) -> dict[str
 
     features = osm_features.features_for(config["extract"], cache_dir=cache_dir)
     pbf = osm_features.download_extract(config["extract"], cache_dir=cache_dir)
+    housing = read_housing(pbf)
     places = read_places(pbf, list(kinds) + list(SETTLEMENT_KINDS))
 
     settlements = [p for p in places if p["kind"] in SETTLEMENT_KINDS]
@@ -298,11 +393,22 @@ def propose(city: str, kinds: list[str], *, cache_dir: pathlib.Path) -> dict[str
     seen_slugs = {e[0] for e in existing_localities()}
     for place in fresh:
         schools, amenities = _yield_for(place, features)
+        homes = _count_near(place, housing)
         place["schools"] = schools
         place["amenities"] = amenities
-        if schools < MIN_SCHOOLS or amenities < MIN_AMENITIES:
+        place["homes"] = homes
+
+        # Either kind of evidence admits a candidate. Requiring amenities alone
+        # rejected Gurugram Sectors 92, 93 and 94 — 208, 235 and 214 mapped
+        # homes apiece and almost nothing else nearby — which are new
+        # residential sectors, precisely where somebody is buying a flat and
+        # has least to go on.
+        has_amenities = schools >= MIN_SCHOOLS and amenities >= MIN_AMENITIES
+        is_residential = homes >= MIN_HOMES
+        if not (has_amenities or is_residential):
             thin.append(place)
             continue
+
         slug = slugify(place["name"])
         if slug in seen_slugs:
             rejected["slug collides with an existing locality"] += 1
@@ -311,8 +417,12 @@ def propose(city: str, kinds: list[str], *, cache_dir: pathlib.Path) -> dict[str
         place["slug"] = slug
         accepted.append(place)
 
-    accepted.sort(key=lambda p: (p["schools"] + p["amenities"]), reverse=True)
-    rejected["too little mapped nearby to fill a page"] = len(thin)
+    # Ranked by homes, because the question this product answers is asked by
+    # somebody deciding where to live. Amenity count breaks ties and no longer
+    # leads: it ranked New Colony 18th on 111 amenities and two mapped homes,
+    # which is a commercial district being offered as somewhere to move to.
+    accepted.sort(key=lambda p: (p["homes"], p["schools"] + p["amenities"]), reverse=True)
+    rejected["neither enough homes nor enough amenities nearby"] = len(thin)
     return {
         "city": city,
         "state": config["state"],
@@ -376,10 +486,11 @@ def main(argv: Optional[list[str]] = None) -> int:
           f"{'/'.join(kinds)} in the extract, {result['in_range']} of them in "
           f"range and attributed to {args.city}\n")
 
-    print(f"{'locality':30s} {'kind':14s} {'schools':>7s} {'amenities':>9s}")
+    print(f"{'locality':30s} {'kind':12s} {'homes':>6s} {'schools':>7s} {'amenities':>9s}")
     shown = result["accepted"][:args.limit] if args.limit else result["accepted"]
     for p in shown:
-        print(f"{p['name'][:30]:30s} {p['kind']:14s} {p['schools']:7d} {p['amenities']:9d}")
+        print(f"{p['name'][:30]:30s} {p['kind']:12s} {p['homes']:6d} "
+              f"{p['schools']:7d} {p['amenities']:9d}")
 
     print(f"\naccepted: {len(result['accepted'])}"
           + (f" (showing {len(shown)})" if len(shown) != len(result["accepted"]) else ""))
