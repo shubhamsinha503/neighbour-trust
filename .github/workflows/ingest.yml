@@ -50,6 +50,18 @@ on:
         required: false
         default: false
         type: boolean
+      refetch_connectivity:
+        description: >-
+          Re-fetch every locality's connectivity, ignoring the freshness skip
+          (connectivity only). Needed after the stored payload changes shape:
+          a locality inside the six-day window is skipped, so an envelope
+          written before a new field existed keeps its old shape indefinitely
+          and the field never appears. That is exactly what happened to the
+          per-feature coordinates the locality map draws from. Costs nothing
+          extra beyond the run — the extract is parsed either way.
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   # A slow run must never overlap the next one — the agents upsert, so an
@@ -173,7 +185,9 @@ jobs:
         # never completed a pass; partial runs used to be the normal outcome.
         # They are no longer expected, so a failure here is worth reading.
         if: steps.which.outputs.agent == 'connectivity' || steps.which.outputs.agent == 'all'
-        run: python -m agents.infrastructure.run
+        run: |
+          python -m agents.infrastructure.run \
+            ${{ inputs.refetch_connectivity && '--force' || '' }}
 
       - name: Check the classifier
         # Only for news runs, and never fatal. It names *why* a classifier is
