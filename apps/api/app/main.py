@@ -291,6 +291,13 @@ class LocalitySummary(BaseModel):
     city: str
     state: str
     pincode: Optional[str] = None
+    # Sent so the browser can match a reader's own position against the list it
+    # already has, without their coordinates ever reaching this server. Omitting
+    # these was also a quiet trap: the frontend's Locality type carries lat/lon
+    # and defaulted them to 0, so every locality on the index believed it was in
+    # the Atlantic off West Africa.
+    lat: float
+    lon: float
     categories_with_data: int = 0
     score: Optional[int] = Field(
         None, description="None when too few categories can be scored — shown as "
@@ -334,6 +341,8 @@ def get_locality_summaries() -> list[dict[str, Any]]:
                     "city": locality["city"],
                     "state": locality["state"],
                     "pincode": locality.get("pincode"),
+                    "lat": locality["lat"],
+                    "lon": locality["lon"],
                     "categories_with_data": coverage.get(locality["h3_cell"], 0),
                     "score": report.trust_score.score,
                     # From the same report object the locality page renders, so

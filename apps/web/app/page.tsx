@@ -1,5 +1,6 @@
 import { HomeIntro } from "@/components/HomeIntro";
 import { LocalitySearch } from "@/components/LocalitySearch";
+import { NearMe } from "@/components/NearMe";
 import {
   fetchLocalitySummaries,
   fetchStats,
@@ -43,18 +44,24 @@ export default async function HomePage() {
         before you commit to it.
       </h1>
 
-      {/* Search first. Someone arrives having already chosen the area they care
-        * about, so the first thing on the page should take that name and answer
-        * it — not offer a menu of forty-four to pick from. The case for
-        * trusting the answer sits below it, where it reads as support rather
-        * than as preamble. */}
+      {/* Two ways in, in the order people arrive.
+        *
+        * Most visitors come with an area already in mind, which is why search
+        * is here rather than a menu of forty-four names. But someone who has
+        * never heard of this cannot be taught by copy — they can be shown, and
+        * the fastest demonstration is the neighbourhood they are standing in.
+        * Declining is itself informative: it means they came with something in
+        * mind, and search is right underneath either way. */}
       <div className="mt-5">
         {error ? (
           <div className="rounded-2xl border border-hairline bg-surface-1 p-4 text-[12px] text-ink-secondary">
             {error}
           </div>
         ) : (
-          <LocalitySearch localities={localities} />
+          <LocalitySearch
+            localities={localities}
+            belowInput={<NearMe key="near-me" localities={localities} />}
+          />
         )}
       </div>
 

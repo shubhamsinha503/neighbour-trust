@@ -30,8 +30,16 @@ import { searchLocalities } from "@/lib/search";
  */
 export function LocalitySearch({
   localities,
+  belowInput,
 }: {
   localities: LocalitySummary[];
+  /** Rendered between the input and the results, and hidden while searching.
+   *
+   * A slot rather than a second component under this one: the results list is
+   * forty-four cards long, so anything appended after this component lands
+   * below all of them, off the bottom of a phone screen. Someone typing has
+   * already chosen their route, so whatever sits here steps out of the way. */
+  belowInput?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -83,6 +91,8 @@ export function LocalitySearch({
             : `${results.length} of ${localities.length}`
           : `${localities.length} localities across Bengaluru and Gurugram`}
       </p>
+
+      {!searching && belowInput}
 
       {searching && results.length === 0 && (
         <div className="mt-3 rounded-2xl border border-hairline bg-surface-1 p-5">

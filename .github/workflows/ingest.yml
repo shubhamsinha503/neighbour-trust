@@ -61,9 +61,22 @@ concurrency:
 jobs:
   ingest:
     runs-on: ubuntu-latest
-    # Generous: a full air quality pass is ~3.5 minutes, most of it waiting out
-    # OpenAQ's 60 requests/minute limit, and schools re-downloads ~6,300 rows.
-    timeout-minutes: 45
+    # Measured on the 2026-09-09 `all` run, which this was too tight for:
+    #
+    #   air quality    ~2 min
+    #   schools        27.8 min   (downloads ~780 MB and parses both extracts)
+    #   connectivity   13 sec     (reads what schools already parsed)
+    #   news monitor   cancelled at 15.3 min, mid-run
+    #
+    # Schools carries the whole OpenStreetMap cost now, and connectivity gets
+    # its answer for nothing — which is the intended trade and why the pair is
+    # far cheaper together than the ~20 minutes they used to cost apart. But it
+    # front-loads 28 minutes before news starts, and 45 left news short.
+    #
+    # The scheduled crons each run one agent and fit comfortably; this ceiling
+    # is for the manual `all` run. Minutes are free on a public repository, so
+    # the only thing a generous limit costs is a later failure signal.
+    timeout-minutes: 90
 
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
