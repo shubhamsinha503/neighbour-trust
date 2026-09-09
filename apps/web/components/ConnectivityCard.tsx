@@ -28,6 +28,7 @@
 
 import { useState } from "react";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL, relativeAge } from "@/lib/aqi";
+import { LocalityMap } from "@/components/LocalityMap";
 import { MeasureFrom, haversineKm, type Origin } from "@/components/MeasureFrom";
 import type { ConnectivityFeature, ConnectivityView } from "@/lib/api";
 
@@ -99,6 +100,16 @@ export function ConnectivityCard({ view }: { view: ConnectivityView }) {
           </h2>
         </div>
       </header>
+
+      {/* Above the address box on purpose. The map is the answer to "what is it
+          like around here", which is the question that brought someone to the
+          page; measuring from a specific address is a refinement of it. */}
+      <LocalityMap
+        localityName={locality.name}
+        lat={locality.lat}
+        lon={locality.lon}
+        features={view.features}
+      />
 
       {canMeasure ? (
         <MeasureFrom
