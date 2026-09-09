@@ -40,16 +40,22 @@ export const metadata: Metadata = {
     siteName: "Neighbour Trust",
     locale: "en_IN",
     title: "Neighbour Trust",
+    // No count. This said "44 localities" and stayed saying it after the
+    // number became 159 — static metadata cannot know, and a link preview is
+    // exactly where a stale figure does most damage: a report gets forwarded to
+    // family far more often than it gets found, so this text is read by people
+    // who never see the page. A claim that cannot go stale is worth more here
+    // than a number that impresses once and then quietly misleads.
     description:
-      "Know the neighbourhood before you commit to it. Sourced data for 44 " +
-      "localities across Bengaluru and Gurugram.",
+      "Know the neighbourhood before you commit to it. Sourced, dated " +
+      "neighbourhood data for Bengaluru and Gurugram.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Neighbour Trust",
     description:
-      "Know the neighbourhood before you commit to it. Sourced data for 44 " +
-      "localities across Bengaluru and Gurugram.",
+      "Know the neighbourhood before you commit to it. Sourced, dated " +
+      "neighbourhood data for Bengaluru and Gurugram.",
   },
 };
 

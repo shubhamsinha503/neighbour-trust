@@ -33,9 +33,13 @@ export function HomeIntro({ stats }: { stats: CoverageStats | null }) {
 
       <p className="mt-2 text-[13px] leading-[1.6] text-ink-secondary">
         Air quality, schools and what local press reports about safety and water
-        — for {stats ? stats.localities : "44"} localities across Bengaluru and
-        Gurugram. Every number says where it came from, how old it is, and how
-        much to trust it.
+        {/* No numeric fallback. This read "44" whenever the stats call
+          * failed, which meant a transient API error printed a specific,
+          * confident and by then wrong figure — the count had reached 159. An
+          * unavailable number should read as unavailable. */}
+        — for {stats ? `${stats.localities} localities` : "localities"} across
+        Bengaluru and Gurugram. Every number says where it came from, how old it
+        is, and how much to trust it.
       </p>
 
       {stats && <Numbers stats={stats} />}
