@@ -8,6 +8,7 @@ import {
   categoryCoverageLabel,
   joinCategoryLabels,
 } from "@/lib/categories";
+import { browseList, citiesOf, coverageOf } from "@/lib/ordering";
 import { searchLocalities } from "@/lib/search";
 
 /**
@@ -42,13 +43,24 @@ export function LocalitySearch({
   belowInput?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
+  // Held in memory only. app/privacy/page.tsx states that nothing is written to
+  // your browser, and a remembered city preference in localStorage would make
+  // that false for the sake of saving one tap.
+  const [city, setCity] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const results = useMemo(
-    () => searchLocalities(localities, query) as LocalitySummary[],
-    [localities, query],
-  );
+  const cities = useMemo(() => citiesOf(localities), [localities]);
   const searching = query.trim().length > 0;
+
+  // A typed name beats a city chip: someone who searched "koramangala" with
+  // Gurugram selected wants Koramangala, not an empty list.
+  const results = useMemo(
+    () =>
+      searching
+        ? (searchLocalities(localities, query) as LocalitySummary[])
+        : browseList(localities, city),
+    [localities, query, city, searching],
+  );
 
   return (
     <div>
@@ -84,12 +96,43 @@ export function LocalitySearch({
         />
       </div>
 
+      {/* City first, because it halves the list before anyone reads a name.
+        * With 44 entries that is a convenience; as coverage grows it is the
+        * difference between a usable index and a scroll — someone in Gurugram
+        * should not pass 28 Bengaluru names to reach their own. Hidden while
+        * searching, where it would only contradict the results. */}
+      {!searching && cities.length > 1 && (
+        <div className="mt-3 flex gap-1.5" role="group" aria-label="Filter by city">
+          {[null, ...cities].map((option) => {
+            const active = city === option;
+            return (
+              <button
+                key={option ?? "all"}
+                type="button"
+                onClick={() => setCity(option)}
+                aria-pressed={active}
+                className={
+                  "rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-colors " +
+                  (active
+                    ? "bg-brand text-white"
+                    : "border border-hairline bg-surface-1 text-ink-secondary hover:border-brand")
+                }
+              >
+                {option ?? "All"}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <p className="mt-2 px-1 text-[11.5px] text-ink-muted" aria-live="polite">
         {searching
           ? results.length === 0
             ? `Nothing matches “${query.trim()}”`
             : `${results.length} of ${localities.length}`
-          : `${localities.length} localities across Bengaluru and Gurugram`}
+          : `${results.length} ${results.length === 1 ? "locality" : "localities"}`
+            + (city ? ` in ${city}` : ` across ${cities.join(" and ")}`)
+            + " · best documented first"}
       </p>
 
       {!searching && belowInput}
@@ -114,6 +157,20 @@ export function LocalitySearch({
             Show all localities
           </button>
         </div>
+      )}
+
+      {/* What the number is, said once, where it is first seen.
+        *
+        * The index showed a green 87 next to a name and never explained it —
+        * not what it measures, not out of what, not how complete it is. A
+        * reader was left to assume, and the most natural assumption ("someone
+        * rated this neighbourhood 87") is the one thing it is not. */}
+      {!searching && results.length > 0 && (
+        <p className="mt-3 px-1 text-[11px] leading-[1.5] text-ink-muted">
+          The score is out of 100, built from up to five categories — schools,
+          safety, air quality, water and connectivity. Each card says how many
+          it actually rests on, because that varies by locality.
+        </p>
       )}
 
       <div className="mt-3 flex flex-col gap-2">
@@ -159,8 +216,14 @@ function ResultRow({ locality }: { locality: LocalitySummary }) {
           </p>
         ) : (
           <p className="mt-1 text-[11.5px] leading-[1.45] text-ink-muted">
+            {/* Deliberately no longer a count. This read "3 categories of
+              * data" beside a chip reading "2 of 5 categories" — two different
+              * true statements (how many hold data, how many fed the score)
+              * worded almost identically, on the same card, disagreeing at a
+              * glance. The chip owns the counting now; this says the one thing
+              * it cannot, which is that we found nothing to warn about. */}
             {locality.categoriesWithData > 0
-              ? `${locality.categoriesWithData} categories of data · nothing flagged`
+              ? "Nothing flagged here"
               : "No data yet"}
           </p>
         )}
@@ -232,7 +295,16 @@ function ScoreChip({
         * category. The full list is in the tooltip and on the locality page. */}
       {score !== null && (
         <span
-          className="text-[8.5px] leading-none text-ink-muted"
+          // The caveat gets louder exactly when it matters. A score resting on
+          // two categories is a far weaker claim than one resting on five, and
+          // in identical grey type the reader has no reason to notice the
+          // difference — they see two confident numbers side by side.
+          className={
+            "text-[8.5px] leading-none " +
+            (scoredCategories.length <= 2
+              ? "font-semibold text-[#c9860a]"
+              : "text-ink-muted")
+          }
           title={joinCategoryLabels(scoredCategories)}
         >
           {categoryCoverageLabel(scoredCategories)}
