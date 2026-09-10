@@ -500,11 +500,21 @@ export interface ConnectivityView {
 }
 
 export async function fetchConnectivity(slug: string): Promise<ConnectivityView> {
-  // What is built near a locality changes on the order of years; an hour of
-  // cache is still far fresher than the weekly ingest behind it.
+  // Ten minutes, not an hour.
+  //
+  // What is built near a locality does change on the order of years, so an hour
+  // of cache costs a reader nothing — that reasoning was right. What it costs is
+  // the ability to tell whether an ingest worked. A connectivity run stored 156
+  // localities and the site showed no change for the next hour, which is
+  // indistinguishable from the run having failed; I misread that signal twice in
+  // one day before finding the cache.
+  //
+  // Ten minutes keeps almost all of the benefit — the data behind this refreshes
+  // weekly, so nearly every request still hits a cached response — and makes a
+  // refresh visible while somebody is still looking at it.
   const response = await fetch(
     `${API_BASE}/api/v1/localities/${slug}/connectivity`,
-    { next: { revalidate: 3600 } },
+    { next: { revalidate: 600 } },
   );
 
   if (response.status === 404) {
