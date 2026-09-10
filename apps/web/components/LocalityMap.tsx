@@ -42,7 +42,26 @@ const FRAME_RADIUS_KM = 3.5;
 
 const SIZE = 320;          // viewBox units, square
 const CENTRE = SIZE / 2;
-const SCALE = (SIZE / 2 - 10) / FRAME_RADIUS_KM;   // units per km, with a margin
+const MARGIN = 10;
+const SCALE = (SIZE / 2 - MARGIN) / FRAME_RADIUS_KM;   // units per km, default frame
+
+/**
+ * The frame is fitted to the locality, not to the search radius.
+ *
+ * Drawing every map out to 3.5 km — the industrial search radius — meant most
+ * of them were mostly empty. Sector 56's furthest feature is 2.50 km away, so
+ * half the frame was blank rings, and the picture read as sparse when the
+ * locality is not. Fitting to the data makes the same features around forty
+ * per cent larger and fills the space they are given.
+ *
+ * A floor of 1.5 km stops a locality with two features from being drawn at
+ * absurd magnification, which would imply a precision the centroid does not
+ * have.
+ */
+function frameFor(maxKm: number): number {
+  const rounded = Math.ceil(maxKm * 2) / 2;   // to the nearest half-kilometre
+  return Math.min(FRAME_RADIUS_KM, Math.max(1.5, rounded));
+}
 
 type Kind = ConnectivityFeature["kind"];
 
@@ -52,20 +71,70 @@ const DRAW_ORDER: Kind[] = [
   "industrial_sites", "parks", "markets", "clinics", "hospitals", "metro_rail",
 ];
 
-const STYLE: Record<Kind, { fill: string; r: number; label: string }> = {
-  // The one signal that counts against a locality, in the colour the cards use
-  // for a warning. Larger because it is usually an area rather than a point,
-  // and because it is the thing a buyer is least likely to find out otherwise.
-  industrial_sites: { fill: "var(--color-status-serious)", r: 4.5, label: "Industrial land" },
-  parks:            { fill: "var(--color-status-good)",    r: 2.6, label: "Parks" },
-  markets:          { fill: "var(--color-series-violet)",  r: 2.4, label: "Supermarkets" },
-  clinics:          { fill: "var(--color-series-blue)",    r: 2.2, label: "Clinics" },
-  hospitals:        { fill: "var(--color-series-blue)",    r: 3.4, label: "Hospitals" },
-  metro_rail:       { fill: "var(--color-brand-deep)",     r: 4.2, label: "Stations" },
+/**
+ * Six kinds, six distinguishable marks.
+ *
+ * The first palette reused the site's chart tokens and three of the six
+ * collided. Hospitals and clinics were the *same* colour — `--color-series-blue`
+ * for both, separated only by radius, which at legend size is no separation at
+ * all. Supermarkets took `--color-series-violet` against that same blue, and
+ * stations took `--color-brand-deep` against the parks green. A reader could
+ * not tell a hospital from a clinic, and had to work to tell either from a
+ * shop.
+ *
+ * Hue now separates every pair, and shape carries the two that matter most:
+ * industrial land is a square because it is an area rather than a point and
+ * because it is the one mark that counts against a locality, and a station is a
+ * ringed dot because it is the single feature people most want to find. That
+ * second channel is what keeps the map readable for the roughly one man in
+ * twelve with red-green colour blindness, for whom the green and the orange are
+ * the pair most at risk.
+ *
+ * These are literal values rather than tokens because they are a categorical
+ * palette — chosen against each other, not against the site's semantic roles.
+ * Parks keep the status green and industrial land the status orange, since
+ * those two do carry the site's meaning of good and warning.
+ */
+const STYLE: Record<
+  Kind,
+  {
+    fill: string; r: number; label: string;
+    shape: "circle" | "square" | "ring" | "hollow";
+    /** Shown in the legend, and on the map only where the kind is sparse.
+     *
+     * Not on every mark, and the reason is density rather than taste:
+     * Koramangala places 219 features inside this frame. Two hundred emoji at
+     * any legible size is a pile rather than a map, and they render differently
+     * on Android, iOS and Windows, so the picture would differ for every
+     * visitor. In the legend there are six of them and each is unmistakable —
+     * which is exactly where an icon earns its place. */
+    emoji: string;
+  }
+> = {
+  industrial_sites: {
+    fill: "var(--color-status-serious)", r: 4.2,
+    label: "Industrial land", shape: "square", emoji: "🏭",
+  },
+  parks:     { fill: "var(--color-status-good)", r: 2.6, label: "Parks", shape: "circle" , emoji: "🌳"},
+  // Magenta, pushed well away from the blues it used to sit beside.
+  markets:   { fill: "#b5359c", r: 2.4, label: "Supermarkets", shape: "circle" , emoji: "🛒"},
+  // Hollow, and teal rather than blue. Hospitals and clinics are the pair a
+  // reader is most likely to confuse — they are the same category of thing and
+  // they sat in the same colour — so they are separated twice over: a different
+  // hue, and filled against outlined. Outlined also reads as the lighter of the
+  // two, which is what a clinic is.
+  clinics:   { fill: "#0d9aa8", r: 2.6, label: "Clinics", shape: "hollow" , emoji: "💊"},
+  hospitals: { fill: "var(--color-series-blue)", r: 3.4, label: "Hospitals", shape: "circle" , emoji: "🏥"},
+  // Near-black, and the only ringed mark: stations are what people look for
+  // first, so they should be findable without consulting the legend.
+  metro_rail: { fill: "#15243d", r: 4.0, label: "Stations", shape: "ring" , emoji: "🚇"},
 };
 
 export function project(
   lat: number, lon: number, centreLat: number, centreLon: number,
+  /** Units per kilometre. Defaults to the full-radius frame; the component
+   *  passes a tighter one when the locality's features do not reach that far. */
+  scale: number = SCALE,
 ): { x: number; y: number; km: number } {
   // Equirectangular about the centre. Over a 7 km square the error is far below
   // one pixel, and it keeps this dependency-free and server-rendered.
@@ -79,8 +148,8 @@ export function project(
     // 39.38441675762962 against ...64 — which React reports as a hydration
     // mismatch on every dot. Two decimals is a hundredth of a viewBox unit,
     // far below a pixel, and it makes the markup deterministic.
-    x: Math.round((CENTRE + eastKm * SCALE) * 100) / 100,
-    y: Math.round((CENTRE - northKm * SCALE) * 100) / 100,  // north must go up
+    x: Math.round((CENTRE + eastKm * scale) * 100) / 100,
+    y: Math.round((CENTRE - northKm * scale) * 100) / 100,  // north must go up
     km: Math.hypot(eastKm, northKm),
   };
 }
@@ -96,11 +165,18 @@ export function LocalityMap({
   lon: number;
   features: ConnectivityFeature[];
 }) {
-  const placed = features
+  const withinFrame = features
     .map((f) => ({ ...f, ...project(f.lat, f.lon, lat, lon) }))
     .filter((f) => f.km <= FRAME_RADIUS_KM);
 
-  if (placed.length === 0) return null;
+  if (withinFrame.length === 0) return null;
+
+  // Measure first, then re-project at a scale that fits what was measured.
+  const frameKm = frameFor(Math.max(...withinFrame.map((f) => f.km)));
+  const scale = (SIZE / 2 - MARGIN) / frameKm;
+  const placed = features
+    .map((f) => ({ ...f, ...project(f.lat, f.lon, lat, lon, scale) }))
+    .filter((f) => f.km <= frameKm);
 
   const present = DRAW_ORDER.filter((k) => placed.some((f) => f.kind === k));
 
@@ -136,7 +212,7 @@ export function LocalityMap({
     <figure className="mt-4">
       <svg
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="w-full max-w-[380px] rounded-2xl border border-hairline bg-page-plane"
+        className="w-full rounded-2xl border border-hairline bg-page-plane"
         role="img"
         aria-label={
           `Map of what is mapped around ${localityName}: ` + counts.join(", ") +
@@ -145,54 +221,125 @@ export function LocalityMap({
       >
         {/* Distance rings, so the picture carries a scale rather than just a
             shape. Labelled on one axis only — labelling all four is noise. */}
-        {[1, 2, AMENITY_RADIUS_KM, FRAME_RADIUS_KM].map((km) => (
+        {[1, 2, 3, AMENITY_RADIUS_KM, frameKm]
+          .filter((km, i, all) => km <= frameKm && all.indexOf(km) === i)
+          .map((km) => (
           <circle
             key={km}
             cx={CENTRE}
             cy={CENTRE}
-            r={km * SCALE}
+            r={km * scale}
             fill="none"
             stroke="var(--color-gridline)"
             strokeWidth={km === AMENITY_RADIUS_KM ? 1.2 : 0.8}
             strokeDasharray={km === AMENITY_RADIUS_KM ? "none" : "3 3"}
           />
         ))}
-        {/* Ring labels sit at the top of each ring and carry a halo of the page
-            colour, drawn under the glyph. Without it they land on top of dots
-            and neither is readable — the first version put them across the
-            middle of the densest part of the map. */}
-        {[1, 2, 3].map((km) => (
+        {DRAW_ORDER.map((kind) => {
+          const style = STYLE[kind];
+          return placed
+            .filter((f) => f.kind === kind)
+            .map((f, i) => {
+              const title = <title>{f.name || style.label}</title>;
+              if (style.shape === "square") {
+                return (
+                  <rect
+                    key={`${kind}-${i}`}
+                    x={f.x - style.r}
+                    y={f.y - style.r}
+                    width={style.r * 2}
+                    height={style.r * 2}
+                    rx={0.8}
+                    fill={style.fill}
+                    fillOpacity={0.55}
+                  >
+                    {title}
+                  </rect>
+                );
+              }
+              if (style.shape === "hollow") {
+                return (
+                  <circle
+                    key={`${kind}-${i}`}
+                    cx={f.x}
+                    cy={f.y}
+                    r={style.r}
+                    fill="none"
+                    stroke={style.fill}
+                    strokeWidth={1.6}
+                  >
+                    {title}
+                  </circle>
+                );
+              }
+              if (style.shape === "ring") {
+                // The one kind drawn as an icon. A locality has two or three
+                // stations, never ninety, so there is room for something
+                // recognisable — and it is the feature people look for first,
+                // which makes it worth finding without the legend. A disc sits
+                // behind it so it stays visible over a park or an estate.
+                return (
+                  <g key={`${kind}-${i}`}>
+                    {/* A plain disc of the page colour, no outline. The first
+                      * version ringed it in near-black and the ring competed
+                      * with the icon it was meant to hold — at this size the
+                      * two read as one dark blob. The disc is only there to
+                      * stop a park or an estate showing through the glyph. */}
+                    <circle
+                      cx={f.x} cy={f.y} r={style.r + 2.2}
+                      fill="var(--color-page-plane)"
+                      fillOpacity={0.9}
+                    />
+                    <text
+                      x={f.x}
+                      y={f.y}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      style={{ fontSize: style.r * 2.8 }}
+                    >
+                      {style.emoji}
+                    </text>
+                    {title}
+                  </g>
+                );
+              }
+              return (
+                <circle
+                  key={`${kind}-${i}`}
+                  cx={f.x}
+                  cy={f.y}
+                  r={style.r}
+                  fill={style.fill}
+                  fillOpacity={0.85}
+                >
+                  {title}
+                </circle>
+              );
+            });
+        })}
+
+        {/* Ring labels, drawn after the features rather than before.
+          *
+          * They carry a halo of the page colour under the glyph, which is
+          * enough to lift them off the rings — but not off ninety dots.
+          * Koramangala buried the "1 km" label under its own density, and a
+          * scale nobody can read is the same as no scale. Drawn last they stay
+          * legible, and at seven pixels they hide almost nothing. */}
+        {[1, 2, 3].filter((km) => km < frameKm).map((km) => (
           <text
             key={km}
             x={CENTRE}
-            y={CENTRE - km * SCALE + 2.5}
+            y={CENTRE - km * scale + 2.5}
             textAnchor="middle"
             className="fill-[var(--color-ink-muted)]"
             style={{ fontSize: 7 }}
             stroke="var(--color-page-plane)"
-            strokeWidth={2.5}
+            strokeWidth={3}
             paintOrder="stroke"
           >
             {km} km
           </text>
         ))}
-
-        {DRAW_ORDER.map((kind) =>
-          placed
-            .filter((f) => f.kind === kind)
-            .map((f, i) => (
-              <circle
-                key={`${kind}-${i}`}
-                cx={f.x}
-                cy={f.y}
-                r={STYLE[kind].r}
-                fill={STYLE[kind].fill}
-                fillOpacity={kind === "industrial_sites" ? 0.55 : 0.85}
-              >
-                <title>{f.name || STYLE[kind].label}</title>
-              </circle>
-            )),
-        )}
 
         {/* The locality centre. A ring rather than a dot, so it reads as "this
             is the point everything is measured from" rather than as one more
@@ -223,10 +370,25 @@ export function LocalityMap({
       <figcaption className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
         {present.map((kind) => (
           <span key={kind} className="inline-flex items-center gap-1.5 text-[10.5px] text-ink-secondary">
+            {/* The swatch carries the shape as well as the colour. A legend of
+              * identical dots is exactly how hospitals and clinics came to be
+              * indistinguishable: same swatch, same hue, and the only
+              * difference — a millimetre of radius on the map — invisible
+              * here. */}
+            <span aria-hidden="true" className="text-[12px] leading-none">
+              {STYLE[kind].emoji}
+            </span>
             <span
               aria-hidden="true"
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ background: STYLE[kind].fill }}
+              className={
+                "inline-block h-2 w-2 " +
+                (STYLE[kind].shape === "square" ? "rounded-[1px]" : "rounded-full")
+              }
+              style={
+                STYLE[kind].shape === "ring" || STYLE[kind].shape === "hollow"
+                  ? { border: `2px solid ${STYLE[kind].fill}` }
+                  : { background: STYLE[kind].fill }
+              }
             />
             {STYLE[kind].label}
             <span className="text-ink-muted">
