@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TrustReport } from "@/components/TrustReport";
-import { fetchLocalities, fetchReport } from "@/lib/api";
+import {
+  fetchConnectivity,
+  fetchLocalities,
+  fetchReport,
+  type ConnectivityView,
+} from "@/lib/api";
 
 const SITE_DESCRIPTION =
   "Sourced, confidence-tagged neighbourhood data for Bengaluru and Gurugram.";
@@ -76,11 +81,24 @@ export default async function LocalityPage({
 
   let report = null;
   let error: string | null = null;
-  try {
-    report = await fetchReport(slug);
-  } catch {
+  // Connectivity is fetched alongside the report rather than folded into it.
+  // The report endpoint deliberately carries no category payloads — it is a
+  // summary — and putting fifty feature coordinates into it for every consumer
+  // to serve one component would be the wrong shape. Losing this must not cost
+  // the page, so the map simply does not render.
+  let connectivity: ConnectivityView | null = null;
+  const [reportResult, connectivityResult] = await Promise.allSettled([
+    fetchReport(slug),
+    fetchConnectivity(slug),
+  ]);
+  if (reportResult.status === "fulfilled") {
+    report = reportResult.value;
+  } else {
     error =
       "Couldn't reach the API. Start it with: uvicorn apps.api.app.main:app --reload";
+  }
+  if (connectivityResult.status === "fulfilled") {
+    connectivity = connectivityResult.value;
   }
 
   const name = report?.locality.name ?? locality?.name ?? slug;
@@ -108,7 +126,7 @@ export default async function LocalityPage({
       </header>
 
       {report ? (
-        <TrustReport report={report} />
+        <TrustReport report={report} connectivity={connectivity} />
       ) : (
         <div className="rounded-[20px] border border-hairline bg-surface-1 p-5">
           <b className="text-[13px]">Report unavailable</b>

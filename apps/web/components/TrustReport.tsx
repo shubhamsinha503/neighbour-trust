@@ -20,9 +20,16 @@
 
 import Link from "next/link";
 import type { Confidence } from "@schema/envelope";
+import { LocalityMap } from "@/components/LocalityMap";
 import { joinCategoryLabels } from "@/lib/categories";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
-import type { Disagreement, Flag, LocalityReport, ReportCategory } from "@/lib/api";
+import type {
+  ConnectivityView,
+  Disagreement,
+  Flag,
+  LocalityReport,
+  ReportCategory,
+} from "@/lib/api";
 
 const SCORE_COLORS: Array<[number, string]> = [
   [75, "var(--color-status-good)"],
@@ -35,7 +42,16 @@ function colorForScore(score: number): string {
   return SCORE_COLORS.find(([floor]) => score >= floor)?.[1] ?? SCORE_COLORS[0][1];
 }
 
-export function TrustReport({ report }: { report: LocalityReport }) {
+export function TrustReport({
+  report,
+  connectivity,
+}: {
+  report: LocalityReport;
+  /** Optional. The map is drawn from it when present and skipped when not, so
+   *  a locality whose connectivity has not been fetched still renders a whole
+   *  report rather than a broken one. */
+  connectivity?: ConnectivityView | null;
+}) {
   const { trustScore: trust, locality } = report;
 
   return (
@@ -83,6 +99,25 @@ export function TrustReport({ report }: { report: LocalityReport }) {
               <FlagCard key={`${flag.category}-${flag.headline}`} flag={flag} />
             ))}
           </div>
+        )}
+
+        {/* 3 — the place itself.
+          *
+          * Directly under the verdict and the flags, because this is the report
+          * page: it is where people land, and it was the one page with nothing
+          * on it that distinguished one neighbourhood from another. Every
+          * locality rendered the same ring above the same paragraphs.
+          *
+          * It sits after the flags rather than before, so a serious warning is
+          * still the first thing read. Absent connectivity simply means no map,
+          * never a gap where one should be. */}
+        {connectivity && connectivity.features.length > 0 && (
+          <LocalityMap
+            localityName={locality.name}
+            lat={locality.lat}
+            lon={locality.lon}
+            features={connectivity.features}
+          />
         )}
 
 
