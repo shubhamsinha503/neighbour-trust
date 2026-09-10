@@ -204,6 +204,18 @@ export function LocalityMap({
     if (!clashes) stations.push(s);
   }
 
+  /**
+   * Icons shrink as the locality fills up.
+   *
+   * Sector 56 places 52 features and Koramangala 219 in the same frame. One
+   * size cannot serve both: what is comfortable at fifty overlaps into mush at
+   * two hundred, and what is legible at two hundred is needlessly timid at
+   * fifty. This is a gentle taper rather than a cliff, so two neighbouring
+   * localities never look like they were drawn to different standards.
+   */
+  const density = Math.min(1, Math.max(0, (placed.length - 60) / 160));
+  const iconScale = 2.7 - 0.9 * density;   // 2.7 when sparse, 1.8 when packed
+
   const counts = present.map(
     (k) => `${placed.filter((f) => f.kind === k).length} ${STYLE[k].label.toLowerCase()}`,
   );
@@ -239,83 +251,19 @@ export function LocalityMap({
           const style = STYLE[kind];
           return placed
             .filter((f) => f.kind === kind)
-            .map((f, i) => {
-              const title = <title>{f.name || style.label}</title>;
-              if (style.shape === "square") {
-                return (
-                  <rect
-                    key={`${kind}-${i}`}
-                    x={f.x - style.r}
-                    y={f.y - style.r}
-                    width={style.r * 2}
-                    height={style.r * 2}
-                    rx={0.8}
-                    fill={style.fill}
-                    fillOpacity={0.55}
-                  >
-                    {title}
-                  </rect>
-                );
-              }
-              if (style.shape === "hollow") {
-                return (
-                  <circle
-                    key={`${kind}-${i}`}
-                    cx={f.x}
-                    cy={f.y}
-                    r={style.r}
-                    fill="none"
-                    stroke={style.fill}
-                    strokeWidth={1.6}
-                  >
-                    {title}
-                  </circle>
-                );
-              }
-              if (style.shape === "ring") {
-                // The one kind drawn as an icon. A locality has two or three
-                // stations, never ninety, so there is room for something
-                // recognisable — and it is the feature people look for first,
-                // which makes it worth finding without the legend. A disc sits
-                // behind it so it stays visible over a park or an estate.
-                return (
-                  <g key={`${kind}-${i}`}>
-                    {/* A plain disc of the page colour, no outline. The first
-                      * version ringed it in near-black and the ring competed
-                      * with the icon it was meant to hold — at this size the
-                      * two read as one dark blob. The disc is only there to
-                      * stop a park or an estate showing through the glyph. */}
-                    <circle
-                      cx={f.x} cy={f.y} r={style.r + 2.2}
-                      fill="var(--color-page-plane)"
-                      fillOpacity={0.9}
-                    />
-                    <text
-                      x={f.x}
-                      y={f.y}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      style={{ fontSize: style.r * 2.8 }}
-                    >
-                      {style.emoji}
-                    </text>
-                    {title}
-                  </g>
-                );
-              }
-              return (
-                <circle
-                  key={`${kind}-${i}`}
-                  cx={f.x}
-                  cy={f.y}
-                  r={style.r}
-                  fill={style.fill}
-                  fillOpacity={0.85}
-                >
-                  {title}
-                </circle>
-              );
-            });
+            .map((f, i) => (
+              <text
+                key={`${kind}-${i}`}
+                x={f.x}
+                y={f.y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                style={{ fontSize: style.r * iconScale }}
+              >
+                {style.emoji}
+                <title>{f.name || style.label}</title>
+              </text>
+            ));
         })}
 
         {/* Ring labels, drawn after the features rather than before.
@@ -375,21 +323,13 @@ export function LocalityMap({
               * indistinguishable: same swatch, same hue, and the only
               * difference — a millimetre of radius on the map — invisible
               * here. */}
-            <span aria-hidden="true" className="text-[12px] leading-none">
+            {/* The icon alone. It used to sit beside a colour chip, which
+              * made sense while the map drew coloured shapes — now that the
+              * map draws these same icons, the chip described nothing that was
+              * on it. */}
+            <span aria-hidden="true" className="text-[13px] leading-none">
               {STYLE[kind].emoji}
             </span>
-            <span
-              aria-hidden="true"
-              className={
-                "inline-block h-2 w-2 " +
-                (STYLE[kind].shape === "square" ? "rounded-[1px]" : "rounded-full")
-              }
-              style={
-                STYLE[kind].shape === "ring" || STYLE[kind].shape === "hollow"
-                  ? { border: `2px solid ${STYLE[kind].fill}` }
-                  : { background: STYLE[kind].fill }
-              }
-            />
             {STYLE[kind].label}
             <span className="text-ink-muted">
               {placed.filter((f) => f.kind === kind).length}
