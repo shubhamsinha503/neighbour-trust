@@ -669,6 +669,12 @@ class ReportResponse(BaseModel):
     flags: list[Flag] = []
     disagreements: list[ReportDisagreement]
     categories: list[ReportCategory]
+    # Infrastructure the local press reports as planned, under way or newly
+    # opened. Headlines rather than a summary, and never a score: press
+    # attention tracks media-market size, so counting what is coming would
+    # credit a well-covered neighbourhood with more planned than an identical
+    # one nobody writes about.
+    upcoming: list[dict[str, Any]] = []
     sources_used: list[str]
     generated_at: str
 
@@ -724,6 +730,7 @@ def debug_report(slug: str) -> dict[str, Any]:
                 for d in report.disagreements
             ],
             categories=report.categories,
+            upcoming=report.upcoming,
             sources_used=report.sources_used,
             generated_at=report.generated_at.isoformat(),
         )
@@ -776,6 +783,7 @@ def get_report(slug: str) -> dict[str, Any]:
             for d in report.disagreements
         ],
         "categories": report.categories,
+        "upcoming": report.upcoming,
         "sources_used": report.sources_used,
         "generated_at": report.generated_at.isoformat(),
     }

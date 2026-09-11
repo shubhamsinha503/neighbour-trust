@@ -123,9 +123,46 @@ class TestClassifierFallbackOrder:
         """The prompt encodes judgements about the task, not about a model —
         that "Monu Manesar" names a man, that a labour dispute at an industrial
         estate is not a neighbourhood incident. A lesson learned from one
-        classifier's mistake should improve both."""
+        classifier's mistake should improve both.
+
+        Asserted through the selector rather than the constant. Categories no
+        longer share a single prompt — development inverts the central rule,
+        since there an announcement is the signal rather than the disqualifier —
+        so what must hold is that both models ask the same function which
+        prompt to use, and therefore cannot drift apart.
+        """
         groq = self.SOURCE[self.SOURCE.index("class OpenAICompatibleClassifier") :]
-        assert "SYSTEM_PROMPT" in groq[: groq.index("def _clean_type")]
+        assert "system_prompt_for(category)" in groq[: groq.index("def _clean_type")]
+        claude = self.SOURCE[
+            self.SOURCE.index("class ClaudeClassifier"):
+            self.SOURCE.index("class OpenAICompatibleClassifier")
+        ]
+        assert "system_prompt_for(category)" in claude
+
+    def test_development_gets_its_own_instructions(self):
+        """Sharing the incident prompt would ask the model to apply a rule and
+        its opposite at once: everywhere else "approved", "announced" and
+        "sanctioned" are the strongest signal of city-level coverage, and in
+        development they are exactly what is being looked for."""
+        from agents.news_monitor.classify import (
+            DEVELOPMENT_SYSTEM_PROMPT,
+            SYSTEM_PROMPT,
+            system_prompt_for,
+        )
+
+        assert system_prompt_for("development") is DEVELOPMENT_SYSTEM_PROMPT
+        for category in ("crime", "water", "power"):
+            assert system_prompt_for(category) is SYSTEM_PROMPT
+
+    def test_development_never_becomes_a_score(self):
+        """Press attention tracks media-market size. Scoring what is *coming*
+        would tell a buyer that a well-covered neighbourhood has more planned
+        than an identical one nobody writes about — the same distortion the
+        volume rules exist to prevent everywhere else here."""
+        from agents.orchestrator.score import CATEGORY_WEIGHTS, SCOREABLE
+
+        assert "development" not in SCOREABLE
+        assert "development" not in CATEGORY_WEIGHTS
 
     def test_verdicts_record_which_model_made_them(self):
         """So a mixed corpus stays auditable and --reclassify-from can revisit

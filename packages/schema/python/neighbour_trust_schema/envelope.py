@@ -45,6 +45,9 @@ class Category(str, Enum):
     WATER = "water"
     POWER = "power"
     INFRASTRUCTURE = "infrastructure"
+    # What the press reports as coming. Not a report category: no score, no
+    # weight, no card on the grid. See DevelopmentPayload.
+    DEVELOPMENT = "development"
 
 
 class DataEnvelope(BaseModel):
@@ -309,6 +312,25 @@ class WaterPayload(BaseModel):
     reported_supply_frequency: Optional[str] = None
     groundwater_trend: Optional[str] = None
     tanker_dependency_pct: Optional[float] = None
+    news: Optional[NewsCoverage] = None
+
+
+class DevelopmentPayload(BaseModel):
+    """Infrastructure the local press reports as planned, under way or opened.
+
+    docs/strategy.md scopes this category to RERA registrations and state master
+    plans — what is approved and by whom. That is a scraping-or-partnership
+    problem and remains unsolved: no state RERA portal has an API and the master
+    plans are PDFs. This is the checkable half — not what was approved, but what
+    was reported.
+
+    Carries no figure of its own on purpose. There is no count, no score and no
+    expected date here, only `news`: press attention tracks media-market size,
+    so any number derived from it would say a well-covered neighbourhood has
+    more coming than an identical one nobody writes about. The report renders
+    the headlines, dated, and lets the reader weigh them.
+    """
+
     news: Optional[NewsCoverage] = None
 
 

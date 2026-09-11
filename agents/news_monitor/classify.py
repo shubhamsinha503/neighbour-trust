@@ -88,17 +88,63 @@ INCIDENT_TERMS: dict[str, dict[str, tuple[str, ...]]] = {
         "scheduled_maintenance": ("scheduled", "maintenance", "shutdown notice",
                                   "planned outage"),
     },
+    # What is coming, rather than what went wrong. Kept coarse on purpose: the
+    # useful distinction to a buyer is transit against road against civic
+    # amenity, not which agency is building it.
+    "development": {
+        "metro": ("metro", "rrts", "namma metro", "rapid rail"),
+        "road": ("flyover", "underpass", "elevated corridor", "road widening",
+                 "expressway", "link road", "ring road", "signal-free"),
+        "civic": ("hospital", "school", "park", "library", "sports complex",
+                  "community centre"),
+        "utility": ("sewerage", "stp ", "water supply project", "substation",
+                    "power line", "pipeline project"),
+    },
 }
 
 
 # Headlines about policy, budgets and announcements are city or state level even
 # when they name a locality. These are the strongest single signal of a
 # non-incident, and the exact failure mode the strategy doc names.
+#
+# For the development category this rule inverts: an announcement is the whole
+# point. See DEVELOPMENT_SYSTEM_PROMPT.
 POLICY_MARKERS = (
     "policy", "budget", "scheme", "launch", "inaugurat", "announce", "plan to",
     "proposal", "tender", "approved", "sanction", "to be built", "survey",
     "minister", "cm ", "chief minister", "election", "manifesto",
 )
+
+
+DEVELOPMENT_SYSTEM_PROMPT = """You classify Indian local-news headlines for a neighbourhood data product used by home buyers.
+
+For each headline decide whether it reports INFRASTRUCTURE OR CIVIC WORK that is planned, under construction, or newly opened AND that is located IN the named locality.
+
+Answer true for: a metro line, station or extension; a flyover, underpass or elevated corridor; a road widening or new link road; an expressway; a hospital, school or park being built or opened; a sewerage, water or power upgrade — when the headline places it in that locality.
+
+Answer false when the headline is:
+- about a different place that merely shares a name, or a different city
+- city-wide or state-wide with no locality named as the site of the work
+- a political statement, demand, protest or promise rather than a project with a
+  location — "MLA demands flyover" is not a flyover
+- a property advertisement or builder's marketing, which is the most common
+  false positive here and is written to look exactly like news
+- an incident rather than a project: a road caving in is not road work
+
+Note the difference from the other categories: here an ANNOUNCEMENT IS THE SIGNAL. "Metro line approved for X" is exactly what we want, where for crime or water that phrasing would mean city-level policy coverage.
+
+Be conservative about location. A project benefits a locality only if it is sited there or explicitly said to serve it; a metro line somewhere in the same city is not this locality's metro line."""
+
+
+def system_prompt_for(category: str) -> str:
+    """Which instructions a category needs.
+
+    Development inverts the central rule of the other three. Everywhere else an
+    announcement means city-level coverage and is the strongest single signal of
+    a non-incident; here it is the thing being looked for. Sharing one prompt
+    would mean asking the model to apply a rule and its opposite at once.
+    """
+    return DEVELOPMENT_SYSTEM_PROMPT if category == "development" else SYSTEM_PROMPT
 
 
 class HeuristicClassifier:
@@ -129,7 +175,19 @@ class HeuristicClassifier:
                 classifier=self.name,
             )
 
-        if any(marker in text for marker in POLICY_MARKERS):
+        # Inverted for development: an announcement is the signal there, not
+        # the disqualifier. Without this the category could never return a
+        # single confirmed item, because every project headline contains one of
+        # these words by definition.
+        if category == "development":
+            if not any(marker in text for marker in POLICY_MARKERS):
+                return Judgement(
+                    is_locality_specific=False,
+                    incident_type=None,
+                    reason="no sign this reports planned or completed work",
+                    classifier=self.name,
+                )
+        elif any(marker in text for marker in POLICY_MARKERS):
             return Judgement(
                 is_locality_specific=False,
                 incident_type=None,
@@ -234,7 +292,7 @@ class ClaudeClassifier:
             response = self._client.messages.create(
                 model=self._model,
                 max_tokens=256,
-                system=SYSTEM_PROMPT,
+                system=system_prompt_for(category),
                 # The system prompt is identical on every call, so caching it
                 # turns the dominant cost of a few-hundred-article run into a
                 # cache read.
@@ -512,7 +570,7 @@ class OpenAICompatibleClassifier:
                 messages=[
                     {
                         "role": "system",
-                        "content": SYSTEM_PROMPT
+                        "content": system_prompt_for(category)
                         + "\n\nRespond with JSON only, in exactly this shape:\n"
                         '{"is_locality_specific": true|false, '
                         '"incident_type": "short_snake_case" or null, '

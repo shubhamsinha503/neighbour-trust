@@ -77,6 +77,9 @@ class LocalityReport:
     generated_at: datetime
     envelopes: dict[str, Any] = field(default_factory=dict)
     flags: list[dict[str, str]] = field(default_factory=list)
+    # Infrastructure reported as planned, under way or newly opened nearby.
+    # Headlines, not a summary — see `_upcoming`.
+    upcoming: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _load_envelopes(conn, h3_cell: str) -> dict[str, Any]:
@@ -121,6 +124,15 @@ def _load_envelopes(conn, h3_cell: str) -> dict[str, Any]:
     )
     if aqicn is not None:
         envelopes["air_quality_aqicn"] = aqicn
+
+    # Development is loaded but is deliberately not in REPORT_CATEGORIES: it has
+    # no card, no score and no weight. It is what the local press says is coming,
+    # which is worth showing and must never become a number — press attention
+    # tracks media-market size, so counting it would credit a well-covered
+    # neighbourhood with more planned than an identical one nobody writes about.
+    development = db.latest_envelope(conn, category="development", h3_cell=h3_cell)
+    if development is not None:
+        envelopes["development"] = development
 
     return envelopes
 
@@ -291,6 +303,41 @@ def _category_summary(category: str, envelope: Optional[dict[str, Any]]) -> str:
     return ""
 
 
+def _upcoming(envelopes: dict[str, Any], limit: int = 4) -> list[dict[str, Any]]:
+    """What the local press reports as coming, as headlines.
+
+    Deliberately not summarised into a claim. Two of the three confirmed items
+    for Hebbal are about a metro proposal being *delayed*, and any sentence
+    this code could write from them — "metro line planned" — would turn a
+    stalled proposal into a promise. The headline says what was reported; the
+    reader can weigh it, which is the whole posture of this product.
+
+    Never scored, and not a category on the grid. Press attention tracks
+    media-market size, so counting what is coming would tell a buyer that a
+    well-covered neighbourhood has more planned than an identical one nobody
+    writes about — the distortion the volume rules exist to prevent everywhere
+    else here.
+    """
+    envelope = envelopes.get("development")
+    if not envelope:
+        return []
+    news = (envelope.get("payload") or {}).get("news") or {}
+    out: list[dict[str, Any]] = []
+    for item in (news.get("recent") or []):
+        if not item.get("incident_type"):
+            continue          # unjudged or rejected — absence is not a finding
+        out.append({
+            "headline": item.get("title"),
+            "kind": item.get("incident_type"),
+            "published_at": item.get("published_at"),
+            "url": item.get("url"),
+            "source": item.get("source_name"),
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
 def build_report(conn, locality: dict[str, Any]) -> LocalityReport:
     now = datetime.now(timezone.utc)
     envelopes = _load_envelopes(conn, locality["h3_cell"])
@@ -360,4 +407,5 @@ def build_report(conn, locality: dict[str, Any]) -> LocalityReport:
         sources_used=sources,
         generated_at=now,
         envelopes=envelopes,
+        upcoming=_upcoming(envelopes),
     )

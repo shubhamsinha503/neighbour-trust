@@ -34,9 +34,10 @@ from neighbour_trust_schema.envelope import (
     Confidence,
     CrimePayload,
     DataEnvelope,
-    PowerPayload,
+    DevelopmentPayload,
     NewsCoverage,
     NewsIncident,
+    PowerPayload,
     WaterPayload,
 )
 
@@ -60,7 +61,22 @@ log = logging.getLogger(__name__)
 # so those are correctly rejected and the confirmed rate is low. What survives is
 # the locality-specific reporting: a transformer that failed, an area left dark
 # for a day.
-CATEGORIES = ("crime", "water", "power")
+#
+# Development is the newest and the only one that can be good news: a metro
+# extension, a flyover, a road widening. docs/strategy.md scopes upcoming
+# infrastructure to RERA registrations and master plans — no API, and PDFs — and
+# that remains true. What is reachable is what gets written about, and the
+# pipeline for that already exists.
+#
+# It is never scored, for the same reason volume is never scored anywhere here:
+# press attention tracks media-market size, so scoring it would tell a buyer
+# that a well-covered neighbourhood has more coming than an identical one
+# nobody writes about. It appears as something found, or it does not appear.
+#
+# And it says "reported as planned", never "arriving in 2027". Indian
+# infrastructure announcements slip by years, and a date on a card is the
+# difference between this being useful and it being a builder's brochure.
+CATEGORIES = ("crime", "water", "power", "development")
 
 # How far back the counts look. A year smooths seasonal reporting spikes
 # (Bengaluru water stories cluster in summer, waterlogging in monsoon) that a
@@ -354,6 +370,10 @@ def build_envelope(
         )
     elif category == "water":
         payload = WaterPayload(news=news)
+    elif category == "development":
+        # Nothing but the coverage. No count, no score, no expected date — see
+        # DevelopmentPayload for why each of those is deliberately absent.
+        payload = DevelopmentPayload(news=news)
     else:
         raise ValueError(f"no payload for category {category!r}")
 

@@ -21,6 +21,7 @@
 import Link from "next/link";
 import type { Confidence } from "@schema/envelope";
 import { LocalityMap } from "@/components/LocalityMap";
+import { UpcomingCard } from "@/components/UpcomingCard";
 import { joinCategoryLabels } from "@/lib/categories";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
 import type {
@@ -195,6 +196,14 @@ export function TrustReport({
       <EmptyCategories
         categories={report.categories.filter((c) => !c.available)}
       />
+
+      {/* 4b — what the press says is coming.
+        *
+        * Below the categories rather than among them, because it is not one:
+        * it carries no score, no confidence tag and no weight. Reading it as a
+        * sixth category would invite the comparison it must not support — that
+        * a locality written about more has more planned. */}
+      <UpcomingCard localityName={locality.name} items={report.upcoming} />
 
       {/* 5 — disagreements */}
       {report.disagreements.length > 0 && (

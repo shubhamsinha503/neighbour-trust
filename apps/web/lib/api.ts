@@ -319,8 +319,26 @@ export interface LocalityReport {
   flags: Flag[];
   disagreements: Disagreement[];
   categories: ReportCategory[];
+  /** What the local press reports as planned, under way or newly opened. */
+  upcoming: UpcomingItem[];
   sourcesUsed: string[];
   generatedAt: string;
+}
+
+/**
+ * One reported project near a locality.
+ *
+ * The headline is carried verbatim rather than summarised. Two of the three
+ * confirmed items for Hebbal are about a metro proposal being *delayed*, and
+ * any sentence generated from them — "metro line planned" — would turn a
+ * stalled proposal into a promise.
+ */
+export interface UpcomingItem {
+  headline: string;
+  kind: string;
+  publishedAt?: string;
+  url?: string;
+  source?: string;
 }
 
 export async function fetchReport(slug: string): Promise<LocalityReport> {
@@ -360,6 +378,15 @@ export async function fetchReport(slug: string): Promise<LocalityReport> {
         dataVintage: c.data_vintage ?? undefined,
       }),
     ),
+    upcoming: ((raw.upcoming ?? []) as Array<Record<string, any>>).map(
+      (u): UpcomingItem => ({
+        headline: u.headline ?? "",
+        kind: u.kind ?? "",
+        publishedAt: u.published_at ?? undefined,
+        url: u.url ?? undefined,
+        source: u.source ?? undefined,
+      }),
+    ).filter((u) => u.headline),
     sourcesUsed: raw.sources_used ?? [],
     generatedAt: raw.generated_at,
   };

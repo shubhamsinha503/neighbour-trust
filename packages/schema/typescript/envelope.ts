@@ -19,7 +19,10 @@ export type Category =
   | "air_quality"
   | "water"
   | "power"
-  | "infrastructure";
+  | "infrastructure"
+  // What the press reports as coming. Not a report category: no score, no
+  // weight, no card on the grid.
+  | "development";
 
 export interface DataEnvelope<TPayload = Record<string, unknown>> {
   category: Category;

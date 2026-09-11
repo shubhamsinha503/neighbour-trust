@@ -1,0 +1,22 @@
+-- Add the `development` category.
+--
+-- What the local press reports as planned, under way or newly opened near a
+-- locality: a metro extension, a flyover, a road widening.
+--
+-- docs/strategy.md scopes upcoming infrastructure to RERA registrations and
+-- state master plans, and that remains unreachable — every state runs its own
+-- RERA portal with no API, and the plans are PDFs. This is the checkable part:
+-- not what has been approved, but what has been reported.
+--
+-- It is deliberately *not* a report category. It carries no score, no weight
+-- and no confidence tag on the grid, because press attention tracks
+-- media-market size: counting what is coming would credit a well-covered
+-- neighbourhood with more planned than an identical one nobody writes about.
+-- It appears as dated headlines or it does not appear.
+--
+-- ADD VALUE IF NOT EXISTS is idempotent, which is what lets this file follow
+-- the same re-runnable rule as every other migration here. It cannot run inside
+-- a transaction block on PostgreSQL below 12; the runner applies each file on
+-- its own connection, and the deployed version is 16.
+
+ALTER TYPE category_t ADD VALUE IF NOT EXISTS 'development';

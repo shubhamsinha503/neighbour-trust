@@ -70,6 +70,19 @@ CATEGORY_TERMS: dict[str, list[str]] = {
         "power cut", "power outage", "electricity", "load shedding",
         "BESCOM", "DHBVN", "transformer", "no power supply",
     ],
+    # What is coming, rather than what went wrong — the only category here that
+    # can be good news. docs/strategy.md scopes upcoming infrastructure to RERA
+    # registrations and master plans, which have no API and are PDFs; but a
+    # metro extension or a flyover gets written about, and the press pipeline
+    # already exists. This is the checkable part of that ambition.
+    #
+    # Agency names earn their place for the same reason the discom names do in
+    # power: Indian coverage says "BMRCL" or "GMDA" far more often than it says
+    # "metro project".
+    "development": [
+        "metro", "flyover", "underpass", "elevated corridor", "road widening",
+        "expressway", "BMRCL", "GMDA", "new project", "infrastructure",
+    ],
 }
 
 # Google News RSS has no published rate limit, but it is a free endpoint being
