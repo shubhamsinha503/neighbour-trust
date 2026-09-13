@@ -164,6 +164,18 @@ export function TrustReport({
         categories={report.categories.filter((c) => !c.available)}
       />
 
+      {/* One route in per page, whatever the categories hold. The per-card link
+        * only appears on a card with nothing measured, and a category with
+        * nothing at all has no card — so on most localities the only way a
+        * resident could reach the form was a page that did not exist. */}
+      <div className="mt-2.5 flex items-center justify-between gap-3 rounded-2xl border border-hairline bg-surface-1 px-3.5 py-3">
+        <p className="text-[11.5px] leading-[1.5] text-ink-secondary">
+          Live in {locality.name}? Water, power, safety — what you have seen is
+          what no official source publishes.
+        </p>
+        <ReportLink localityName={locality.name} />
+      </div>
+
       {/* 4b — what the press says is coming.
         *
         * Below the categories rather than among them, because it is not one:
@@ -472,7 +484,8 @@ function ReportLink({
   category,
   localityName,
 }: {
-  category: string;
+  /** Omitted for the page-level link, which leaves the choice to the resident. */
+  category?: string;
   localityName: string;
 }) {
   const base = process.env.NEXT_PUBLIC_REPORT_URL;
@@ -486,7 +499,7 @@ function ReportLink({
   // Only send a category the form actually offers. An unmapped label would
   // arrive as a value no option matches, which Google silently drops — the
   // reporter would then see the question unanswered with no idea why.
-  const option = FORM_CATEGORY_OPTION[category];
+  const option = category ? FORM_CATEGORY_OPTION[category] : undefined;
   if (option) params.set(FORM_FIELD_CATEGORY, option);
 
   const url = `${base}${base.includes("?") ? "&" : "?"}${params.toString()}`;
@@ -496,7 +509,7 @@ function ReportLink({
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="mt-2 inline-flex items-center gap-1 text-[10.5px] font-semibold text-brand underline decoration-dotted underline-offset-2 hover:decoration-solid"
+      className={`inline-flex shrink-0 items-center gap-1 text-[10.5px] font-semibold text-brand underline decoration-dotted underline-offset-2 hover:decoration-solid ${category ? "mt-2" : ""}`}
     >
       Seen something? Tell us
       <span aria-hidden="true">→</span>
