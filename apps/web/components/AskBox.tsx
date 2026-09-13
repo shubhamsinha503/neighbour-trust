@@ -167,11 +167,6 @@ export function AskBox({ slug, localityName }: { slug: string; localityName: str
           <div className="mt-4 border-t border-gridline pt-4">
             <div className="text-[11px] font-medium text-ink-muted">{asked}</div>
             <p className="mt-1.5 text-[14px] leading-[1.6] text-ink-primary">
-              {!result.answerable && (
-                <span className="mr-1.5 rounded-full bg-page-plane px-2 py-0.5 align-[1px] text-[10px] font-semibold text-ink-secondary">
-                  Not in our data
-                </span>
-              )}
               {splitCitations(result.answer, citationIds).map((part, i) =>
                 part.type === "text" ? (
                   <span key={i}>{part.value}</span>
