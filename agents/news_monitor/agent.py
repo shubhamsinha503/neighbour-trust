@@ -164,19 +164,21 @@ def fetch_for_locality(
                 )
                 continue
 
-            for article in articles:
-                db.upsert_news_mention(
-                    conn,
+            written = db.upsert_news_mentions(
+                conn,
+                [
                     {
                         **article,
                         "locality_id": locality["id"],
                         "h3_cell": locality["h3_cell"],
                         "category": category,
                         "source_name": label,
-                    },
-                )
-                stored += 1
-                found += 1
+                    }
+                    for article in articles
+                ],
+            )
+            stored += written
+            found += written
 
         log.info("[%s/%s] %d mentions", locality["slug"], category, found)
 
@@ -221,6 +223,12 @@ COMMIT_EVERY = 50
 # run that is killed publishes nothing while one that stops early publishes what
 # it judged. Override with NEWS_RUN_BUDGET_MINUTES.
 DEFAULT_RUN_BUDGET_MINUTES = 70.0
+
+# How long fetching may take before the rest of the localities wait for the
+# next run, oldest-fetched first. Leaves most of the run for classification,
+# which is the slow part on a paced free-tier model. Override with
+# NEWS_FETCH_BUDGET_MINUTES.
+DEFAULT_FETCH_BUDGET_MINUTES = 25.0
 
 # However slow the fetch, classification always gets a few minutes, so a run
 # never finishes having judged nothing at all.

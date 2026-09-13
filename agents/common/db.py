@@ -520,6 +520,64 @@ def upsert_news_mention(conn: psycopg.Connection, mention: dict[str, Any]) -> in
     return row["id"]
 
 
+def upsert_news_mentions(conn: psycopg.Connection, mentions: list[dict[str, Any]]) -> int:
+    """Store a batch of locality-tagged articles in one round trip.
+
+    Same conflict rule as `upsert_news_mention`: a re-fetched article keeps its
+    classification. Exists because one search returns up to a hundred articles
+    and writing them a row at a time, from a CI runner to a hosted database,
+    turned a daily fetch into seventy minutes — most of it spent waiting on the
+    network to acknowledge rows that were already there.
+    """
+    if not mentions:
+        return 0
+    rows = [
+        (
+            m["locality_id"], m["h3_cell"], m["category"], m["url"], m["title"],
+            m.get("domain"), m.get("language"), m.get("source_country"),
+            m.get("published_at"), m.get("query_term"), m.get("source_name", "GDELT"),
+        )
+        for m in mentions
+    ]
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            INSERT INTO news_mention
+                (locality_id, h3_cell, category, url, title, domain, language,
+                 source_country, published_at, query_term, source_name)
+            VALUES (%s, %s, %s::category_t, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (locality_id, category, url) DO UPDATE SET
+                title      = EXCLUDED.title,
+                fetched_at = now()
+            """,
+            rows,
+        )
+    return len(rows)
+
+
+def localities_by_news_staleness(conn: psycopg.Connection) -> list[dict[str, Any]]:
+    """Every locality, the one whose news was fetched longest ago first.
+
+    Never fetched sorts first of all. Lets a time-limited fetch rotate through
+    the whole list over successive runs instead of re-reading the same first
+    few dozen localities every day and never reaching the rest.
+    """
+    return conn.execute(
+        """
+        SELECT l.id, l.slug, l.name, l.city, l.state, l.pincode, l.h3_cell,
+               ST_Y(l.centroid::geometry) AS lat,
+               ST_X(l.centroid::geometry) AS lon
+          FROM locality l
+          LEFT JOIN (
+                SELECT locality_id, MAX(fetched_at) AS last_fetched
+                  FROM news_mention
+                 GROUP BY locality_id
+          ) m ON m.locality_id = l.id
+         ORDER BY m.last_fetched ASC NULLS FIRST, l.slug
+        """
+    ).fetchall()
+
+
 def unclassified_mentions(
     conn: psycopg.Connection, *, limit: int = 500
 ) -> list[dict[str, Any]]:

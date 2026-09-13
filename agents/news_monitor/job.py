@@ -99,13 +99,42 @@ def run_once(
                     )
 
                 if not skip_fetch:
-                    for locality in localities:
+                    # Longest-unfetched first, within a time limit. Re-reading
+                    # all 159 localities took 70 of the run's 70 minutes on
+                    # 2026-09-13 and left classification its five-minute floor —
+                    # 78 headlines judged, against a backlog of thousands. A
+                    # locality's news changes over weeks, so rotating through
+                    # the list across a few daily runs loses nothing, and the
+                    # time goes to judging what is already stored.
+                    fetch_order = (
+                        localities
+                        if locality_slug
+                        else db.localities_by_news_staleness(conn)
+                    )
+                    fetch_minutes = float(
+                        os.environ.get("NEWS_FETCH_BUDGET_MINUTES")
+                        or news_agent.DEFAULT_FETCH_BUDGET_MINUTES
+                    )
+                    fetched_localities = 0
+                    for locality in fetch_order:
+                        if time.monotonic() - started > fetch_minutes * 60:
+                            log.info(
+                                "fetch budget reached after %d of %d localities; "
+                                "the rest are first in line next run",
+                                fetched_localities, len(fetch_order),
+                            )
+                            break
                         outcome.mentions_found += news_agent.fetch_for_locality(
                             conn,
                             locality,
                             gnews_client=gnews_client,
                             gdelt_client=gdelt_client,
                         )
+                        fetched_localities += 1
+                        # Per locality, so a run killed mid-fetch keeps what it
+                        # read and the rotation order reflects it.
+                        if not dry_run:
+                            conn.commit()
                     if not dry_run:
                         # Commit the fetch before classifying: GDELT's rate limit
                         # makes a re-fetch expensive, and a classifier failure

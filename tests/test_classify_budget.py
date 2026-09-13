@@ -109,3 +109,22 @@ def test_no_budget_means_no_deferral(monkeypatch):
     _patch(monkeypatch, conn, 30)
     result = agent.classify_pending(conn, CountingClassifier())
     assert result.deferred == 0 and result.judged == 30
+
+
+def test_fetch_writes_each_search_as_one_batch(monkeypatch):
+    batches = []
+    monkeypatch.setattr(agent.db, "upsert_news_mentions",
+                        lambda conn, rows: batches.append(len(rows)) or len(rows))
+    monkeypatch.setattr(agent.db, "upsert_news_mention",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("row-at-a-time write")))
+
+    class FakeNews:
+        def search_locality(self, *, locality, city, category, months):
+            return [{"url": f"https://x/{category}/{i}", "title": "t"} for i in range(7)]
+
+    stored = agent.fetch_for_locality(
+        None, {"id": 1, "slug": "s", "name": "S", "city": "Bengaluru", "h3_cell": "h"},
+        gnews_client=FakeNews(), gdelt_client=None,
+    )
+    assert batches == [7] * len(agent.CATEGORIES)
+    assert stored == 7 * len(agent.CATEGORIES)
