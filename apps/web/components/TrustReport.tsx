@@ -20,6 +20,7 @@
 
 import Link from "next/link";
 import type { Confidence } from "@schema/envelope";
+import { ExpandableCard } from "@/components/ExpandableCard";
 import { LocalityMap } from "@/components/LocalityMap";
 import { UpcomingCard } from "@/components/UpcomingCard";
 import { joinCategoryLabels } from "@/lib/categories";
@@ -322,38 +323,34 @@ function CategoryCard({
   const color =
     category.score !== null ? colorForScore(category.score) : "var(--color-gridline)";
 
-  const body = (
-    <div
-      className={`h-full rounded-2xl border p-3.5 ${
-        category.counted
-          ? "border-hairline bg-surface-1"
-          : "border-dashed border-gridline bg-page-plane"
-      }`}
-    >
-      {/*
-        An unscored category shows no number and no meter at all.
+  const cardClass = `h-full rounded-2xl border p-3.5 ${
+    category.counted
+      ? "border-hairline bg-surface-1"
+      : "border-dashed border-gridline bg-page-plane"
+  }`;
 
-        It used to render an em dash above an empty progress bar, which is the
-        shape of a broken component rather than of an answer — the eye reads a
-        zero-width bar as a score of nothing, which is the one reading this
-        product must never invite. The dashed border already says "no data";
-        drawing an empty meter says it a second time, worse.
+  /*
+    An unscored category shows no number and no meter at all.
 
-        The alternative considered and rejected was giving unscored categories a
-        default number. Silence in the local press is not evidence of safety,
-        and scoring it as though it were would rank the neighbourhoods nobody
-        writes about above the ones that get covered.
-      */}
+    It used to render an em dash above an empty progress bar, which is the
+    shape of a broken component rather than of an answer — the eye reads a
+    zero-width bar as a score of nothing, which is the one reading this
+    product must never invite.
+
+    The alternative considered and rejected was giving unscored categories a
+    default number. Silence in the local press is not evidence of safety,
+    and scoring it as though it were would rank the neighbourhoods nobody
+    writes about above the ones that get covered.
+  */
+  const header = (
+    <>
       <div className="mb-1.5 flex items-start justify-between gap-2">
         <div className="text-[12.5px] font-semibold text-ink-primary">
           {category.label}
         </div>
         {category.score !== null && (
           <div className="flex shrink-0 items-center gap-1.5">
-            {/* A baseline is not a measurement, so it must not look like one.
-              * It carries the muted ink rather than a status colour, and the
-              * word "baseline" sits beside it — a green 80 next to a measured
-              * green 80 would be the same pixel making two different claims. */}
+            {/* A baseline is not a measurement, so it must not look like one. */}
             {category.isBaseline && (
               <span className="rounded bg-page-plane px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-ink-muted">
                 Baseline
@@ -370,7 +367,7 @@ function CategoryCard({
       </div>
 
       {category.score !== null && (
-        <div className="mb-2 h-[5px] w-full overflow-hidden rounded-[3px] bg-gridline">
+        <div className="mb-1 h-[5px] w-full overflow-hidden rounded-[3px] bg-gridline">
           <div
             className={`h-full rounded-[3px] ${category.isBaseline ? "opacity-40" : ""}`}
             style={{
@@ -380,45 +377,52 @@ function CategoryCard({
           />
         </div>
       )}
+    </>
+  );
 
-      <div className="min-h-[30px] text-[11px] leading-[1.4] text-ink-secondary">
+  // Folded by default and opened by tapping the card: the grid is read at a
+  // glance, and a paragraph under every score made the page a wall of text.
+  const detail = (
+    <>
+      <div className="mt-2 text-[11px] leading-[1.45] text-ink-secondary">
         {category.summary || category.status}
       </div>
-
       {/* The invitation belongs on exactly the cards where we admit we know
         * little: nothing measurable, or a baseline standing in for silence. */}
       {(category.score === null || category.isBaseline) && (
         <ReportLink category={category.label} localityName={localityName} />
       )}
-
-      <div className="mt-1.5 flex items-center justify-between gap-2">
-        {category.confidence ? (
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-ink-secondary">
-            <span
-              className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{ background: CONFIDENCE_COLOR[category.confidence as Confidence] }}
-              aria-hidden="true"
-            />
-            {CONFIDENCE_LABEL[category.confidence as Confidence]}
-          </span>
-        ) : (
-          <span className="text-[10px] text-ink-muted">No data yet</span>
-        )}
-        {hasDetailPage && category.available && (
-          <span className="text-[10px] text-brand">Details →</span>
-        )}
-      </div>
-    </div>
+    </>
   );
 
-  if (hasDetailPage && category.available) {
-    return (
-      <Link href={`/${slug}/${DETAIL_PATH[category.category]}`} className="block">
-        {body}
-      </Link>
-    );
-  }
-  return body;
+  const footer = (
+    <span className="flex items-center gap-3">
+      {category.confidence ? (
+        <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-ink-secondary">
+          <span
+            className="inline-block h-1.5 w-1.5 rounded-full"
+            style={{ background: CONFIDENCE_COLOR[category.confidence as Confidence] }}
+            aria-hidden="true"
+          />
+          {CONFIDENCE_LABEL[category.confidence as Confidence]}
+        </span>
+      ) : (
+        <span className="text-[10px] text-ink-muted">No data yet</span>
+      )}
+      {hasDetailPage && category.available && (
+        <Link
+          href={`/${slug}/${DETAIL_PATH[category.category]}`}
+          className="text-[10px] text-brand hover:underline"
+        >
+          Details →
+        </Link>
+      )}
+    </span>
+  );
+
+  return (
+    <ExpandableCard className={cardClass} header={header} detail={detail} footer={footer} />
+  );
 }
 
 /**
