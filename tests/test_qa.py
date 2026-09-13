@@ -249,7 +249,7 @@ def test_openai_compatible_client_gives_up_after_one_retry():
     assert len(calls) == 2
 
 
-def test_connectivity_source_says_station_means_rail_or_metro(monkeypatch):
+def test_connectivity_source_says_rail_and_metro_are_not_distinguished(monkeypatch):
     report = _fake_report()
     report.categories.append({"category": "infrastructure", "label": "Connectivity", "available": True,
                               "score": 75, "summary": "nearest station 1.39 km (Hebbal)",
@@ -259,5 +259,6 @@ def test_connectivity_source_says_station_means_rail_or_metro(monkeypatch):
     monkeypatch.setattr(qa.db, "accepted_reports", lambda conn, *, h3_cell: [])
     sources = qa.assemble(None, {"slug": "hebbal", "name": "Hebbal", "city": "Bengaluru", "h3_cell": "x"})
     connectivity = next(s for s in sources if s.text.startswith("Connectivity"))
-    assert "railway or metro station" in connectivity.text
+    assert "railway and metro stations together" in connectivity.text
+    assert "does not say which kind" in connectivity.text
     assert "1.39 km" in connectivity.text

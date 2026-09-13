@@ -164,14 +164,15 @@ def assemble(conn, locality: dict[str, Any]) -> list[Source]:
             continue
         detail = category.get("summary") or ""
         if category.get("category") == "infrastructure":
-            # The card's shorthand says "nearest station", which a reader of the
-            # page understands and a model does not reliably connect to a
-            # question about the metro. Live, "Is there a metro nearby?" on
-            # Hebbal was refused with "nearest station 1.39 km" in the sources.
+            # Stated because it decides what a metro question may be told. The
+            # connectivity extract files railway and metro stations under one
+            # kind, so "nearest station 1.39 km (Hebbal)" is Hebbal *railway*
+            # station — Hebbal has no operating metro. An earlier wording that
+            # nudged the model toward "metro" produced exactly that false answer.
             detail = (
-                f"{detail} Measured from OpenStreetMap: \"station\" means the "
-                "nearest railway or metro station, and distances are straight-line "
-                "from the locality centre."
+                f"{detail} From OpenStreetMap. \"Station\" here counts railway "
+                "and metro stations together; this data does not say which kind "
+                "a station is. Distances are straight-line from the locality centre."
             ).strip()
         baseline = (
             " This is the no-reports baseline rather than a measurement: it "
@@ -287,7 +288,12 @@ reported" — never that something "is under development", "is coming" or "will 
 open". Indian projects are announced years before they happen, and many never \
 do; turning a headline into a promise is what a builder's brochure does.
 
-6. Be short. Two or three sentences. A buyer reading on a phone wants the \
+6. If the sources answer part of the question, set answerable to true, answer \
+that part with citations, and say plainly what the sources do not tell us. Do \
+not refuse a whole question because one part of it is missing, and never fill \
+the missing part in.
+
+7. Be short. Two or three sentences. A buyer reading on a phone wants the \
 answer, not the reasoning.
 
 Do not recommend, advise or reassure. Do not tell anyone a neighbourhood is a \
@@ -451,9 +457,12 @@ class OpenAICompatibleQaClient:
         try:
             response = self._client.chat.completions.create(
                 model=self._model,
-                # Reasoning models spend tokens before answering; an answer is
-                # three sentences, so this is headroom for thinking, not prose.
-                max_tokens=1500,
+                # Under Groq's free-tier ceiling of 1,000 output tokens a minute,
+                # which a request *declaring* more is refused against outright —
+                # the same lesson the classifier learned at 1,024. This was 1,500
+                # and every refusal read to visitors as "Something went wrong".
+                # An answer is about 150 tokens; the rest is room to reason.
+                max_tokens=int(os.environ.get("QA_MAX_TOKENS") or 700),
                 temperature=0,
                 response_format={"type": "json_object"},
                 messages=[
