@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -22,6 +23,7 @@ class JobOutcome:
     judged: int = 0
     confirmed: int = 0
     undecided: int = 0
+    deferred: int = 0
     classifier: str = "none"
     ok: int = 0
     skipped: int = 0
@@ -63,6 +65,7 @@ def run_once(
     if gdelt_client is None:
         log.info("GDELT disabled (set ENABLE_GDELT=1 to re-enable)")
 
+    started = time.monotonic()
     try:
         with db.connect() as conn:
             # Logged against 'crime' because ingest_run keys on a real category
@@ -109,10 +112,33 @@ def run_once(
                         # should not throw the articles away.
                         conn.commit()
 
-                classified = news_agent.classify_pending(conn, classifier)
+                # Commits as it goes and stops at its budget, so the envelopes
+                # below are built from this run's judgements even when the
+                # backlog is larger than one run can clear. A dry run commits
+                # nothing, mid-pass or otherwise.
+                #
+                # The budget is what is left of the whole run's allowance, not a
+                # fixed slice: a slow fetch across 159 localities leaves less
+                # time to classify, and the envelopes still have to be built
+                # inside the workflow's 90-minute limit.
+                run_minutes = float(
+                    os.environ.get("NEWS_RUN_BUDGET_MINUTES")
+                    or news_agent.DEFAULT_RUN_BUDGET_MINUTES
+                )
+                elapsed = time.monotonic() - started
+                budget_seconds = max(
+                    news_agent.MIN_CLASSIFY_SECONDS, run_minutes * 60 - elapsed
+                )
+                classified = news_agent.classify_pending(
+                    conn,
+                    classifier,
+                    budget_seconds=budget_seconds,
+                    commit=not dry_run,
+                )
                 outcome.judged = classified.judged
                 outcome.confirmed = classified.confirmed
                 outcome.undecided = classified.undecided
+                outcome.deferred = classified.deferred
                 if not dry_run:
                     conn.commit()
 

@@ -125,6 +125,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         f"Judged           : {outcome.judged} "
         f"({outcome.confirmed} confirmed as incidents)\n"
         f"Left undecided   : {outcome.undecided}  <- excluded from all counts\n"
+        f"Left for next run: {outcome.deferred}  <- classification time budget reached\n"
         f"Classifier       : {outcome.classifier}\n"
     )
 

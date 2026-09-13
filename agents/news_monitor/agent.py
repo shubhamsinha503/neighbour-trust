@@ -101,6 +101,9 @@ class ClassifyResult:
     confirmed: int = 0
     undecided: int = 0
     classifier: str = "none"
+    # Left for the next run because the time budget ran out — not declined by
+    # the classifier, and so reported apart from `undecided`.
+    deferred: int = 0
 
 
 @dataclass
@@ -186,53 +189,91 @@ def fetch_for_locality(
 
 
 # How many headlines to classify at once. Each is an independent single-shot
-# call with no shared state, so this is embarrassingly parallel — and it has to
-# be: a real fetch produces ~1,300 mentions, which sequentially at ~1.5s each is
-# over thirty minutes and overruns the CI job before finishing.
-#
-# Eight is chosen against the API's rate limits rather than the machine's cores;
-# the work is entirely network-bound.
+# call with no shared state, so this is embarrassingly parallel on a provider
+# that allows it. On Groq's free tier the classifier paces every worker through
+# one shared interval, so extra workers wait rather than overrun the limit.
 CLASSIFY_CONCURRENCY = 8
 
 
-# How many mentions one run may classify.
-#
-# Sized so a full pass finishes in a single run. At 44 localities a fetch
-# produces ~3,400 mentions, and a cap of 2,000 left 1,439 of them unjudged —
-# which is not merely incomplete, it is *biased* incomplete: the unjudged rows
-# are whatever the query returned last, so some localities got their evidence
-# fully assessed and others did not, and the resulting counts are not comparable
-# between them. Counts that cannot be compared are worse than no counts, because
-# nothing on the page says which locality got a full reading.
-#
-# Concurrency is 8 and each call is ~1.5s, so 4,000 is about 12 minutes — well
-# inside the 45-minute job timeout. The cap stays as a guard against an
-# unexpected fetch explosion running up a bill, not as a routine limit.
+# How many mentions one run may classify. A guard against a fetch explosion
+# running up a bill, not a routine limit — the time budget below is what
+# actually bounds a run.
 CLASSIFY_LIMIT = 4000
 
 
-def classify_pending(
-    conn, classifier: classify_mod.Classifier, *, limit: int = CLASSIFY_LIMIT
-) -> ClassifyResult:
-    """Judge every unclassified mention.
+# Judgements are committed in batches of this size.
+#
+# They were committed once, after the whole pass. The limit above was sized for
+# Claude at eight parallel calls of ~1.5 s — "4,000 is about 12 minutes". When
+# the Anthropic balance ran out the classifier fell back to Groq's free tier,
+# paced at 14 calls a minute, and the same 4,000 became nearly five hours inside
+# a 90-minute job. The job was killed, the single transaction rolled back, and
+# every judgement of the run was lost. The next run started from the same
+# backlog and lost it again: 10,341 headlines unjudged, no news run finishing
+# for four days, and the docstring below promising a resumability the code did
+# not have.
+COMMIT_EVERY = 50
 
-    Only ever touches rows with `classified_at IS NULL`, which makes the phase
-    resumable and stops a re-fetch from paying to re-judge headlines already
-    decided. That property is what makes a timeout survivable: the next run
-    continues from where this one stopped rather than starting over.
+
+# How long a news run may spend fetching and classifying before classification
+# stops and leaves the rest for the next run. The job still has to build every
+# locality's envelopes afterwards, inside the workflow's 90-minute limit, and a
+# run that is killed publishes nothing while one that stops early publishes what
+# it judged. Override with NEWS_RUN_BUDGET_MINUTES.
+DEFAULT_RUN_BUDGET_MINUTES = 70.0
+
+# However slow the fetch, classification always gets a few minutes, so a run
+# never finishes having judged nothing at all.
+MIN_CLASSIFY_SECONDS = 5 * 60
+
+
+def classify_pending(
+    conn,
+    classifier: classify_mod.Classifier,
+    *,
+    limit: int = CLASSIFY_LIMIT,
+    budget_seconds: Optional[float] = None,
+    commit: bool = True,
+    clock=None,
+) -> ClassifyResult:
+    """Judge unclassified mentions, saving as it goes, within a time budget.
+
+    Only ever touches rows with `classified_at IS NULL`, and commits every
+    `COMMIT_EVERY` judgements, so a run that is killed keeps what it finished
+    and the next run continues from there rather than starting over.
+
+    When `budget_seconds` elapses, mentions not yet started are left
+    unclassified (counted as `deferred`) instead of being sent to the model, so
+    the caller still has time to build envelopes from what was judged.
 
     Classification runs concurrently, but the database writes stay on this
-    thread — psycopg connections are not thread-safe, and the ordering here is
-    cheap anyway compared to the network round-trips.
+    thread — psycopg connections are not thread-safe.
     """
+    import time as _time
+
+    now = clock or _time.monotonic
+    deadline = None if budget_seconds is None else now() + budget_seconds
+
     result = ClassifyResult(classifier=classifier.name)
     pending = db.unclassified_mentions(conn, limit=limit)
     if not pending:
         return result
 
-    log.info("classifying %d mentions with %s", len(pending), classifier.name)
+    log.info(
+        "classifying up to %d mentions with %s%s",
+        len(pending),
+        classifier.name,
+        "" if budget_seconds is None else f" (budget {budget_seconds / 60:.0f} min)",
+    )
+
+    deferred = object()
 
     def judge(mention: dict[str, Any]):
+        # Checked when a worker picks the mention up, not when it was queued:
+        # every mention is submitted at once, and on a paced provider most of
+        # them wait a long time for their turn.
+        if deadline is not None and now() >= deadline:
+            return mention, deferred
         return mention, classifier.classify(
             title=mention["title"],
             locality=mention["locality"],
@@ -240,8 +281,12 @@ def classify_pending(
             category=mention["category"],
         )
 
+    since_commit = 0
     with ThreadPoolExecutor(max_workers=CLASSIFY_CONCURRENCY) as pool:
         for mention, judgement in pool.map(judge, pending):
+            if judgement is deferred:
+                result.deferred += 1
+                continue
             if judgement is None:
                 # The classifier declined to decide. The row stays unclassified
                 # and is excluded from every count — being unsure costs recall,
@@ -261,6 +306,22 @@ def classify_pending(
             if judgement.is_locality_specific:
                 result.confirmed += 1
 
+            since_commit += 1
+            if commit and since_commit >= COMMIT_EVERY:
+                conn.commit()
+                since_commit = 0
+
+    # `commit=False` is for dry runs, which must leave the database untouched
+    # and roll back at the end.
+    if commit and since_commit:
+        conn.commit()
+
+    if result.deferred:
+        log.warning(
+            "classification budget reached: %d judged, %d left for the next run",
+            result.judged,
+            result.deferred,
+        )
     return result
 
 
