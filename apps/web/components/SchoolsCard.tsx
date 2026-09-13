@@ -164,50 +164,13 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
                         pupils/teacher
                       </div>
                     </>
-                  ) : (
-                    /* Not a zero and not a dash-in-passing: the absence is the
-                       finding, since this school exists in OSM but has no UDISE
-                       record at all. */
-                    <div className="text-[10px] text-ink-muted">
-                      no staffing
-                      <br />
-                      data
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               </li>
             ))}
           </ul>
         </section>
       )}
-
-      {/* 4 — honesty, after the data */}
-      <div className="mt-5 flex items-start gap-2.5 rounded-2xl bg-brand-soft px-3.5 py-3">
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--color-brand)"
-          strokeWidth="2.2"
-          className="mt-0.5 shrink-0"
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="12" r="9" />
-          <path d="M12 8h.01M11 12h1v4h1" />
-        </svg>
-        <div>
-          <b className="text-[12.5px] text-brand-deep">
-            What this card can and can&apos;t tell you
-          </b>
-          <p className="mt-1 text-[11.5px] leading-[1.5] text-ink-secondary">
-            {verdict.caveat}
-          </p>
-          <p className="mt-1.5 text-[11.5px] leading-[1.5] text-ink-secondary">
-            {verdict.qualityDisclaimer}
-          </p>
-        </div>
-      </div>
 
       {/* 5 — sources and confidence */}
       <footer className="mt-4 border-t border-dashed border-gridline pt-3">

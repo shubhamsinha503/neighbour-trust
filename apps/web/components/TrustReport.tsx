@@ -8,12 +8,12 @@
  *   2. Flags — loss aversion: a flagged risk is weighed about twice
  *      as heavily as an equivalent gain, so it gets its own callout instead of
  *      being one tile among several.
- *   3. Honesty banner — the pratfall effect works only *after* competence is
- *      established, so this sits below the score, never above it.
+ *   3. (Removed: the honesty banner. Coverage is stated on the score itself.)
  *   4. Category grid — including the categories we have nothing for, because a
  *      grid that silently shows only what it has is a different claim than one
  *      that lists every category and admits which are empty.
- *   5. Disagreements — where sources conflict, stated rather than averaged away.
+ *   5. (Removed from the page: disagreements. Still computed and returned by
+ *      the API, and still available to the Q&A agent as evidence.)
  *   6. Source strip — the credibility engine, in the main flow per
  *      Prominence-Interpretation Theory.
  */
@@ -26,7 +26,6 @@ import { joinCategoryLabels } from "@/lib/categories";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
 import type {
   ConnectivityView,
-  Disagreement,
   Flag,
   LocalityReport,
   ReportCategory,
@@ -71,8 +70,7 @@ export function TrustReport({
              * neighbourhood while being a statement about two or three things.
              *
              * Naming the basis beside the number costs nothing and is the
-             * difference between a claim and an overclaim. The honesty banner
-             * below gives the weighting; this gives the subject. */}
+             * difference between a claim and an overclaim. */}
             <div className="mb-1 text-[10.5px] font-bold uppercase tracking-[0.05em] text-brand">
               {trust.score === null
                 ? "Our take"
@@ -121,7 +119,6 @@ export function TrustReport({
           />
         )}
 
-
         {/* 6 — source strip, kept with the score where it does its work */}
         {report.sourcesUsed.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-gridline pt-3">
@@ -137,36 +134,6 @@ export function TrustReport({
           </div>
         )}
       </section>
-
-      {/* 3 — the honesty banner, below the score by design */}
-      <div className="mt-3 flex items-start gap-2.5 rounded-2xl bg-brand-soft px-3.5 py-3">
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--color-brand)"
-          strokeWidth="2.2"
-          className="mt-0.5 shrink-0"
-          aria-hidden="true"
-        >
-          <path d="M12 2l3 6 6 1-4.5 4.5L18 20l-6-3-6 3 1.5-6.5L3 9l6-1 3-6z" />
-        </svg>
-        <div>
-          <b className="text-[12.5px] text-brand-deep">
-            We show what we don&apos;t know, too.
-          </b>
-          <p className="mt-1 text-[11.5px] leading-[1.5] text-ink-secondary">
-            This score covers{" "}
-            <strong className="font-semibold">
-              {trust.categoriesCounted} of {trust.categoriesTotal} categories
-            </strong>{" "}
-            ({trust.coveragePct}% of the weighting). Every category below carries its
-            own confidence tag, and the ones we have no source for say so rather than
-            being quietly scored as average.
-          </p>
-        </div>
-      </div>
 
       {/* 4 — the category grid, empties included */}
       <h3 className="mb-2.5 mt-6 flex items-center justify-between text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
@@ -204,20 +171,6 @@ export function TrustReport({
         * sixth category would invite the comparison it must not support — that
         * a locality written about more has more planned. */}
       <UpcomingCard localityName={locality.name} items={report.upcoming} />
-
-      {/* 5 — disagreements */}
-      {report.disagreements.length > 0 && (
-        <section className="mt-6">
-          <h3 className="mb-2.5 text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
-            Where our sources disagree
-          </h3>
-          <div className="flex flex-col gap-2.5">
-            {report.disagreements.map((d, i) => (
-              <DisagreementCard key={`${d.category}-${i}`} disagreement={d} />
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 }
@@ -471,24 +424,6 @@ const DETAIL_PATH: Record<string, string> = {
   schools: "schools",
   infrastructure: "connectivity",
 };
-
-function DisagreementCard({ disagreement }: { disagreement: Disagreement }) {
-  const notable = disagreement.severity === "notable";
-  return (
-    <div
-      className={`rounded-2xl border px-3.5 py-3 ${
-        notable
-          ? "border-[rgba(74,58,167,0.28)] bg-[rgba(74,58,167,0.06)]"
-          : "border-hairline bg-surface-1"
-      }`}
-    >
-      <b className="text-[12px] text-ink-primary">{disagreement.headline}</b>
-      <p className="mt-1 text-[11.5px] leading-[1.5] text-ink-secondary">
-        {disagreement.detail}
-      </p>
-    </div>
-  );
-}
 
 /**
  * "Seen something here?" — the only route a resident has into these categories.
