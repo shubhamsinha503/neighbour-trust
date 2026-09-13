@@ -46,7 +46,7 @@ export default function PrivacyPage() {
 
       <h1 className="mt-5 text-[24px] font-bold tracking-[-0.01em]">Privacy</h1>
       <p className="mt-1.5 text-[12px] text-ink-muted">
-        Last updated 8 September 2026
+        Last updated 13 September 2026
       </p>
 
       <Section title="The short version">
@@ -62,10 +62,13 @@ export default function PrivacyPage() {
           never that you opened it. Details below.
         </p>
         <p>
-          Two things on the site accept something you type, and both are
-          optional: a box that measures distances from an address you give, and a
-          link to a form for reporting what you have seen in your area. Neither
-          is required to use anything. Both are described in full below.
+          A few things on the site accept something you type, and all of them
+          are optional: the search box, which can look up a pincode or place to
+          find the localities near it; a box that measures distances from an
+          address you give; a question box on each locality page, answered by an
+          AI model; and a link to a form for reporting what you have seen in your
+          area. None is required to use anything. Each is described in full
+          below.
         </p>
       </Section>
 
@@ -102,11 +105,15 @@ export default function PrivacyPage() {
         </p>
         <p className="mt-3">
           <strong className="font-semibold text-ink-primary">
-            The address box.
+            The search box and the address box.
           </strong>{" "}
-          On the schools and connectivity pages you can enter an address so
-          distances are measured from there rather than from the middle of the
-          neighbourhood. What you type is sent to our server and on to{" "}
+          Searching a locality name is matched in your browser and sent nowhere.
+          If you search a pincode we don&apos;t hold, or press Enter to find a
+          place such as an apartment, road or landmark, that text is looked up so
+          we can show the localities nearest to it. On the schools and
+          connectivity pages you can also enter an address so distances are
+          measured from there rather than from the middle of the neighbourhood.
+          In both cases what you typed is sent to our server and on to{" "}
           <strong className="font-semibold text-ink-primary">Nominatim</strong>,
           the OpenStreetMap geocoding service, which turns it into coordinates.
           We do not store it, and it is not linked to anything else. It is sent
@@ -115,22 +122,40 @@ export default function PrivacyPage() {
         </p>
         <p className="mt-3">
           The result is used in your browser and forgotten when you close the
-          tab. Nominatim receives the address from our server, not from you, so
+          tab. Nominatim receives the text from our server, not from you, so
           your own IP address is not part of what it sees.
+        </p>
+        <p className="mt-3">
+          <strong className="font-semibold text-ink-primary">
+            The question box.
+          </strong>{" "}
+          Each locality page lets you ask a question about that neighbourhood.
+          Your question is sent to our server, and from there to{" "}
+          <strong className="font-semibold text-ink-primary">Groq</strong>, the
+          company that runs the AI model which writes the answer, together with
+          the public data we hold about that locality. We do not store your
+          question or the answer. To stop the box being flooded, our server
+          keeps a count of questions per IP address in memory for an hour; it is
+          never written to a database or a file, and it is gone when the server
+          restarts. Groq receives the question from our server, not from you, so
+          your IP address is not part of what it sees, but its own terms apply
+          to what it is sent — so please don&apos;t put personal details in a
+          question.
         </p>
         <p className="mt-3">
           <strong className="font-semibold text-ink-primary">
             The reporting form.
           </strong>{" "}
-          Cards where we have little or no data carry a link inviting you to tell
-          us what you have seen. That link goes to a form hosted by{" "}
+          Every locality page, and cards where we have little or no data, carry
+          a link inviting you to tell us what you have seen. That link goes to a form hosted by{" "}
           <strong className="font-semibold text-ink-primary">Google Forms</strong>,
           outside this app, and what you submit is stored in the Google account
           of whoever runs this site — not in our database. It asks which
           neighbourhood, what category, what you saw, when, and how you know. An
           email address is optional and used only to ask you a follow-up
           question. Google's own privacy terms apply to that form, and the
-          locality and category are filled in from the page you came from.
+          locality — and, from a category card, the category — is filled in
+          from the page you came from.
         </p>
       </Section>
 
@@ -159,9 +184,15 @@ export default function PrivacyPage() {
           </Bullet>
           <Bullet>
             <strong className="font-semibold text-ink-primary">Nominatim</strong>,
-            run by the OpenStreetMap Foundation, receives an address only when
-            you use the address box, and receives it from our server rather than
-            from your browser.
+            run by the OpenStreetMap Foundation, receives what you typed only
+            when you look up a place in the search box or use the address box,
+            and receives it from our server rather than from your browser.
+          </Bullet>
+          <Bullet>
+            <strong className="font-semibold text-ink-primary">Groq</strong>{" "}
+            receives a question only when you ask one, with that locality&apos;s
+            public data, and receives it from our server rather than from your
+            browser.
           </Bullet>
           <Bullet>
             <strong className="font-semibold text-ink-primary">Google</strong>{" "}
@@ -172,7 +203,7 @@ export default function PrivacyPage() {
         <p className="mt-3">
           We do not read those logs to build profiles, and nothing in them is
           combined with anything else. They exist because servers keep them. The
-          address lookup writes no log of its own.
+          place lookup and the question box write no log of their own.
         </p>
       </Section>
 
@@ -237,6 +268,17 @@ export default function PrivacyPage() {
           counter was chosen over the usual analytics tools specifically so that
           the rest of this page stays true: no cookies, no identifier, no
           consent banner asking you to agree to something you did not want.
+        </p>
+        <p>
+          <strong className="font-semibold text-ink-primary">
+            It was wrong again, from 12 to 13 September 2026.
+          </strong>{" "}
+          The question box on each locality page went live on 12 September, and
+          this page did not mention it or name Groq until the next day. No
+          question was stored by us in that window, but the page did not tell
+          you where a question goes, and it should have said so before the box
+          appeared. On 13 September the search box also began looking up
+          pincodes and places, and this page was updated in the same change.
         </p>
         <p>
           The commitment stands, and now has a record attached to it. Resident

@@ -9,7 +9,60 @@ import {
   joinCategoryLabels,
 } from "@/lib/categories";
 import { browseList, citiesOf, coverageOf } from "@/lib/ordering";
-import { searchLocalities } from "@/lib/search";
+import {
+  looksLikePincode,
+  nearbyLocalities,
+  nearestAnyDistance,
+  searchLocalities,
+} from "@/lib/search";
+
+/**
+ * The outcome of placing a typed query on the map.
+ *
+ * Someone may not know which locality they are asking about — they know their
+ * pincode, their apartment, the tech park they work in or the road they would
+ * live on. Only names we hold can match as they type, so anything else is
+ * looked up as a place and answered with the covered localities nearest to it.
+ */
+type PlaceLookup =
+  | { status: "idle" }
+  | { status: "loading"; query: string }
+  | {
+      status: "found";
+      query: string;
+      label: string;
+      nearby: Array<{ locality: LocalitySummary; km: number }>;
+    }
+  | {
+      status: "outside";
+      query: string;
+      label: string;
+      nearest: { locality: LocalitySummary; km: number } | null;
+    }
+  | { status: "failed"; query: string; message: string };
+
+async function geocode(
+  q: string,
+  city?: string | null,
+): Promise<{ lat: number; lon: number; label: string } | { error: string }> {
+  try {
+    const response = await fetch("/api/geocode", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ q, city: city ?? undefined }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { error: data?.error ?? "We could not look that up." };
+    return data;
+  } catch {
+    return { error: "We could not look that up. Check your connection." };
+  }
+}
+
+/** "Starbucks, Phoenix Marketcity Bangalore, Whitefield Main Road, …" → first three parts. */
+function shortLabel(label: string): string {
+  return label.split(",").slice(0, 3).map((p) => p.trim()).join(", ");
+}
 
 /**
  * Search over the localities, answering rather than listing.
@@ -48,9 +101,82 @@ export function LocalitySearch({
   // that false for the sake of saving one tap.
   const [city, setCity] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [place, setPlace] = useState<PlaceLookup>({ status: "idle" });
+  // Each lookup takes a number; only the latest may write its result. A slow
+  // lookup for "560024" must not land under a query that has since become
+  // "Hebbal".
+  const lookupSeq = useRef(0);
 
   const cities = useMemo(() => citiesOf(localities), [localities]);
   const searching = query.trim().length > 0;
+
+  /**
+   * Look the query up as a place and list the localities nearest to it.
+   *
+   * Only ever on an explicit action — Enter, the button, or a completed
+   * six-digit pincode — never per keystroke: the lookup service's usage policy
+   * forbids autocomplete, and a finished pincode is as deliberate as pressing
+   * Enter.
+   *
+   * With no city chosen the place is looked up across India first, then biased
+   * to each launch city in turn if it landed somewhere we do not cover. "Phoenix
+   * Marketcity" exists in several cities; the one worth answering is ours.
+   */
+  async function lookUp(raw: string) {
+    const q = raw.trim();
+    if (q.length < 3) return;
+    const seq = ++lookupSeq.current;
+    const current = () => seq === lookupSeq.current;
+    setPlace({ status: "loading", query: q });
+
+    const attempts: Array<string | null> = city ? [city] : [null, ...cities];
+    let lastFound: { lat: number; lon: number; label: string } | null = null;
+    let lastError = "We could not find that place.";
+
+    for (const attemptCity of attempts) {
+      const result = await geocode(q, attemptCity);
+      if (!current()) return;
+      if ("error" in result) {
+        lastError = result.error;
+        continue;
+      }
+      lastFound = result;
+      const nearby = nearbyLocalities(localities, result.lat, result.lon);
+      if (nearby.length > 0) {
+        setPlace({ status: "found", query: q, label: shortLabel(result.label), nearby });
+        return;
+      }
+    }
+
+    if (!current()) return;
+    if (lastFound) {
+      setPlace({
+        status: "outside",
+        query: q,
+        label: shortLabel(lastFound.label),
+        nearest: nearestAnyDistance(localities, lastFound.lat, lastFound.lon),
+      });
+    } else {
+      setPlace({ status: "failed", query: q, message: lastError });
+    }
+  }
+
+  function onQueryChange(value: string) {
+    setQuery(value);
+    // A result for an earlier query must not sit under a different one.
+    if (place.status !== "idle" && place.query !== value.trim()) {
+      lookupSeq.current++;
+      setPlace({ status: "idle" });
+    }
+    // A finished pincode that none of our localities carry is looked up at
+    // once: most localities have no pincode stored, and a pincode is the one
+    // thing nearly everyone knows about where they live.
+    if (looksLikePincode(value)) {
+      const digits = value.replace(/\s/g, "");
+      const known = localities.some((l) => (l.pincode ?? "") === digits);
+      if (!known) void lookUp(digits);
+    }
+  }
 
   // A typed name beats a city chip: someone who searched "koramangala" with
   // Gurugram selected wants Koramangala, not an empty list.
@@ -64,7 +190,14 @@ export function LocalitySearch({
 
   return (
     <div>
-      <div className="relative">
+      <form
+        role="search"
+        className="relative"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void lookUp(query);
+        }}
+      >
         <svg
           className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-ink-muted"
           viewBox="0 0 24 24"
@@ -81,12 +214,13 @@ export function LocalitySearch({
           ref={inputRef}
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => onQueryChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Escape") setQuery("");
+            if (event.key === "Escape") onQueryChange("");
           }}
-          placeholder="Search your locality"
-          aria-label="Search localities"
+          placeholder="Locality, pincode, apartment, road or landmark"
+          aria-label="Search by locality, pincode, apartment, road or landmark"
+          enterKeyHint="search"
           className="w-full rounded-2xl border-[1.5px] border-hairline bg-surface-1 py-4 pl-12 pr-4 text-[15px] outline-none transition-colors placeholder:text-ink-muted focus:border-brand"
           // Indian locality names are proper nouns the browser does not know;
           // autocorrect turns "Hoodi" into "Hoodie" mid-keystroke.
@@ -94,7 +228,7 @@ export function LocalitySearch({
           autoCapitalize="off"
           spellCheck={false}
         />
-      </div>
+      </form>
 
       {/* City first, because it halves the list before anyone reads a name.
         * With 44 entries that is a convenience; as coverage grows it is the
@@ -137,26 +271,50 @@ export function LocalitySearch({
 
       {!searching && belowInput}
 
-      {searching && results.length === 0 && (
+      {/* A typed place, placed on the map. Sits above any name matches, since
+        * someone who pressed Enter asked for exactly this. */}
+      {searching && place.status !== "idle" && (
+        <PlaceResult
+          place={place}
+          onShowAll={() => {
+            onQueryChange("");
+            inputRef.current?.focus();
+          }}
+        />
+      )}
+
+      {/* No name matches yet and no lookup asked for: offer one, rather than
+        * telling someone we do not cover a place we may well cover under
+        * another name. */}
+      {searching && results.length === 0 && place.status === "idle" && (
         <div className="mt-3 rounded-2xl border border-hairline bg-surface-1 p-5">
           <p className="text-[13px] font-semibold">
-            We don&apos;t cover that one yet
+            No locality is called &ldquo;{query.trim()}&rdquo;
           </p>
           <p className="mt-1.5 text-[12px] leading-[1.55] text-ink-secondary">
-            We add areas where we can source data we trust, rather than filling
-            the map with estimates.
+            If it&apos;s a pincode, apartment, road or landmark, we can find the
+            localities nearest to it.
           </p>
           <button
             type="button"
-            onClick={() => {
-              setQuery("");
-              inputRef.current?.focus();
-            }}
-            className="mt-3 text-[12px] font-semibold text-brand hover:underline"
+            onClick={() => void lookUp(query)}
+            className="mt-3 rounded-xl bg-brand px-4 py-2 text-[12.5px] font-semibold text-white"
           >
-            Show all localities
+            Find localities near &ldquo;{query.trim()}&rdquo;
           </button>
         </div>
+      )}
+
+      {/* Name matches exist, but the reader may mean a place rather than a
+        * locality — "Phoenix" matches no name yet is a mall. One quiet line. */}
+      {searching && results.length > 0 && place.status === "idle" && query.trim().length >= 3 && (
+        <button
+          type="button"
+          onClick={() => void lookUp(query)}
+          className="mt-2 px-1 text-left text-[11.5px] font-medium text-brand hover:underline"
+        >
+          Not what you meant? Find localities near &ldquo;{query.trim()}&rdquo; →
+        </button>
       )}
 
       {/* What the number is, said once, where it is first seen.
@@ -312,4 +470,87 @@ function ScoreChip({
       )}
     </div>
   );
+}
+
+/** What a place lookup found, in the same result rows the name search uses. */
+function PlaceResult({
+  place,
+  onShowAll,
+}: {
+  place: Exclude<PlaceLookup, { status: "idle" }>;
+  onShowAll: () => void;
+}) {
+  if (place.status === "loading") {
+    return (
+      <p className="mt-3 rounded-2xl border border-hairline bg-surface-1 p-4 text-[12.5px] text-ink-secondary" aria-live="polite">
+        Finding &ldquo;{place.query}&rdquo; on the map…
+      </p>
+    );
+  }
+
+  if (place.status === "failed") {
+    return (
+      <div className="mt-3 rounded-2xl border border-hairline bg-surface-1 p-5" aria-live="polite">
+        <p className="text-[13px] font-semibold">
+          We couldn&apos;t find &ldquo;{place.query}&rdquo;
+        </p>
+        <p className="mt-1.5 text-[12px] leading-[1.55] text-ink-secondary">
+          {place.message} Try a pincode, a nearby landmark, or the name of the
+          road.
+        </p>
+        <button
+          type="button"
+          onClick={onShowAll}
+          className="mt-3 text-[12px] font-semibold text-brand hover:underline"
+        >
+          Show all localities
+        </button>
+      </div>
+    );
+  }
+
+  if (place.status === "outside") {
+    return (
+      <div className="mt-3 rounded-2xl border border-hairline bg-surface-1 p-5" aria-live="polite">
+        <p className="text-[13px] font-semibold">
+          {place.label} is outside the areas we cover
+        </p>
+        <p className="mt-1.5 text-[12px] leading-[1.55] text-ink-secondary">
+          {place.nearest
+            ? `The closest locality we cover is ${place.nearest.locality.name}, ${place.nearest.locality.city} — ${formatKm(place.nearest.km)} away.`
+            : "We cover parts of Bengaluru and Gurugram so far."}
+        </p>
+        <button
+          type="button"
+          onClick={onShowAll}
+          className="mt-3 text-[12px] font-semibold text-brand hover:underline"
+        >
+          Show all localities
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <section className="mt-3" aria-live="polite">
+      <p className="px-1 text-[12px] text-ink-secondary">
+        <span aria-hidden="true">📍 </span>
+        Nearest to <span className="font-semibold text-ink-primary">{place.label}</span>
+      </p>
+      <div className="mt-2 flex flex-col gap-2">
+        {place.nearby.map(({ locality, km }) => (
+          <div key={locality.slug} className="relative">
+            <ResultRow locality={locality} />
+            <span className="pointer-events-none absolute right-3.5 top-3.5 rounded-full bg-page-plane px-2 py-0.5 text-[10.5px] font-semibold text-ink-secondary">
+              {formatKm(km)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function formatKm(km: number): string {
+  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
 }

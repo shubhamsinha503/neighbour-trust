@@ -10,7 +10,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { Locality } from "@/lib/api";
-import { normalize, searchLocalities } from "@/lib/search";
+import {
+  nearbyLocalities,
+  nearestAnyDistance,
+  looksLikePincode,
+  normalize,
+  searchLocalities,
+} from "@/lib/search";
 
 function locality(
   slug: string,
@@ -122,5 +128,55 @@ describe("searchLocalities", () => {
     const twice = names(searchLocalities(LOCALITIES, "nagar"));
     expect(once).toEqual(twice);
     expect(once).toEqual([...once].sort());
+  });
+});
+
+describe("typos, pincodes and nearby places", () => {
+  const all = [
+    locality("koramangala", "Koramangala", "Bengaluru"),
+    locality("indiranagar", "Indiranagar", "Bengaluru"),
+    locality("marathahalli", "Marathahalli", "Bengaluru"),
+    locality("hsr-layout", "HSR Layout", "Bengaluru"),
+    locality("sector-45", "Sector 45", "Gurugram"),
+    locality("sector-46", "Sector 46", "Gurugram"),
+  ];
+
+  it("finds a locality typed with a letter missing or wrong", () => {
+    expect(searchLocalities(all, "koramangla")[0]?.slug).toBe("koramangala");
+    expect(searchLocalities(all, "indranagar")[0]?.slug).toBe("indiranagar");
+    expect(searchLocalities(all, "marathalli")[0]?.slug).toBe("marathahalli");
+    expect(searchLocalities(all, "koramang")[0]?.slug).toBe("koramangala");
+  });
+
+  it("does not let typo tolerance blur numbered sectors together", () => {
+    // A wrong digit is a different place: "sector 45" must not return Sector 46.
+    const found = searchLocalities(all, "sector 45").map((l) => l.slug);
+    expect(found).toEqual(["sector-45"]);
+  });
+
+  it("ranks an exact match above a typo match", () => {
+    const withSimilar = [...all, locality("koramangala-2", "Koramangla", "Bengaluru")];
+    expect(searchLocalities(withSimilar, "koramangla")[0]?.slug).toBe("koramangala-2");
+  });
+
+  it("recognises a complete pincode", () => {
+    expect(looksLikePincode("560024")).toBe(true);
+    expect(looksLikePincode("560 024")).toBe(true);
+    expect(looksLikePincode("5600")).toBe(false);
+    expect(looksLikePincode("sector 45")).toBe(false);
+  });
+
+  it("orders nearby localities by distance and drops far ones", () => {
+    const placed = [
+      { ...locality("hebbal", "Hebbal", "Bengaluru"), lat: 13.0358, lon: 77.597 },
+      { ...locality("nagavara", "Nagavara", "Bengaluru"), lat: 13.043, lon: 77.62 },
+      { ...locality("whitefield", "Whitefield", "Bengaluru"), lat: 12.9698, lon: 77.75 },
+      { ...locality("nowhere", "No coordinate", "Bengaluru"), lat: 0, lon: 0 },
+    ];
+    // Manyata Tech Park, roughly.
+    const near = nearbyLocalities(placed, 13.046, 77.626);
+    expect(near.map((n) => n.locality.slug)).toEqual(["nagavara", "hebbal"]);
+    expect(near[0].km).toBeLessThan(1.5);
+    expect(nearestAnyDistance(placed, 28.46, 77.03)?.km).toBeGreaterThan(1000);
   });
 });

@@ -1,7 +1,7 @@
 /**
  * Matching locality names the way people actually type them.
  *
- * The list is 44 entries, so this runs in the browser over data the page already
+ * The list is a few hundred entries, so this runs in the browser over data the page already
  * has — no endpoint, no debounce, no loading state. What matters is not speed
  * but tolerating how Indian locality names get written.
  *
@@ -64,6 +64,20 @@ function scoreOne(locality: Locality, q: string): number {
 
   if (name.includes(q) || slug.includes(q)) return 50;
 
+  // Misspellings. "Koramangla", "Indranagar", "Marathalli" — people type these
+  // names from memory, and a missing letter should not read as "we don't
+  // cover it". Only for queries long enough that one wrong letter is a typo
+  // rather than a different word, and ranked below every exact match.
+  // Never for anything containing a digit: Sector 45 and Sector 46 are one
+  // edit apart and are different places, not a typo of each other.
+  if (q.length >= 5 && !/\d/.test(q)) {
+    const allowed = q.length >= 9 ? 2 : 1;
+    if (editDistance(q, name) <= allowed || editDistance(q, slug) <= allowed) return 40;
+    // A misspelt beginning of a longer name: "koramang" for Koramangala.
+    const head = name.slice(0, q.length);
+    if (q.length >= 6 && editDistance(q, head) <= 1) return 35;
+  }
+
   // City matches rank last on purpose. Typing "bangalore" should list Bengaluru
   // localities, but any locality whose own name matched should still come first.
   if (city.startsWith(q)) return 20;
@@ -99,4 +113,79 @@ export function searchLocalities(
   });
 
   return scored.map((s) => s.locality);
+}
+
+/**
+ * Levenshtein distance, with an early exit once it exceeds anything we accept.
+ * Names are short and the list is a few hundred long, so this runs per
+ * keystroke without any noticeable cost.
+ */
+export function editDistance(a: string, b: string, cap = 3): number {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > cap) return cap + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const curr = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+      rowMin = Math.min(rowMin, curr[j]);
+    }
+    if (rowMin > cap) return cap + 1;
+    prev = curr;
+  }
+  return prev[b.length];
+}
+
+/** A complete six-digit Indian pincode, with or without a space. */
+export function looksLikePincode(query: string): boolean {
+  return /^\d{3}\s?\d{3}$/.test(query.trim());
+}
+
+/** How far a looked-up place may be from a locality before we stop claiming it. */
+export const NEARBY_MAX_KM = 8;
+
+/**
+ * The covered localities closest to a point, nearest first.
+ *
+ * Used when someone types a place we do not hold as a locality — a pincode, an
+ * apartment, a tech park, a road — and it has been placed on the map. Returning
+ * a few rather than one matters: "Manyata Tech Park" sits 1.2 km from both
+ * Thanisandra and Nagavara, and choosing between them is the reader's call.
+ */
+export function nearbyLocalities<T extends Locality>(
+  localities: T[],
+  lat: number,
+  lon: number,
+  limit = 3,
+  maxKm = NEARBY_MAX_KM,
+): Array<{ locality: T; km: number }> {
+  const out: Array<{ locality: T; km: number }> = [];
+  for (const locality of localities) {
+    if (!locality.lat || !locality.lon) continue;
+    out.push({ locality, km: greatCircleKm(lat, lon, locality.lat, locality.lon) });
+  }
+  out.sort((a, b) => a.km - b.km);
+  return out.filter((entry) => entry.km <= maxKm).slice(0, limit);
+}
+
+/** The single nearest locality at any distance, for saying how far away we are. */
+export function nearestAnyDistance<T extends Locality>(
+  localities: T[],
+  lat: number,
+  lon: number,
+): { locality: T; km: number } | null {
+  return nearbyLocalities(localities, lat, lon, 1, Infinity)[0] ?? null;
+}
+
+function greatCircleKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const r = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * r * Math.asin(Math.sqrt(h));
 }
