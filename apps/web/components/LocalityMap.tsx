@@ -337,12 +337,6 @@ export function LocalityMap({
           </span>
         ))}
       </figcaption>
-
-      <p className="mt-2 text-[10.5px] leading-[1.5] text-ink-muted">
-        Positions are as recorded in OpenStreetMap, measured from the centre of{" "}
-        {localityName}. Not a street map — it shows only what we counted, so a
-        blank area means nothing was mapped there rather than nothing is there.
-      </p>
     </figure>
   );
 }
