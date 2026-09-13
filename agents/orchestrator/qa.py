@@ -420,7 +420,23 @@ class OpenAICompatibleQaClient:
         self._client = OpenAI(api_key=key or "not-needed", base_url=base_url)
         self.name = f"{provider}:{self._model}"
 
+    # One retry, after a short pause. Groq's free tier meters tokens per minute
+    # and shares that budget with the news classifier, so a question can be
+    # refused for arriving a few seconds too soon. The first live question after
+    # deploy failed exactly that way and the next four succeeded. A visitor
+    # should not have to be the retry.
+    RETRY_AFTER_SECONDS = 3.0
+
     def ask(self, *, question: str, sources: list[Source]) -> Optional[dict[str, Any]]:
+        import time
+
+        result = self._ask_once(question=question, sources=sources)
+        if result is None:
+            time.sleep(self.RETRY_AFTER_SECONDS)
+            result = self._ask_once(question=question, sources=sources)
+        return result
+
+    def _ask_once(self, *, question: str, sources: list[Source]) -> Optional[dict[str, Any]]:
         block = "\n".join(source.as_prompt_line() for source in sources)
         try:
             response = self._client.chat.completions.create(

@@ -224,3 +224,26 @@ def test_rate_limits(monkeypatch):
     assert "hour" in main._ask_allowed("a")
     assert main._ask_allowed("b") is None
     assert "today" in main._ask_allowed("c")
+
+
+def test_openai_compatible_client_retries_once(monkeypatch):
+    client = qa.OpenAICompatibleQaClient.__new__(qa.OpenAICompatibleQaClient)
+    client.RETRY_AFTER_SECONDS = 0
+    calls = []
+
+    def once(*, question, sources):
+        calls.append(1)
+        return None if len(calls) == 1 else {"answerable": False, "answer": "No.", "citations": []}
+
+    client._ask_once = once
+    assert client.ask(question="q", sources=[]) == {"answerable": False, "answer": "No.", "citations": []}
+    assert len(calls) == 2
+
+
+def test_openai_compatible_client_gives_up_after_one_retry():
+    client = qa.OpenAICompatibleQaClient.__new__(qa.OpenAICompatibleQaClient)
+    client.RETRY_AFTER_SECONDS = 0
+    calls = []
+    client._ask_once = lambda *, question, sources: calls.append(1)
+    assert client.ask(question="q", sources=[]) is None
+    assert len(calls) == 2
