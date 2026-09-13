@@ -247,3 +247,17 @@ def test_openai_compatible_client_gives_up_after_one_retry():
     client._ask_once = lambda *, question, sources: calls.append(1)
     assert client.ask(question="q", sources=[]) is None
     assert len(calls) == 2
+
+
+def test_connectivity_source_says_station_means_rail_or_metro(monkeypatch):
+    report = _fake_report()
+    report.categories.append({"category": "infrastructure", "label": "Connectivity", "available": True,
+                              "score": 75, "summary": "nearest station 1.39 km (Hebbal)",
+                              "source_name": "OpenStreetMap", "data_vintage": None, "is_baseline": False})
+    monkeypatch.setattr(qa.orchestrator, "build_report", lambda conn, loc: report)
+    monkeypatch.setattr(qa.db, "confirmed_incidents", lambda conn, *, h3_cell, category: [])
+    monkeypatch.setattr(qa.db, "accepted_reports", lambda conn, *, h3_cell: [])
+    sources = qa.assemble(None, {"slug": "hebbal", "name": "Hebbal", "city": "Bengaluru", "h3_cell": "x"})
+    connectivity = next(s for s in sources if s.text.startswith("Connectivity"))
+    assert "railway or metro station" in connectivity.text
+    assert "1.39 km" in connectivity.text

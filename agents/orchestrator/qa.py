@@ -163,6 +163,16 @@ def assemble(conn, locality: dict[str, Any]) -> list[Source]:
             )
             continue
         detail = category.get("summary") or ""
+        if category.get("category") == "infrastructure":
+            # The card's shorthand says "nearest station", which a reader of the
+            # page understands and a model does not reliably connect to a
+            # question about the metro. Live, "Is there a metro nearby?" on
+            # Hebbal was refused with "nearest station 1.39 km" in the sources.
+            detail = (
+                f"{detail} Measured from OpenStreetMap: \"station\" means the "
+                "nearest railway or metro station, and distances are straight-line "
+                "from the locality centre."
+            ).strip()
         baseline = (
             " This is the no-reports baseline rather than a measurement: it "
             "means nothing has been reported, not that conditions were checked."
