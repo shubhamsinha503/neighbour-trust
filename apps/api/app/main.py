@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException  # noqa: E402
+from fastapi import FastAPI, HTTPException, Request  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
@@ -787,3 +787,119 @@ def get_report(slug: str) -> dict[str, Any]:
         "sources_used": report.sources_used,
         "generated_at": report.generated_at.isoformat(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Questions — docs/build-roadmap.md Phase 3, "the retrieval-grounded Q&A agent
+# answering buyer questions against the stored dataset with citations".
+# ---------------------------------------------------------------------------
+
+
+class AskRequest(BaseModel):
+    question: str = Field(..., min_length=3, max_length=400)
+
+
+class Citation(BaseModel):
+    id: int
+    kind: str
+    text: str
+    label: Optional[str] = None
+    url: Optional[str] = None
+    vintage: Optional[str] = None
+
+
+class AskResponse(BaseModel):
+    """`answerable: false` is a complete answer, returned with a 200.
+
+    Most localities here hold two of five categories, so "we have no data on
+    that" is the right reply to a large share of honest questions — and it is
+    not an error for the caller to handle.
+    """
+
+    answerable: bool
+    answer: str
+    citations: list[Citation] = []
+    model: Optional[str] = None
+
+
+# The only endpoint here that spends money per request, and the first one that
+# accepts a body from a stranger. Both limits are in-process rather than Redis:
+# the API runs as one instance, and a limiter that resets on redeploy costs at
+# most one extra window of spend, which is cheaper than the dependency.
+#
+# The per-client window stops one person hammering it. The daily ceiling is the
+# one that matters: it bounds what a bot rotating addresses can cost, and when
+# it trips the endpoint says so plainly instead of degrading quietly.
+_ASK_PER_CLIENT = int(os.environ.get("ASK_PER_CLIENT_PER_HOUR", "20"))
+_ASK_PER_DAY = int(os.environ.get("ASK_PER_DAY", "500"))
+_ask_hits: dict[str, list[float]] = {}
+_ask_day: dict[str, Any] = {"date": None, "count": 0}
+_qa_client: Any = None
+
+
+def _ask_allowed(client_key: str) -> Optional[str]:
+    """None when the request may proceed, otherwise the reason it may not."""
+    import time
+
+    now = time.time()
+    today = datetime.now(timezone.utc).date()
+    if _ask_day["date"] != today:
+        _ask_day.update(date=today, count=0)
+    if _ask_day["count"] >= _ASK_PER_DAY:
+        return "Questions are paused for today — we cap how many we answer per day. Try again tomorrow."
+
+    recent = [t for t in _ask_hits.get(client_key, []) if now - t < 3600]
+    if len(recent) >= _ASK_PER_CLIENT:
+        _ask_hits[client_key] = recent
+        return "That is a lot of questions in an hour. Please try again a little later."
+
+    recent.append(now)
+    _ask_hits[client_key] = recent
+    _ask_day["count"] += 1
+    return None
+
+
+def _get_qa_client() -> Any:
+    global _qa_client
+    if _qa_client is None:
+        from agents.orchestrator import qa
+
+        _qa_client = qa.build_client()
+    return _qa_client
+
+
+@app.post("/api/v1/localities/{slug}/ask", response_model=AskResponse)
+def ask_question(slug: str, body: AskRequest, request: Request) -> dict[str, Any]:
+    """Answer one question about one locality, from that locality's record only.
+
+    Every citation in the response refers to a source actually assembled for
+    this request — `qa.validate` removes any the model invented before this
+    returns. Questions are not stored: nothing here needs them, and a question
+    like "is it safe for a single woman" says more about the asker than about
+    the neighbourhood.
+    """
+    from agents.orchestrator import qa
+
+    # Behind Vercel's proxy the socket address is the proxy, so the forwarded
+    # header is the only per-person key available. It is spoofable, which is
+    # exactly why the daily ceiling exists as well.
+    forwarded = request.headers.get("x-forwarded-for", "")
+    client_key = forwarded.split(",")[0].strip() or (
+        request.client.host if request.client else "unknown"
+    )
+    refusal = _ask_allowed(client_key)
+    if refusal:
+        raise HTTPException(status_code=429, detail=refusal)
+
+    try:
+        client = _get_qa_client()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="Questions are not available right now.") from exc
+
+    with db.connect() as conn:
+        locality = db.get_locality(conn, slug)
+        if locality is None:
+            raise HTTPException(status_code=404, detail=f"unknown locality: {slug}")
+        answer = qa.ask(conn, locality, body.question, client)
+
+    return answer.as_dict()

@@ -36,3 +36,6 @@ Thumbs.db
 # osm_extract.EXTRACTS. Committing them would put a stale copy of the map in
 # the history forever.
 .cache/
+
+# Local working files — smoke scripts, logs, paste lists.
+.scratch/

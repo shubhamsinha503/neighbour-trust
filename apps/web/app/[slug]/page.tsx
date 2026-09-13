@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AskBox } from "@/components/AskBox";
 import { TrustReport } from "@/components/TrustReport";
 import {
   fetchConnectivity,
@@ -126,7 +127,12 @@ export default async function LocalityPage({
       </header>
 
       {report ? (
-        <TrustReport report={report} connectivity={connectivity} />
+        <>
+          <TrustReport report={report} connectivity={connectivity} />
+          {/* After the report, not before: a question is better asked once the
+            * reader has seen what we hold, and the answer cites that record. */}
+          <AskBox slug={slug} localityName={name} />
+        </>
       ) : (
         <div className="rounded-[20px] border border-hairline bg-surface-1 p-5">
           <b className="text-[13px]">Report unavailable</b>
