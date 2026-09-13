@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AskBox } from "@/components/AskBox";
+import { SaveButton } from "@/components/SaveButton";
+import { authConfigured } from "@/lib/auth";
 import { TrustReport } from "@/components/TrustReport";
 import {
   fetchConnectivity,
@@ -116,14 +118,17 @@ export default async function LocalityPage({
         ← All localities
       </Link>
 
-      <header className="mb-5 mt-3">
-        <h1 className="text-[23px] font-bold tracking-[-0.01em]">{name}</h1>
-        {city && (
-          <div className="mt-0.5 text-[12.5px] text-ink-secondary">
-            {city}, {state}
-            {pincode ? ` · ${pincode}` : ""}
-          </div>
-        )}
+      <header className="mb-5 mt-3 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[23px] font-bold tracking-[-0.01em]">{name}</h1>
+          {city && (
+            <div className="mt-0.5 text-[12.5px] text-ink-secondary">
+              {city}, {state}
+              {pincode ? ` · ${pincode}` : ""}
+            </div>
+          )}
+        </div>
+        {authConfigured && report && <SaveButton slug={slug} name={name} />}
       </header>
 
       {report ? (

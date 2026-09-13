@@ -16,9 +16,11 @@ export const metadata = {
  * broad rights "just in case" is the kind of document this product exists to be
  * the opposite of.
  *
- * IMPORTANT: this describes a build with no accounts, no cookies and no
- * client-side storage, and with one cookieless analytics script that counts
- * page views and cannot identify a reader. That is verifiable in the source. If
+ * IMPORTANT: this describes a build with optional Google sign-in (session
+ * cookies only for people who sign in, and an account table holding the Google
+ * id, email, name and what they save), no client-side storage, and one
+ * cookieless analytics script that counts page views and cannot identify a
+ * reader. That is verifiable in the source. If
  * any of it changes — resident reporting, sign-in, an analytics tool that sets
  * cookies or assigns a persistent id — this page has to change in the same
  * commit, or it becomes a false statement rather than a stale one.
@@ -51,9 +53,12 @@ export default function PrivacyPage() {
 
       <Section title="The short version">
         <p>
-          Neighbour Trust has no accounts, no sign-in, no cookies and no
-          advertising. It stores nothing about you in its database — there is no
-          table of people in it, only tables of places.
+          Neighbour Trust has no advertising, and you never need an account to
+          read anything on it. If you choose to sign in with Google — only to
+          save localities, keep notes and compare them — we store your Google
+          account id, email, name and what you save, and nothing else. You can
+          delete all of it yourself, at any time, in one step. If you never sign
+          in, we store nothing about you and set no cookies.
         </p>
         <p>
           It counts page views, so we can see which neighbourhoods people look
@@ -75,11 +80,39 @@ export default function PrivacyPage() {
       <Section title="What we collect from you">
         <p>
           <strong className="font-semibold text-ink-primary">
-            Nothing that identifies you, unless you type it in yourself.
+            Nothing that identifies you, unless you sign in or type it in yourself.
           </strong>{" "}
-          There is no login and no newsletter. We cannot identify you, and
-          nothing you do here is tied to a profile, because there is nothing to
-          tie it to.
+          There is no newsletter, and signing in is optional. Without signing in
+          we cannot identify you, and nothing you do here is tied to a profile.
+        </p>
+        <p className="mt-3">
+          <strong className="font-semibold text-ink-primary">
+            If you sign in.
+          </strong>{" "}
+          Sign-in uses your Google account and asks Google only for your basic
+          profile: your name and email. We store your Google account id (so we
+          recognise you next time), that name and email, the localities you save
+          and any private notes you write on them, and when you joined and were
+          last seen. Nothing else — not your photo, contacts, location or
+          browsing. Your shortlist and notes are visible only to you; they are
+          never shown to anyone else, counted publicly, or used in any
+          locality&apos;s score.
+        </p>
+        <p className="mt-3">
+          Signing in sets cookies that keep you signed in for up to 30 days and
+          protect the sign-in form from forgery. They are set only when you sign
+          in, and removed when you sign out. Comparisons are ordinary links and
+          need no account.
+        </p>
+        <p className="mt-3">
+          <strong className="font-semibold text-ink-primary">
+            Deleting your account.
+          </strong>{" "}
+          On your shortlist page, &ldquo;Delete my account and everything
+          saved&rdquo; permanently erases your account, shortlist and notes from
+          our database straight away. Nothing is kept or deactivated &ldquo;just
+          in case&rdquo;. Copies may remain in the database provider&apos;s
+          routine backups until those expire.
         </p>
         <p className="mt-3">
           <strong className="font-semibold text-ink-primary">
@@ -179,8 +212,8 @@ export default function PrivacyPage() {
           </Bullet>
           <Bullet>
             <strong className="font-semibold text-ink-primary">Neon</strong>{" "}
-            stores the neighbourhood data. It holds no personal data, because we
-            have none to put in it.
+            stores the neighbourhood data and, for people who sign in, their
+            account and shortlist. For everyone else it holds nothing personal.
           </Bullet>
           <Bullet>
             <strong className="font-semibold text-ink-primary">Nominatim</strong>,
@@ -196,8 +229,8 @@ export default function PrivacyPage() {
           </Bullet>
           <Bullet>
             <strong className="font-semibold text-ink-primary">Google</strong>{" "}
-            hosts the reporting form, and sees a submission only if you choose to
-            send one.
+            handles sign-in if you choose to sign in, and hosts the reporting
+            form, seeing a submission only if you choose to send one.
           </Bullet>
         </ul>
         <p className="mt-3">
@@ -281,10 +314,18 @@ export default function PrivacyPage() {
           pincodes and places, and this page was updated in the same change.
         </p>
         <p>
-          The commitment stands, and now has a record attached to it. Resident
-          reporting in the product itself is still planned and will need
-          accounts. If that arrives, this page changes before the feature does,
-          and you will be asked before anything about you is stored.
+          <strong className="font-semibold text-ink-primary">
+            On 13 September 2026 optional sign-in was added
+          </strong>{" "}
+          — to save localities, write private notes and compare them. This page
+          changed in the same commit as the code, before sign-in was switched on.
+          Signing in is the &ldquo;asking before anything about you is
+          stored&rdquo; this page promised: nothing is stored until you choose
+          to sign in.
+        </p>
+        <p>
+          The commitment stands, and now has a record attached to it. If
+          anything else about what is stored changes, this page changes first.
         </p>
       </Section>
 

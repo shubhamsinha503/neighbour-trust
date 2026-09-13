@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
 
+import { AccountBar } from "@/components/AccountBar";
+import { AuthProvider } from "@/components/AuthProvider";
 import { RegisterServiceWorker } from "@/components/RegisterServiceWorker";
+import { authConfigured } from "@/lib/auth";
 import { SiteFooter } from "@/components/SiteFooter";
 import { WebAnalytics } from "@/components/WebAnalytics";
 import "./globals.css";
@@ -79,7 +82,12 @@ export default function RootLayout({
   return (
     <html lang="en-IN">
       <body className="min-h-screen bg-page-plane">
-        {children}
+        {/* Sign-in appears only once Google credentials are configured; until
+          * then the site renders exactly as it did without accounts. */}
+        <AuthProvider enabled={authConfigured}>
+          {authConfigured && <AccountBar />}
+          {children}
+        </AuthProvider>
         <SiteFooter />
         <RegisterServiceWorker />
         <WebAnalytics />

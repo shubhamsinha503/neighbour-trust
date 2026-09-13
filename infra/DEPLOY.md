@@ -84,6 +84,27 @@ Import the repo → **Root Directory: `apps/web`** → set
 `NEXT_PUBLIC_API_BASE_URL` to the Render URL. Deploy, then put the Vercel domain
 into `CORS_ALLOWED_ORIGINS` on Render and redeploy that service.
 
+## A4b. Optional sign-in (shortlist, notes, compare)
+
+Off until all of these are set; the site renders with no sign-in until then.
+
+| Where | Variable | Value |
+|---|---|---|
+| Vercel | `GOOGLE_CLIENT_ID` | From Google Cloud → APIs & Services → Credentials → OAuth client (Web application) |
+| Vercel | `GOOGLE_CLIENT_SECRET` | Same client |
+| Vercel | `NEXTAUTH_SECRET` | Any 32+ random bytes, base64 — signs the session cookie |
+| Vercel | `NEXTAUTH_URL` | The production site URL, e.g. `https://neighbour-trust-virid.vercel.app` |
+| Vercel **and** Render | `USER_TOKEN_SECRET` | The *same* 64-character random hex string on both — signs the two-minute tokens the site sends the API |
+
+The Google OAuth client's **Authorised redirect URI** must be exactly
+`<site URL>/api/auth/callback/google`, and **Authorised JavaScript origin** the
+site URL. Redeploy Vercel after adding variables — `NEXT_PUBLIC_*` values and
+the auth switch are read at build time.
+
+Migration `009_user_accounts.sql` is applied by the Ingest workflow's migration
+step like every other; running `python -m infra.migrate` once by hand is also
+safe.
+
 ## A5. Verify
 
 ```powershell

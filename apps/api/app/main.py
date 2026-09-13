@@ -27,6 +27,7 @@ from agents.orchestrator import agent as orchestrator  # noqa: E402
 from agents.orchestrator import score as score_mod  # noqa: E402
 from apps.api.app.schools_verdict import build_verdict as build_schools_verdict  # noqa: E402
 from apps.api.app.verdict import build_verdict  # noqa: E402
+from apps.api.app.accounts import router as accounts_router  # noqa: E402
 
 app = FastAPI(
     title="Neighbour Trust API",
@@ -44,6 +45,10 @@ _EXTRA_ORIGINS = [
     for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
     if origin.strip()
 ]
+
+# Accounts: shortlist, notes, compare. Called by the web app's server only —
+# see apps/api/app/accounts.py for why the browser never reaches these.
+app.include_router(accounts_router)
 
 app.add_middleware(
     CORSMiddleware,
