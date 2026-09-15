@@ -1,52 +1,74 @@
+import Link from "next/link";
 import { Suspense } from "react";
 
 import { HomeIntro } from "@/components/HomeIntro";
 import { LocalitySearch } from "@/components/LocalitySearch";
 import { NearMe } from "@/components/NearMe";
-import {
-  Bone,
-  ResultRowSkeleton,
-  SkeletonRegion,
-  SlowNotice,
-} from "@/components/Skeleton";
-import { fetchLocalitySummaries, fetchStats } from "@/lib/api";
+import { ShortlistShortcut } from "@/components/ShortlistShortcut";
+import { Bone, SkeletonRegion, SlowNotice } from "@/components/Skeleton";
+import { authConfigured } from "@/lib/auth";
+import { fetchLocalitySummaries, fetchStats, type LocalitySummary } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
 /**
- * The home page streams: the masthead and headline are sent at once, and the
- * locality list and the coverage figures arrive as each is ready.
+ * The front page: a search, not a directory.
  *
- * It used to wait for both before sending a byte. The summary behind the list
- * builds 159 reports and is cached for five minutes, so most visits were fast —
- * but a visit that found the cache cold, or the API asleep on its free tier,
- * got a white screen for the whole wait. Now the page is visibly there straight
- * away and the list fills in beneath it.
+ * It used to open on a column of all 159 localities under the search box,
+ * which told a first-time visitor to scroll a list rather than ask about the
+ * place they care about — and buried the one thing they most need to know
+ * before typing anything, which is whether we cover their city at all.
+ *
+ * So the order is: where we are (Bengaluru and Gurugram, said before anything
+ * else), then the box, with examples of the three kinds of thing it accepts,
+ * then "near me". Results appear only once something is typed. The full list
+ * still exists, one link away on /localities, which also keeps every locality
+ * linked for search engines.
+ *
+ * The page streams: everything above the box is sent at once, and the search
+ * (which needs the locality list) fills in behind a skeleton.
  */
+
+// A locality name, a pincode, a place — one of each kind the box understands.
+// The pincode is one no locality stores, so tapping it shows the place lookup.
+const EXAMPLES = ["Koramangala", "560092", "Cyber Hub"];
+
 export default function HomePage() {
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
+    <main className="mx-auto max-w-3xl px-4 pb-10 pt-8 sm:pt-12">
       <Masthead />
 
-      <h1 className="mt-5 text-[26px] font-bold leading-[1.2] tracking-[-0.02em]">
-        Know the neighbourhood
-        <br />
-        before you commit to it.
-      </h1>
+      <section className="mt-8 sm:mt-12">
+        {/* Coverage first. Someone in Pune should learn in one second that this
+          * is not for them yet, not after searching for their locality and
+          * getting nothing. */}
+        <p className="inline-flex items-center gap-2 rounded-full bg-brand-soft px-3 py-1.5 text-[12px] font-semibold text-brand-deep">
+          <span aria-hidden="true">📍</span>
+          Now live in Bengaluru &amp; Gurugram
+        </p>
 
-      {/* Two ways in, in the order people arrive.
-        *
-        * Most visitors come with an area already in mind, which is why search
-        * is here rather than a menu of names. But someone who has never heard
-        * of this cannot be taught by copy — they can be shown, and the fastest
-        * demonstration is the neighbourhood they are standing in. */}
-      <div className="mt-5">
-        <Suspense fallback={<SearchSkeleton />}>
-          <SearchSection />
-        </Suspense>
-      </div>
+        <h1 className="mt-4 text-[30px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[38px]">
+          Know the neighbourhood
+          <br />
+          before you commit to it.
+        </h1>
 
-      <div className="mt-9 border-t border-hairline pt-7">
+        <p className="mt-3 max-w-xl text-[14.5px] leading-[1.6] text-ink-secondary">
+          Search a locality, pincode, apartment or landmark. See its schools,
+          safety, air, water and connectivity — with the source and date behind
+          every number.
+        </p>
+
+        <div className="mt-6">
+          <Suspense fallback={<SearchSkeleton />}>
+            <SearchSection />
+          </Suspense>
+        </div>
+      </section>
+
+      {authConfigured && <ShortlistShortcut />}
+
+      <div className="mt-10 border-t border-hairline pt-8">
         <Suspense fallback={<HomeIntro stats={null} />}>
           <IntroSection />
         </Suspense>
@@ -56,63 +78,103 @@ export default function HomePage() {
 }
 
 async function SearchSection() {
+  let localities: LocalitySummary[];
   try {
-    const localities = await fetchLocalitySummaries();
-    return (
-      <LocalitySearch
-        localities={localities}
-        belowInput={<NearMe key="near-me" localities={localities} />}
-      />
-    );
+    localities = await fetchLocalitySummaries();
   } catch {
     return (
-      <div className="rounded-2xl border border-hairline bg-surface-1 p-4 text-[12px] text-ink-secondary">
+      <div className="rounded-2xl border border-hairline bg-surface-1 p-4 text-[12.5px] text-ink-secondary">
         Couldn&apos;t load the localities just now. Please refresh in a moment.
       </div>
     );
   }
+
+  return (
+    <>
+      <LocalitySearch
+        localities={localities}
+        showBrowseList={false}
+        examples={EXAMPLES}
+        belowInput={
+          <div className="mt-5">
+            <NearMe key="near-me" localities={localities} />
+            <Coverage localities={localities} />
+          </div>
+        }
+      />
+    </>
+  );
 }
 
-/** Stats are decoration on top of the list; losing them must not cost the page. */
+/**
+ * How much of each city is covered, with the way into the full list.
+ *
+ * Counts come from the same list the search runs over, so the number here and
+ * the number of things you can find cannot disagree.
+ */
+function Coverage({ localities }: { localities: LocalitySummary[] }) {
+  const byCity = new Map<string, number>();
+  for (const locality of localities) {
+    byCity.set(locality.city, (byCity.get(locality.city) ?? 0) + 1);
+  }
+  const cities = [...byCity.entries()].sort((a, b) => b[1] - a[1]);
+
+  return (
+    <div className="mt-6 rounded-2xl border border-hairline bg-surface-1 p-4">
+      <div className="grid grid-cols-2 gap-3">
+        {cities.map(([city, count]) => (
+          <Link
+            key={city}
+            href={`/localities?city=${encodeURIComponent(city)}`}
+            className="rounded-xl bg-page-plane px-3.5 py-3 transition-colors hover:bg-brand-soft"
+          >
+            <div className="text-[14px] font-semibold text-ink-primary">{city}</div>
+            <div className="mt-0.5 text-[12px] text-ink-secondary">{count} localities</div>
+          </Link>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-0.5">
+        <p className="text-[11.5px] text-ink-muted">
+          Other cities aren&apos;t covered yet — we add areas only where we can
+          source data we trust.
+        </p>
+        <Link href="/localities" className="text-[12px] font-semibold text-brand hover:underline">
+          Browse all localities →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/** Stats are decoration on top of the search; losing them must not cost the page. */
 async function IntroSection() {
   const stats = await fetchStats().catch(() => null);
   return <HomeIntro stats={stats} />;
 }
 
-/** The search box, city chips and first results, in their real positions. */
 function SearchSkeleton() {
   return (
-    <SkeletonRegion label="Loading localities">
+    <SkeletonRegion label="Loading search">
       <Bone className="h-[56px] w-full rounded-2xl" />
-      <div className="mt-3 flex gap-1.5">
-        <Bone className="h-[30px] w-12 rounded-full" />
-        <Bone className="h-[30px] w-[88px] rounded-full" />
-        <Bone className="h-[30px] w-[84px] rounded-full" />
+      <div className="mt-3 flex items-center gap-1.5 px-1">
+        <Bone className="h-3 w-6" />
+        <Bone className="h-[26px] w-[104px] rounded-full" />
+        <Bone className="h-[26px] w-[72px] rounded-full" />
+        <Bone className="h-[26px] w-[84px] rounded-full" />
       </div>
-      <Bone className="mt-3 h-3 w-64" />
       <SlowNotice />
-      <div className="mt-3 flex flex-col gap-2">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <ResultRowSkeleton key={i} />
-        ))}
-      </div>
+      <Bone className="mt-5 h-[52px] w-full rounded-2xl" />
+      <Bone className="mt-6 h-[132px] w-full rounded-2xl" />
     </SkeletonRegion>
   );
 }
 
-/** The map-style hero from the v2 mockup, reduced to its essentials. */
 /**
  * The masthead, reduced to a masthead.
  *
  * This was a 140-pixel gradient panel with decorative map lines drawn across
  * it, and the only thing in it was the logo. On a phone that is a quarter of
- * the first screen spent on nothing — and once the city filter, the location
- * button and the note explaining the score were added, a reader had to scroll
- * past two full screens before reaching a single locality.
- *
- * Everything above the first result is a toll charged on someone who has not
- * yet been shown anything worth paying it for. The brand still identifies the
- * page; it just no longer costs a screen to do it.
+ * the first screen spent on nothing.
  */
 function Masthead() {
   return (
@@ -120,9 +182,7 @@ function Masthead() {
       <div className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-brand text-[13px] font-bold text-white">
         N
       </div>
-      <div className="text-[14px] font-bold tracking-[-0.01em]">
-        Neighbour Trust
-      </div>
+      <div className="text-[14px] font-bold tracking-[-0.01em]">Neighbour Trust</div>
     </div>
   );
 }

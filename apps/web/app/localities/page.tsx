@@ -1,0 +1,64 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+
+import { LocalitySearch } from "@/components/LocalitySearch";
+import { fetchLocalitySummaries } from "@/lib/api";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "All localities",
+  description:
+    "Every locality Neighbour Trust covers in Bengaluru and Gurugram, with its Trust Score and anything flagged.",
+};
+
+/**
+ * The full directory, moved off the front page.
+ *
+ * The front page is a search; this is for someone who wants to scan what is
+ * covered, and it keeps every locality one link from the home page for search
+ * engines. It is the same component with the list switched on, so filtering,
+ * ordering and the result rows cannot drift from the search.
+ */
+export default async function LocalitiesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ city?: string }>;
+}) {
+  const { city } = await searchParams;
+  let localities = null;
+  try {
+    localities = await fetchLocalitySummaries();
+  } catch {
+    localities = null;
+  }
+
+  return (
+    <main className="mx-auto max-w-3xl px-4 py-8">
+      <Link
+        href="/"
+        className="text-[11px] text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink-secondary"
+      >
+        ← Search
+      </Link>
+      <h1 className="mt-3 text-[23px] font-bold tracking-[-0.01em]">All localities</h1>
+      <p className="mt-1 text-[13px] text-ink-secondary">
+        Bengaluru and Gurugram. Best documented first.
+      </p>
+
+      <div className="mt-5">
+        {localities ? (
+          <LocalitySearch
+            localities={localities}
+            // Only a city that exists in the list; anything else opens on "All".
+            initialCity={city && localities.some((l) => l.city === city) ? city : null}
+          />
+        ) : (
+          <div className="rounded-2xl border border-hairline bg-surface-1 p-4 text-[12.5px] text-ink-secondary">
+            Couldn&apos;t load the localities just now. Please refresh in a moment.
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}

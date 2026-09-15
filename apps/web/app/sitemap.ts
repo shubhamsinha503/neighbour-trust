@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 import { fetchLocalities } from "@/lib/api";
 
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://neighbour-trust-virid.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://neighbourtrust.com";
 
 /**
  * Sitemap.
@@ -22,6 +22,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const fixed: MetadataRoute.Sitemap = [
     { url: SITE_URL, lastModified: now, changeFrequency: "daily", priority: 1 },
+    { url: `${SITE_URL}/localities`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${SITE_URL}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${SITE_URL}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
   ];

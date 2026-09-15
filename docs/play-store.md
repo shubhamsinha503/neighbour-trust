@@ -55,8 +55,8 @@ Account type: **Organization** (needs a D-U-N-S number; not subject to the
 **Category:** House & Home. **Tags:** real estate, neighbourhood, city guide.
 
 **Contact email:** the organization's support address (required, public).
-**Website:** `https://neighbour-trust-virid.vercel.app` (or the custom domain).
-**Privacy policy URL:** `https://neighbour-trust-virid.vercel.app/privacy`
+**Website:** `https://neighbourtrust.com` (or the custom domain).
+**Privacy policy URL:** `https://neighbourtrust.com/privacy`
 
 ### Graphics needed
 
@@ -79,7 +79,7 @@ any code that alters these (the same rule the privacy page follows).
 
 **Do you provide a way for users to request that their data be deleted?** Yes —
 in-app, "Delete my account and everything saved" on the shortlist page. Deletion
-URL for the form: `https://neighbour-trust-virid.vercel.app/shortlist`.
+URL for the form: `https://neighbourtrust.com/shortlist`.
 
 | Data type | Collected? | Shared? | Optional? | Purpose | Notes |
 |---|---|---|---|---|---|

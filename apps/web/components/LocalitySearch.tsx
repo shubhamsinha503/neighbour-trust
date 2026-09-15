@@ -86,8 +86,24 @@ function shortLabel(label: string): string {
 export function LocalitySearch({
   localities,
   belowInput,
+  showBrowseList = true,
+  examples = [],
+  autoFocus = false,
+  initialCity = null,
 }: {
   localities: LocalitySummary[];
+  /**
+   * Whether the full list shows before anything is typed. The front page turns
+   * it off: it is a search, not a directory, and a column of 159 names under
+   * the box told a first-time visitor to scroll rather than ask. The browse
+   * page keeps it on.
+   */
+  showBrowseList?: boolean;
+  /** Tappable sample queries shown under the box before anything is typed. */
+  examples?: string[];
+  autoFocus?: boolean;
+  /** Opens with this city chip selected, e.g. from a city tile on the front page. */
+  initialCity?: string | null;
   /** Rendered between the input and the results, and hidden while searching.
    *
    * A slot rather than a second component under this one: the results list is
@@ -100,7 +116,7 @@ export function LocalitySearch({
   // Held in memory only. app/privacy/page.tsx states that nothing is written to
   // your browser, and a remembered city preference in localStorage would make
   // that false for the sake of saving one tap.
-  const [city, setCity] = useState<string | null>(null);
+  const [city, setCity] = useState<string | null>(initialCity);
   const inputRef = useRef<HTMLInputElement>(null);
   const [place, setPlace] = useState<PlaceLookup>({ status: "idle" });
   // Each lookup takes a number; only the latest may write its result. A slow
@@ -228,15 +244,43 @@ export function LocalitySearch({
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}
+          autoFocus={autoFocus}
         />
       </form>
+
+      {/* Sample queries, so the three kinds of thing the box accepts — a name,
+        * a pincode, a place — are shown rather than described. */}
+      {!searching && examples.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 px-1">
+          <span className="text-[11.5px] text-ink-muted">Try</span>
+          {examples.map((example) => (
+            <button
+              key={example}
+              type="button"
+              onClick={() => {
+                onQueryChange(example);
+                // A place or pincode is looked up as if Enter were pressed; a
+                // locality name already matches as it is typed.
+                // (A complete pincode already starts its own lookup on change.)
+                if (!looksLikePincode(example) && searchLocalities(localities, example).length === 0) {
+                  void lookUp(example);
+                }
+                inputRef.current?.focus();
+              }}
+              className="rounded-full border border-hairline bg-surface-1 px-3 py-1 text-[12px] font-medium text-ink-secondary hover:border-brand hover:text-brand"
+            >
+              {example}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* City first, because it halves the list before anyone reads a name.
         * With 44 entries that is a convenience; as coverage grows it is the
         * difference between a usable index and a scroll — someone in Gurugram
         * should not pass 28 Bengaluru names to reach their own. Hidden while
         * searching, where it would only contradict the results. */}
-      {!searching && cities.length > 1 && (
+      {showBrowseList && !searching && cities.length > 1 && (
         <div className="mt-3 flex gap-1.5" role="group" aria-label="Filter by city">
           {[null, ...cities].map((option) => {
             const active = city === option;
@@ -260,6 +304,10 @@ export function LocalitySearch({
         </div>
       )}
 
+      {/* No "Nothing matches" once a place lookup is under way or answered: it
+        * sat directly above "Nearest to DLF Cyber Hub" and read as a
+        * contradiction. The lookup panel says what was found instead. */}
+      {(showBrowseList || searching) && !(searching && results.length === 0 && place.status !== "idle") && (
       <p className="mt-2 px-1 text-[11.5px] text-ink-muted" aria-live="polite">
         {searching
           ? results.length === 0
@@ -269,6 +317,7 @@ export function LocalitySearch({
             + (city ? ` in ${city}` : ` across ${cities.join(" and ")}`)
             + " · best documented first"}
       </p>
+      )}
 
       {!searching && belowInput}
 
@@ -324,7 +373,7 @@ export function LocalitySearch({
         * not what it measures, not out of what, not how complete it is. A
         * reader was left to assume, and the most natural assumption ("someone
         * rated this neighbourhood 87") is the one thing it is not. */}
-      {!searching && results.length > 0 && (
+      {(showBrowseList || searching) && results.length > 0 && (
         <p className="mt-3 px-1 text-[11px] leading-[1.5] text-ink-muted">
           The score is out of 100, built from up to five categories — schools,
           safety, air quality, water and connectivity. Each card says how many
@@ -332,11 +381,13 @@ export function LocalitySearch({
         </p>
       )}
 
-      <div className="mt-3 flex flex-col gap-2">
-        {results.map((locality) => (
-          <ResultRow key={locality.slug} locality={locality} />
-        ))}
-      </div>
+      {(showBrowseList || searching) && (
+        <div className="mt-3 flex flex-col gap-2">
+          {results.map((locality) => (
+            <ResultRow key={locality.slug} locality={locality} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

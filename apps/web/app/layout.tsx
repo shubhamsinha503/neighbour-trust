@@ -9,7 +9,7 @@ import { WebAnalytics } from "@/components/WebAnalytics";
 import "./globals.css";
 
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://neighbour-trust-virid.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://neighbourtrust.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

@@ -93,7 +93,7 @@ Off until all of these are set; the site renders with no sign-in until then.
 | Vercel | `GOOGLE_CLIENT_ID` | From Google Cloud → APIs & Services → Credentials → OAuth client (Web application) |
 | Vercel | `GOOGLE_CLIENT_SECRET` | Same client |
 | Vercel | `NEXTAUTH_SECRET` | Any 32+ random bytes, base64 — signs the session cookie |
-| Vercel | `NEXTAUTH_URL` | The production site URL, e.g. `https://neighbour-trust-virid.vercel.app` |
+| Vercel | `NEXTAUTH_URL` | The production site URL, e.g. `https://neighbourtrust.com` |
 | Vercel **and** Render | `USER_TOKEN_SECRET` | The *same* 64-character random hex string on both — signs the two-minute tokens the site sends the API |
 
 The Google OAuth client's **Authorised redirect URI** must be exactly
