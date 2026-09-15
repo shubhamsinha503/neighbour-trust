@@ -28,6 +28,7 @@ from agents.orchestrator import score as score_mod  # noqa: E402
 from apps.api.app.schools_verdict import build_verdict as build_schools_verdict  # noqa: E402
 from apps.api.app.verdict import build_verdict  # noqa: E402
 from apps.api.app.accounts import router as accounts_router  # noqa: E402
+from apps.api.app.locality_requests import router as locality_requests_router  # noqa: E402
 
 app = FastAPI(
     title="Neighbour Trust API",
@@ -49,6 +50,8 @@ _EXTRA_ORIGINS = [
 # Accounts: shortlist, notes, compare. Called by the web app's server only —
 # see apps/api/app/accounts.py for why the browser never reaches these.
 app.include_router(accounts_router)
+# Anonymous "please cover this place" requests. See locality_requests.py.
+app.include_router(locality_requests_router)
 
 app.add_middleware(
     CORSMiddleware,

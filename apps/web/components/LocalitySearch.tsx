@@ -15,6 +15,7 @@ import {
   nearestAnyDistance,
   searchLocalities,
 } from "@/lib/search";
+import { RequestLocality } from "@/components/RequestLocality";
 import { ResultRowSkeleton, SkeletonRegion } from "@/components/Skeleton";
 
 /**
@@ -32,12 +33,16 @@ type PlaceLookup =
       status: "found";
       query: string;
       label: string;
+      lat: number;
+      lon: number;
       nearby: Array<{ locality: LocalitySummary; km: number }>;
     }
   | {
       status: "outside";
       query: string;
       label: string;
+      lat: number;
+      lon: number;
       nearest: { locality: LocalitySummary; km: number } | null;
     }
   | { status: "failed"; query: string; message: string };
@@ -160,7 +165,7 @@ export function LocalitySearch({
       lastFound = result;
       const nearby = nearbyLocalities(localities, result.lat, result.lon);
       if (nearby.length > 0) {
-        setPlace({ status: "found", query: q, label: shortLabel(result.label), nearby });
+        setPlace({ status: "found", query: q, label: shortLabel(result.label), lat: result.lat, lon: result.lon, nearby });
         return;
       }
     }
@@ -171,6 +176,8 @@ export function LocalitySearch({
         status: "outside",
         query: q,
         label: shortLabel(lastFound.label),
+        lat: lastFound.lat,
+        lon: lastFound.lon,
         nearest: nearestAnyDistance(localities, lastFound.lat, lastFound.lon),
       });
     } else {
@@ -234,6 +241,14 @@ export function LocalitySearch({
           onChange={(event) => onQueryChange(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Escape") onQueryChange("");
+            // Handled here as well as by the form, and the default prevented so
+            // it runs once: some Android keyboards' "Go" key and IME setups do
+            // not reliably trigger a form's implicit submission. Ignored while
+            // an IME is composing, where Enter confirms a word, not the search.
+            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              void lookUp(query);
+            }
           }}
           placeholder="Locality, pincode, apartment, road or landmark"
           aria-label="Search by locality, pincode, apartment, road or landmark"
@@ -326,6 +341,7 @@ export function LocalitySearch({
       {searching && place.status !== "idle" && (
         <PlaceResult
           place={place}
+          city={city}
           onShowAll={() => {
             onQueryChange("");
             inputRef.current?.focus();
@@ -352,6 +368,7 @@ export function LocalitySearch({
           >
             Find localities near &ldquo;{query.trim()}&rdquo;
           </button>
+          <RequestLocality context={{ query: query.trim(), city }} />
         </div>
       )}
 
@@ -527,9 +544,11 @@ function ScoreChip({
 /** What a place lookup found, in the same result rows the name search uses. */
 function PlaceResult({
   place,
+  city,
   onShowAll,
 }: {
   place: Exclude<PlaceLookup, { status: "idle" }>;
+  city: string | null;
   onShowAll: () => void;
 }) {
   if (place.status === "loading") {
@@ -558,6 +577,7 @@ function PlaceResult({
           {place.message} Try a pincode, a nearby landmark, or the name of the
           road.
         </p>
+        <RequestLocality context={{ query: place.query, city }} />
         <button
           type="button"
           onClick={onShowAll}
@@ -580,6 +600,17 @@ function PlaceResult({
             ? `The closest locality we cover is ${place.nearest.locality.name}, ${place.nearest.locality.city} — ${formatKm(place.nearest.km)} away.`
             : "We cover parts of Bengaluru and Gurugram so far."}
         </p>
+        <RequestLocality
+          context={{
+            query: place.query,
+            city,
+            placeLabel: place.label,
+            lat: place.lat,
+            lon: place.lon,
+            nearestSlug: place.nearest?.locality.slug,
+            nearestKm: place.nearest?.km,
+          }}
+        />
         <button
           type="button"
           onClick={onShowAll}
@@ -607,6 +638,18 @@ function PlaceResult({
           </div>
         ))}
       </div>
+      <RequestLocality
+        variant="link"
+        context={{
+          query: place.query,
+          city,
+          placeLabel: place.label,
+          lat: place.lat,
+          lon: place.lon,
+          nearestSlug: place.nearby[0]?.locality.slug,
+          nearestKm: place.nearby[0]?.km,
+        }}
+      />
     </section>
   );
 }

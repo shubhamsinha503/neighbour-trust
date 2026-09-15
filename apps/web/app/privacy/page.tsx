@@ -48,7 +48,7 @@ export default function PrivacyPage() {
 
       <h1 className="mt-5 text-[24px] font-bold tracking-[-0.01em]">Privacy</h1>
       <p className="mt-1.5 text-[12px] text-ink-muted">
-        Last updated 13 September 2026
+        Last updated 15 September 2026
       </p>
 
       <Section title="The short version">
@@ -71,8 +71,10 @@ export default function PrivacyPage() {
           are optional: the search box, which can look up a pincode or place to
           find the localities near it; a box that measures distances from an
           address you give; a question box on each locality page, answered by an
-          AI model; and a link to a form for reporting what you have seen in your
-          area. None is required to use anything. Each is described in full
+          AI model; a button to ask us to add a locality we don&apos;t cover,
+          which stores the place and nothing about you; and a link to a form for
+          reporting what you have seen in your area. None is required to use
+          anything. Each is described in full
           below.
         </p>
       </Section>
@@ -157,6 +159,20 @@ export default function PrivacyPage() {
           The result is used in your browser and forgotten when you close the
           tab. Nominatim receives the text from our server, not from you, so
           your own IP address is not part of what it sees.
+        </p>
+        <p className="mt-3">
+          <strong className="font-semibold text-ink-primary">
+            Asking us to add a locality.
+          </strong>{" "}
+          When a search doesn&apos;t find what you wanted, you can ask us to add
+          it. We store only what you searched for, the city filter if you had
+          one selected, and — if the place was found on the map — where that
+          place is and how far it is from the nearest locality we cover. We do
+          not store your name, email, IP address or anything else about you,
+          and the request is not linked to any account. To stop the button
+          being misused, our server counts requests per IP address in memory
+          for an hour; that count is never written down. We use the requests,
+          counted together, to decide which areas to add next.
         </p>
         <p className="mt-3">
           <strong className="font-semibold text-ink-primary">
@@ -312,6 +328,8 @@ export default function PrivacyPage() {
           you where a question goes, and it should have said so before the box
           appeared. On 13 September the search box also began looking up
           pincodes and places, and this page was updated in the same change.
+          On 15 September a button to ask us to add a locality was added, and
+          this page was updated in the same change to say what it stores.
         </p>
         <p>
           <strong className="font-semibold text-ink-primary">
