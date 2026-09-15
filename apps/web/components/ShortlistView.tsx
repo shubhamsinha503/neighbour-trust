@@ -14,6 +14,31 @@ import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { Bone, SkeletonRegion } from "@/components/Skeleton";
+
+function ShortlistSkeleton() {
+  return (
+    <SkeletonRegion label="Loading your shortlist">
+      <Bone className="mt-4 h-[46px] w-full rounded-2xl" />
+      <div className="mt-3 flex flex-col gap-2.5">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex gap-3 rounded-2xl border border-hairline bg-surface-1 p-3.5">
+            <Bone className="mt-1 h-4 w-4 rounded" />
+            <div className="flex-1">
+              <div className="flex justify-between">
+                <Bone className="h-4 w-36" />
+                <Bone className="h-5 w-8" />
+              </div>
+              <Bone className="mt-2 h-3 w-3/5" />
+              <Bone className="mt-3 h-[34px] w-full rounded-xl" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </SkeletonRegion>
+  );
+}
+
 type Saved = {
   slug: string;
   name: string;
@@ -52,7 +77,7 @@ export function ShortlistView() {
       .catch((e: Error) => setError(e.message));
   }, [session]);
 
-  if (status === "loading") return <p className="mt-4 text-[13px] text-ink-muted">Loading…</p>;
+  if (status === "loading") return <ShortlistSkeleton />;
 
   if (!session) {
     return (
@@ -104,9 +129,7 @@ export function ShortlistView() {
       </p>
 
       {error && <p className="mt-4 text-[13px] text-[#c0442c]">{error}</p>}
-      {items === null && !error && (
-        <p className="mt-4 text-[13px] text-ink-muted">Loading your shortlist…</p>
-      )}
+      {items === null && !error && <ShortlistSkeleton />}
 
       {items?.length === 0 && (
         <div className="mt-4 rounded-[20px] border border-dashed border-hairline p-5 text-[13px] text-ink-secondary">

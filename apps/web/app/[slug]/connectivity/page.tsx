@@ -17,7 +17,7 @@ export default async function ConnectivityPage({
     unavailable =
       error instanceof NoDataError
         ? error.reason
-        : "Couldn't reach the API. Start it with: uvicorn apps.api.app.main:app --reload";
+        : "Couldn't load this just now. Please refresh in a moment.";
   }
 
   return (

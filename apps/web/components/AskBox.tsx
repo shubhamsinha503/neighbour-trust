@@ -15,6 +15,7 @@
  */
 
 import { useState } from "react";
+import { AnswerSkeleton, SkeletonRegion } from "@/components/Skeleton";
 import { splitCitations } from "@/lib/citations";
 
 type Citation = {
@@ -156,9 +157,10 @@ export function AskBox({ slug, localityName }: { slug: string; localityName: str
 
       <div aria-live="polite">
         {loading && (
-          <p className="mt-4 text-[12.5px] text-ink-muted">
-            Reading everything we hold on {localityName}…
-          </p>
+          <SkeletonRegion label={`Reading everything we hold on ${localityName}`}>
+            <p className="mt-4 text-[11px] font-medium text-ink-muted">{asked}</p>
+            <AnswerSkeleton />
+          </SkeletonRegion>
         )}
 
         {error && <p className="mt-4 text-[12.5px] text-ink-secondary">{error}</p>}

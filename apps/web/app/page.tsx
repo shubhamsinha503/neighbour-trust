@@ -1,39 +1,29 @@
+import { Suspense } from "react";
+
 import { HomeIntro } from "@/components/HomeIntro";
 import { LocalitySearch } from "@/components/LocalitySearch";
 import { NearMe } from "@/components/NearMe";
 import {
-  fetchLocalitySummaries,
-  fetchStats,
-  type CoverageStats,
-  type LocalitySummary,
-} from "@/lib/api";
+  Bone,
+  ResultRowSkeleton,
+  SkeletonRegion,
+  SlowNotice,
+} from "@/components/Skeleton";
+import { fetchLocalitySummaries, fetchStats } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
-  let localities: LocalitySummary[] = [];
-  let stats: CoverageStats | null = null;
-  let error: string | null = null;
-
-  // Fetched together — the page needs both and they are independent.
-  const [localityResult, statsResult] = await Promise.allSettled([
-    fetchLocalitySummaries(),
-    fetchStats(),
-  ]);
-
-  if (localityResult.status === "fulfilled") {
-    localities = localityResult.value;
-  } else {
-    error =
-      "Couldn't reach the API. Start it with: uvicorn apps.api.app.main:app --reload";
-  }
-
-  // Stats are decoration on top of the list; losing them must not cost the page.
-  // HomeIntro renders without them.
-  if (statsResult.status === "fulfilled") {
-    stats = statsResult.value;
-  }
-
+/**
+ * The home page streams: the masthead and headline are sent at once, and the
+ * locality list and the coverage figures arrive as each is ready.
+ *
+ * It used to wait for both before sending a byte. The summary behind the list
+ * builds 159 reports and is cached for five minutes, so most visits were fast —
+ * but a visit that found the cache cold, or the API asleep on its free tier,
+ * got a white screen for the whole wait. Now the page is visibly there straight
+ * away and the list fills in beneath it.
+ */
+export default function HomePage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
       <Masthead />
@@ -47,29 +37,66 @@ export default async function HomePage() {
       {/* Two ways in, in the order people arrive.
         *
         * Most visitors come with an area already in mind, which is why search
-        * is here rather than a menu of forty-four names. But someone who has
-        * never heard of this cannot be taught by copy — they can be shown, and
-        * the fastest demonstration is the neighbourhood they are standing in.
-        * Declining is itself informative: it means they came with something in
-        * mind, and search is right underneath either way. */}
+        * is here rather than a menu of names. But someone who has never heard
+        * of this cannot be taught by copy — they can be shown, and the fastest
+        * demonstration is the neighbourhood they are standing in. */}
       <div className="mt-5">
-        {error ? (
-          <div className="rounded-2xl border border-hairline bg-surface-1 p-4 text-[12px] text-ink-secondary">
-            {error}
-          </div>
-        ) : (
-          <LocalitySearch
-            localities={localities}
-            belowInput={<NearMe key="near-me" localities={localities} />}
-          />
-        )}
+        <Suspense fallback={<SearchSkeleton />}>
+          <SearchSection />
+        </Suspense>
       </div>
 
       <div className="mt-9 border-t border-hairline pt-7">
-        <HomeIntro stats={stats} />
+        <Suspense fallback={<HomeIntro stats={null} />}>
+          <IntroSection />
+        </Suspense>
       </div>
-
     </main>
+  );
+}
+
+async function SearchSection() {
+  try {
+    const localities = await fetchLocalitySummaries();
+    return (
+      <LocalitySearch
+        localities={localities}
+        belowInput={<NearMe key="near-me" localities={localities} />}
+      />
+    );
+  } catch {
+    return (
+      <div className="rounded-2xl border border-hairline bg-surface-1 p-4 text-[12px] text-ink-secondary">
+        Couldn&apos;t load the localities just now. Please refresh in a moment.
+      </div>
+    );
+  }
+}
+
+/** Stats are decoration on top of the list; losing them must not cost the page. */
+async function IntroSection() {
+  const stats = await fetchStats().catch(() => null);
+  return <HomeIntro stats={stats} />;
+}
+
+/** The search box, city chips and first results, in their real positions. */
+function SearchSkeleton() {
+  return (
+    <SkeletonRegion label="Loading localities">
+      <Bone className="h-[56px] w-full rounded-2xl" />
+      <div className="mt-3 flex gap-1.5">
+        <Bone className="h-[30px] w-12 rounded-full" />
+        <Bone className="h-[30px] w-[88px] rounded-full" />
+        <Bone className="h-[30px] w-[84px] rounded-full" />
+      </div>
+      <Bone className="mt-3 h-3 w-64" />
+      <SlowNotice />
+      <div className="mt-3 flex flex-col gap-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <ResultRowSkeleton key={i} />
+        ))}
+      </div>
+    </SkeletonRegion>
   );
 }
 

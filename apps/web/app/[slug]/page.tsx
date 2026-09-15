@@ -7,8 +7,8 @@ import { authConfigured } from "@/lib/auth";
 import { TrustReport } from "@/components/TrustReport";
 import {
   fetchConnectivity,
-  fetchLocalities,
   fetchReport,
+  LocalityNotFoundError,
   type ConnectivityView,
 } from "@/lib/api";
 
@@ -78,10 +78,11 @@ export default async function LocalityPage({
 }) {
   const { slug } = await params;
 
-  const localities = await fetchLocalities().catch(() => []);
-  const locality = localities.find((entry) => entry.slug === slug);
-  if (localities.length > 0 && !locality) notFound();
-
+  // No list of every locality first. This page used to fetch all 159, uncached,
+  // only to check the slug existed — before the report, and in series with it.
+  // Every visit paid a round trip to the API that no cache could absorb, and
+  // when the API was asleep a report already cached at the edge still waited
+  // the whole cold start behind it. The report's own 404 answers the question.
   let report = null;
   let error: string | null = null;
   // Connectivity is fetched alongside the report rather than folded into it.
@@ -96,18 +97,19 @@ export default async function LocalityPage({
   ]);
   if (reportResult.status === "fulfilled") {
     report = reportResult.value;
+  } else if (reportResult.reason instanceof LocalityNotFoundError) {
+    notFound();
   } else {
-    error =
-      "Couldn't reach the API. Start it with: uvicorn apps.api.app.main:app --reload";
+    error = "Couldn't load this report just now. Please refresh in a moment.";
   }
   if (connectivityResult.status === "fulfilled") {
     connectivity = connectivityResult.value;
   }
 
-  const name = report?.locality.name ?? locality?.name ?? slug;
-  const city = report?.locality.city ?? locality?.city;
-  const state = report?.locality.state ?? locality?.state;
-  const pincode = report?.locality.pincode ?? locality?.pincode;
+  const name = report?.locality.name ?? slug;
+  const city = report?.locality.city;
+  const state = report?.locality.state;
+  const pincode = report?.locality.pincode;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">

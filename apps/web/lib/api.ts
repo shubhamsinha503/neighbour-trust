@@ -69,6 +69,14 @@ export class NoDataError extends Error {
   }
 }
 
+/** Thrown when the API does not know the locality at all — a 404 page, not an outage. */
+export class LocalityNotFoundError extends Error {
+  constructor(public readonly slug: string) {
+    super(`unknown locality: ${slug}`);
+    this.name = "LocalityNotFoundError";
+  }
+}
+
 export async function fetchLocalities(): Promise<Locality[]> {
   const response = await fetch(`${API_BASE}/api/v1/localities`, {
     cache: "no-store",
@@ -345,6 +353,9 @@ export async function fetchReport(slug: string): Promise<LocalityReport> {
   const response = await fetch(`${API_BASE}/api/v1/localities/${slug}/report`, {
     next: { revalidate: 300 },
   });
+  if (response.status === 404) {
+    throw new LocalityNotFoundError(slug);
+  }
   if (!response.ok) {
     throw new Error(`Failed to load report (${response.status})`);
   }

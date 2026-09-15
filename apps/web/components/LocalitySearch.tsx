@@ -15,6 +15,7 @@ import {
   nearestAnyDistance,
   searchLocalities,
 } from "@/lib/search";
+import { ResultRowSkeleton, SkeletonRegion } from "@/components/Skeleton";
 
 /**
  * The outcome of placing a typed query on the map.
@@ -482,9 +483,17 @@ function PlaceResult({
 }) {
   if (place.status === "loading") {
     return (
-      <p className="mt-3 rounded-2xl border border-hairline bg-surface-1 p-4 text-[12.5px] text-ink-secondary" aria-live="polite">
-        Finding &ldquo;{place.query}&rdquo; on the map…
-      </p>
+      <SkeletonRegion label={`Finding ${place.query} on the map`}>
+        <p className="mt-3 px-1 text-[12px] text-ink-secondary">
+          <span aria-hidden="true">📍 </span>
+          Finding &ldquo;{place.query}&rdquo; on the map…
+        </p>
+        <div className="mt-2 flex flex-col gap-2">
+          {[0, 1, 2].map((i) => (
+            <ResultRowSkeleton key={i} />
+          ))}
+        </div>
+      </SkeletonRegion>
     );
   }
 

@@ -57,7 +57,11 @@ export function SaveButton({ slug, name }: { slug: string; name: string }) {
     setSaved(!currentlySaved);
   }
 
-  if (status === "loading") return null;
+  // Holds the button's space while the session loads, so the title beside it
+  // does not shift when it appears.
+  if (status === "loading") {
+    return <span aria-hidden="true" className="inline-block h-[30px] w-[74px] rounded-full bg-[#e8e7e1] motion-safe:animate-pulse" />;
+  }
 
   if (!session) {
     return (
