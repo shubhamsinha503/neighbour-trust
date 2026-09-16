@@ -76,3 +76,15 @@ def test_junk_is_refused(client, query):
 @db_required
 def test_out_of_range_coordinates_are_refused(client):
     assert client.post("/api/v1/locality-requests", json={"query": "Somewhere", "lat": 200}).status_code == 422
+
+
+def test_global_cap_holds_even_when_client_key_varies(monkeypatch):
+    # Strix vuln-0002/0005: the per-client key is a spoofable header, so a
+    # global cap that ignores the key is what actually bounds the flood.
+    monkeypatch.setattr(lr, "GLOBAL_PER_MINUTE", 3)
+    monkeypatch.setattr(lr, "PER_CLIENT_PER_HOUR", 100)
+    lr._hits.clear(); lr._recent.clear()
+    ok = [lr.allowed(f"spoofed-{i}", now=1000) for i in range(5)]
+    assert ok == [True, True, True, False, False]
+    # The window slides: a minute later the global bucket is clear again.
+    assert lr.allowed("spoofed-x", now=1000 + 61) is True

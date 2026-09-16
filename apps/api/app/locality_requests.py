@@ -25,7 +25,13 @@ router = APIRouter()
 # A person asking for their neighbourhood asks once or twice. Ten an hour is
 # generous for that and useless for filling the table with junk.
 PER_CLIENT_PER_HOUR = int(os.environ.get("LOCALITY_REQUESTS_PER_HOUR", "10"))
+# The per-client key is x-forwarded-for, which a caller reaching the API
+# directly can spoof for a fresh bucket — so a global per-minute cap, counting
+# every accepted request regardless of the claimed client, is what actually
+# bounds how fast the table can be filled.
+GLOBAL_PER_MINUTE = int(os.environ.get("LOCALITY_REQUESTS_GLOBAL_PER_MINUTE", "20"))
 _hits: dict[str, list[float]] = {}
+_recent: list[float] = []
 
 
 def query_key(text: str) -> str:
@@ -35,12 +41,16 @@ def query_key(text: str) -> str:
 
 def allowed(client_key: str, now: Optional[float] = None) -> bool:
     current = time.time() if now is None else now
+    _recent[:] = [t for t in _recent if current - t < 60]
+    if len(_recent) >= GLOBAL_PER_MINUTE:
+        return False
     recent = [t for t in _hits.get(client_key, []) if current - t < 3600]
     if len(recent) >= PER_CLIENT_PER_HOUR:
         _hits[client_key] = recent
         return False
     recent.append(current)
     _hits[client_key] = recent
+    _recent.append(current)
     return True
 
 

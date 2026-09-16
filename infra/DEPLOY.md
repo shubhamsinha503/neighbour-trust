@@ -105,6 +105,13 @@ Migration `009_user_accounts.sql` is applied by the Ingest workflow's migration
 step like every other; running `python -m infra.migrate` once by hand is also
 safe.
 
+## A4c. Operational endpoints (optional)
+
+The API's `/debug/classification` and `/debug/report/{slug}` are gated by
+`DEBUG_TOKEN`. Leave it unset and both answer 404 (disabled), which is the safe
+default for a public service. To use them, set `DEBUG_TOKEN` on Render to a long
+random string and send it as the `x-debug-token` header.
+
 ## A5. Verify
 
 ```powershell

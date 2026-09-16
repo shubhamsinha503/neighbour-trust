@@ -10,6 +10,7 @@ Run from the repo root:
 
 from __future__ import annotations
 
+import hmac
 import os
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
@@ -272,16 +273,33 @@ def get_stats() -> dict[str, Any]:
         return db.coverage_stats(conn)
 
 
+# The /debug endpoints are operational tools, not public API. They were
+# reachable by anyone who could reach the service, and /debug/report returned a
+# server-side stack trace (absolute paths, module chain, the database driver
+# error). Now they require DEBUG_TOKEN: unset means the endpoints are disabled
+# and answer 404 like any unknown path, so nothing is exposed by default; set
+# it (and send it as `x-debug-token`) to use them.
+def _require_debug_access(request: Request) -> None:
+    token = os.environ.get("DEBUG_TOKEN", "")
+    supplied = request.headers.get("x-debug-token", "")
+    # A 404 rather than 401/403: an operator with the token knows the path, and
+    # anyone without it learns nothing about whether the endpoint exists.
+    if not token or not hmac.compare_digest(supplied, token):
+        raise HTTPException(status_code=404, detail="Not Found")
+
+
 @app.get("/debug/classification")
-def get_classification_state() -> dict[str, Any]:
+def get_classification_state(request: Request) -> dict[str, Any]:
     """Where every news mention sits in the classify pipeline.
 
-    Operational, not part of the public API. It exists because the pipeline has
-    three independent nullable columns — classifier, classified_at,
-    is_locality_specific — and their combinations distinguish "never judged"
-    from "queued for re-judgement" from "verdict destroyed". Guessing which one
-    a symptom means, from run logs, produced two wrong diagnoses in a row.
+    Operational, not part of the public API — gated by DEBUG_TOKEN. It exists
+    because the pipeline has three independent nullable columns — classifier,
+    classified_at, is_locality_specific — and their combinations distinguish
+    "never judged" from "queued for re-judgement" from "verdict destroyed".
+    Guessing which one a symptom means, from run logs, produced two wrong
+    diagnoses in a row.
     """
+    _require_debug_access(request)
     with db.connect() as conn:
         return db.classification_state(conn)
 
@@ -688,17 +706,19 @@ class ReportResponse(BaseModel):
 
 
 @app.get("/debug/report/{slug}")
-def debug_report(slug: str) -> dict[str, Any]:
+def debug_report(slug: str, request: Request) -> dict[str, Any]:
     """Build one report and return the traceback if it raises.
 
-    Operational, and added while every /report was returning 500 with no way to
-    see why from outside the process. A stack trace beats another round of
-    reasoning about which field might be missing — that approach has been wrong
-    twice today.
+    Operational, gated by DEBUG_TOKEN, and added while every /report was
+    returning 500 with no way to see why from outside the process. A stack
+    trace beats another round of reasoning about which field might be missing —
+    that approach has been wrong twice today. The trace only reaches an operator
+    who holds the token; without it this path is 404.
 
     Returns the failure as data rather than raising, so the answer survives the
     trip through the error handler.
     """
+    _require_debug_access(request)
     import traceback
 
     try:
@@ -840,13 +860,27 @@ class AskResponse(BaseModel):
 # it trips the endpoint says so plainly instead of degrading quietly.
 _ASK_PER_CLIENT = int(os.environ.get("ASK_PER_CLIENT_PER_HOUR", "20"))
 _ASK_PER_DAY = int(os.environ.get("ASK_PER_DAY", "500"))
+# A ceiling that does not depend on the client key. The per-client window keys
+# on x-forwarded-for, which a caller hitting the API directly can spoof to get a
+# fresh bucket every request — so the per-minute and per-day caps below, which
+# count every accepted call regardless of who it claims to be, are what actually
+# bound the spend. Sized so a real burst of visitors is fine and an unthrottled
+# scripted caller is stopped within a minute.
+_ASK_GLOBAL_PER_MINUTE = int(os.environ.get("ASK_GLOBAL_PER_MINUTE", "30"))
 _ask_hits: dict[str, list[float]] = {}
+_ask_recent: list[float] = []
 _ask_day: dict[str, Any] = {"date": None, "count": 0}
 _qa_client: Any = None
 
 
 def _ask_allowed(client_key: str) -> Optional[str]:
-    """None when the request may proceed, otherwise the reason it may not."""
+    """None when the request may proceed, otherwise the reason it may not.
+
+    Two of the three limits (per-minute, per-day) are global and cannot be
+    lifted by varying the client key. The per-client window is best-effort on
+    top of them, so a single honest visitor is throttled sooner than the global
+    cap would.
+    """
     import time
 
     now = time.time()
@@ -856,6 +890,10 @@ def _ask_allowed(client_key: str) -> Optional[str]:
     if _ask_day["count"] >= _ASK_PER_DAY:
         return "Questions are paused for today — we cap how many we answer per day. Try again tomorrow."
 
+    _ask_recent[:] = [t for t in _ask_recent if now - t < 60]
+    if len(_ask_recent) >= _ASK_GLOBAL_PER_MINUTE:
+        return "We're answering a lot of questions right now. Please try again in a minute."
+
     recent = [t for t in _ask_hits.get(client_key, []) if now - t < 3600]
     if len(recent) >= _ASK_PER_CLIENT:
         _ask_hits[client_key] = recent
@@ -863,6 +901,7 @@ def _ask_allowed(client_key: str) -> Optional[str]:
 
     recent.append(now)
     _ask_hits[client_key] = recent
+    _ask_recent.append(now)
     _ask_day["count"] += 1
     return None
 
@@ -888,9 +927,10 @@ def ask_question(slug: str, body: AskRequest, request: Request) -> dict[str, Any
     """
     from agents.orchestrator import qa
 
-    # Behind Vercel's proxy the socket address is the proxy, so the forwarded
-    # header is the only per-person key available. It is spoofable, which is
-    # exactly why the daily ceiling exists as well.
+    # Behind the proxy the socket address is the proxy, so the forwarded header
+    # is the only per-person key available. It is spoofable — which is why the
+    # per-minute and per-day caps in _ask_allowed are global and do not depend
+    # on this value; this key only sharpens throttling for an honest visitor.
     forwarded = request.headers.get("x-forwarded-for", "")
     client_key = forwarded.split(",")[0].strip() or (
         request.client.host if request.client else "unknown"

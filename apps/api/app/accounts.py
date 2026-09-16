@@ -92,7 +92,18 @@ def verify_user_token(token: str, *, secret: str, now: Optional[float] = None) -
     exp, iat = claims.get("exp"), claims.get("iat")
     if not isinstance(exp, (int, float)) or exp < current:
         raise ValueError("expired")
-    if isinstance(iat, (int, float)) and exp - iat > MAX_TOKEN_LIFETIME_SECONDS:
+    # `iat` is required and must be numeric. A missing or non-numeric `iat`
+    # used to short-circuit this check (`isinstance(iat, ...) and ...` is False
+    # when iat is absent), so a token with no iat and a far-future exp slipped
+    # past the lifetime ceiling entirely. The minter always sets iat, so
+    # demanding it costs a legitimate caller nothing.
+    if not isinstance(iat, (int, float)):
+        raise ValueError("no issued-at")
+    if iat > current + 60:
+        # Issued in the future beyond a minute of clock skew — not a token this
+        # server's minter produces.
+        raise ValueError("issued in the future")
+    if exp - iat > MAX_TOKEN_LIFETIME_SECONDS:
         raise ValueError("lifetime too long")
     if claims.get("aud") != TOKEN_AUDIENCE:
         raise ValueError("wrong audience")

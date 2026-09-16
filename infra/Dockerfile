@@ -21,6 +21,14 @@ COPY agents/ ./agents/
 COPY apps/api/ ./apps/api/
 COPY infra/migrations/ ./infra/migrations/
 
+# Run as a non-root user. The default was root, so a flaw in the process would
+# have held root inside the container. The app only reads its own code and talks
+# to Postgres over the network, so it needs no privileges and no write access to
+# /app; an unprivileged user is strictly safer at no cost.
+RUN useradd --system --no-create-home --uid 10001 appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
 # Railway injects PORT; 8000 is the local default.
 ENV PORT=8000
 EXPOSE 8000

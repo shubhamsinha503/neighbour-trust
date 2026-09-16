@@ -61,6 +61,35 @@ def test_bad_tokens_are_refused(token, why):
     assert why.split()[0] in str(exc.value)
 
 
+def _sign(body: dict) -> str:
+    header = _b64(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+    payload = _b64(json.dumps(body).encode())
+    sig = _b64(hmac.new(SECRET.encode(), f"{header}.{payload}".encode(), hashlib.sha256).digest())
+    return f"{header}.{payload}.{sig}"
+
+
+def test_missing_or_bad_iat_is_refused_not_a_lifetime_bypass():
+    # Strix vuln-0003: omitting iat used to short-circuit the lifetime ceiling,
+    # so a no-iat token with a far-future exp was accepted forever.
+    now = int(time.time())
+    base = {"sub": "victim", "aud": accounts.TOKEN_AUDIENCE, "exp": 9999999999}
+    for label, iat in [("absent", None), ("string", "x"), ("null", None), ("future", now + 3600)]:
+        body = dict(base)
+        if iat is not None:
+            body["iat"] = iat
+        with pytest.raises(ValueError):
+            accounts.verify_user_token(_sign(body), secret=SECRET, now=now)
+
+
+def test_a_normal_fresh_token_still_passes():
+    now = int(time.time())
+    claims = accounts.verify_user_token(
+        _sign({"sub": "u", "aud": accounts.TOKEN_AUDIENCE, "iat": now, "exp": now + 120}),
+        secret=SECRET, now=now,
+    )
+    assert claims["sub"] == "u"
+
+
 def test_tampered_claims_fail_the_signature():
     header, payload, sig = make_token().split(".")
     forged = _b64(json.dumps({"sub": "someone-else", "aud": accounts.TOKEN_AUDIENCE,
