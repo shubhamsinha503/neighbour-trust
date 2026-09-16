@@ -12,9 +12,13 @@ deploy reaches the app. The pieces already in the repo:
 | Digital Asset Links (removes the URL bar once filled in) | `apps/web/app/.well-known/assetlinks.json/route.ts` |
 | Privacy policy, incl. "If you install the app" | `/privacy` |
 
-Account type: **Organization** (needs a D-U-N-S number; not subject to the
-12-tester / 14-day closed-test requirement that applies to new personal accounts
-— confirm on the Console at sign-up, policies change).
+Account type: **Personal / single developer**. $25 one-time, no D-U-N-S. A new
+personal account must run a **closed test with 12+ testers opted in for 14
+continuous days** before it can apply for production; internal testing (just
+you) has no such gate. The 14-day window is timed to overlap the news-pipeline
+fix and locality expansion, so the app is public-ready when the data is fresh.
+Identity verification (a government ID) is required at sign-up. Confirm the
+current rules on the Console — Google changes them.
 
 ---
 
@@ -133,7 +137,9 @@ camera). Keep it that way unless the privacy page changes first.
    `ANDROID_CERT_FINGERPRINTS=<upload>,<play signing>`; redeploy. Confirm
    `/.well-known/assetlinks.json` lists both, then check the installed app shows
    no URL bar.
-7. Internal testing → (closed testing if the Console requires it) → production.
+7. Internal testing (you) → **closed testing, 12+ testers, 14 days** (required
+   for a new personal account) → production. Recruit testers now — friends,
+   family, a few prospective users — since the 14 days are the long pole.
 
 **Domain note:** the app is tied to the site's origin. If the site moves from
 `*.vercel.app` to a custom domain, the app must be rebuilt and re-verified —
