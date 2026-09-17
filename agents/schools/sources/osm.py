@@ -54,12 +54,17 @@ SOURCE_URL = "https://www.openstreetmap.org/copyright"
 CITY_BBOX: dict[str, tuple[float, float, float, float]] = {
     "Bengaluru": (12.70, 77.30, 13.25, 77.90),
     "Gurugram": (28.25, 76.75, 28.65, 77.25),
+    "Hyderabad": (17.10, 78.15, 17.70, 78.80),
+    "Mumbai": (18.85, 72.60, 19.35, 73.15),
 }
 
-# Which regional extract covers each city.
+# Which regional extract covers each city. Hyderabad rides in southern-zone
+# (already downloaded for Bengaluru); Mumbai needs western-zone.
 CITY_EXTRACT: dict[str, str] = {
     "Bengaluru": "southern-zone",
     "Gurugram": "northern-zone",
+    "Hyderabad": "southern-zone",
+    "Mumbai": "western-zone",
 }
 
 log = logging.getLogger(__name__)

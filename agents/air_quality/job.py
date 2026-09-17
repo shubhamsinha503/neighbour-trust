@@ -87,25 +87,38 @@ def run_once(
                         "No localities seeded. Run: python -m agents.common.seed_localities"
                     )
 
-                for locality in localities:
-                    result = aq_agent.run_for_locality(
-                        conn,
-                        locality,
-                        openaq_client=openaq_client,
-                        cpcb_client=cpcb_client,
-                        aqicn_client=aqicn_client,
-                        trend_days=trend_days,
-                    )
-                    outcome.results.append(result)
-                    if result.ok:
-                        outcome.ok += 1
-                    else:
-                        outcome.skipped += 1
-
-                if dry_run:
-                    conn.rollback()
-                else:
-                    conn.commit()
+                # Each locality in its own savepoint. run_for_locality guards
+                # each source, but a call outside those guards — a transient 429
+                # or timeout, a city a client has no station list for — still
+                # raised, and with the whole batch in one transaction that error
+                # rolled back every locality already processed and failed the
+                # step. At 44 stable localities that was rare; at 1,328 it is
+                # near-certain, and a failed air-quality step also skips the
+                # schools, connectivity and news steps scheduled after it. So one
+                # locality's failure now rolls back only its own savepoint and
+                # the run carries on. force_rollback discards the lot on a dry run.
+                with conn.transaction(force_rollback=dry_run):
+                    for locality in localities:
+                        try:
+                            with conn.transaction():
+                                result = aq_agent.run_for_locality(
+                                    conn,
+                                    locality,
+                                    openaq_client=openaq_client,
+                                    cpcb_client=cpcb_client,
+                                    aqicn_client=aqicn_client,
+                                    trend_days=trend_days,
+                                )
+                        except Exception as exc:
+                            slug = (locality or {}).get("slug", "?")
+                            log.warning("air quality failed for %s: %s", slug, exc)
+                            outcome.skipped += 1
+                            continue
+                        outcome.results.append(result)
+                        if result.ok:
+                            outcome.ok += 1
+                        else:
+                            outcome.skipped += 1
 
                 if run_id is not None:
                     db.finish_ingest_run(

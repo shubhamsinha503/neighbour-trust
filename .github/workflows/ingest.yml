@@ -178,7 +178,10 @@ jobs:
         # separately scheduled runs it does not carry over, which is why these
         # two crons each pay their own parse. Worth revisiting if the weekly
         # minutes ever matter.
-        if: steps.which.outputs.agent == 'schools' || steps.which.outputs.agent == 'all'
+        # !cancelled() so an earlier agent failing (e.g. air quality) no longer
+        # skips this one. The whole populate phase used to abort on the first
+        # failed step, leaving every category empty.
+        if: ${{ !cancelled() && (steps.which.outputs.agent == 'schools' || steps.which.outputs.agent == 'all') }}
         run: python -m agents.schools.run
 
       - name: Run connectivity
@@ -194,7 +197,8 @@ jobs:
         # This replaced the Overpass API, which took 20s-4min per locality and
         # never completed a pass; partial runs used to be the normal outcome.
         # They are no longer expected, so a failure here is worth reading.
-        if: steps.which.outputs.agent == 'connectivity' || steps.which.outputs.agent == 'all'
+        # !cancelled() so a failed earlier step no longer skips connectivity.
+        if: ${{ !cancelled() && (steps.which.outputs.agent == 'connectivity' || steps.which.outputs.agent == 'all') }}
         run: |
           python -m agents.infrastructure.run \
             ${{ inputs.refetch_connectivity && '--force' || '' }}
@@ -205,12 +209,12 @@ jobs:
         # surface as "could not answer a test headline", and the fix differs for
         # each. Three seconds here saves reading a fifteen-minute run to learn
         # the same thing less precisely.
-        if: steps.which.outputs.agent == 'news_monitor' || steps.which.outputs.agent == 'all'
+        if: ${{ !cancelled() && (steps.which.outputs.agent == 'news_monitor' || steps.which.outputs.agent == 'all') }}
         continue-on-error: true
         run: python -m scripts.check_classifier
 
       - name: Run news monitor
-        if: steps.which.outputs.agent == 'news_monitor' || steps.which.outputs.agent == 'all'
+        if: ${{ !cancelled() && (steps.which.outputs.agent == 'news_monitor' || steps.which.outputs.agent == 'all') }}
         # `inputs.reclassify == true` rather than a bare truthiness check.
         # GitHub expressions treat any non-empty string as true, and a boolean
         # input does not always arrive as a boolean — from a schedule or the API
