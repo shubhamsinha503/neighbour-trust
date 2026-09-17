@@ -8,21 +8,25 @@
    The status ramp is reserved for status only (AQI bands), never reused as a
    generic series colour. */
 @theme {
-  --color-surface-1: #fcfcfb;
-  --color-page-plane: #f4f4f1;
+  --color-surface-1: #ffffff;
+  --color-page-plane: #fbfbfa;
 
-  --color-ink-primary: #0b0b0b;
-  --color-ink-secondary: #52514e;
-  --color-ink-muted: #898781;
+  --color-ink-primary: #0c0a09;
+  --color-ink-secondary: #57534e;
+  --color-ink-muted: #a8a29e;
 
-  --color-gridline: #e1e0d9;
-  --color-baseline: #c3c2b7;
-  --color-hairline: rgba(11, 11, 11, 0.09);
+  --color-gridline: #ecebe8;
+  --color-baseline: #e2e0dc;
+  --color-hairline: rgba(12, 10, 9, 0.08);
 
-  --color-brand: #147a56;
-  --color-brand-soft: rgba(27, 175, 122, 0.12);
-  --color-brand-deep: #0e5a3f;
-  --color-brand-bright: #1baf7a;
+  /* The brand accent is a single knob. Every text-brand / bg-brand-soft in the
+     app reads from here, so the whole product's colour is these four lines —
+     swap them for clay (#b5502f), teal (#0e6e6e) or coral (#fa5138) and the
+     entire redesign re-skins with no other change. Currently: vibrant pink. */
+  --color-brand: #ff2d78;
+  --color-brand-soft: rgba(255, 45, 120, 0.1);
+  --color-brand-deep: #b0114e;
+  --color-brand-bright: #ff5290;
 
   --color-series-blue: #2a78d6;
   --color-series-violet: #4a3aa7;
@@ -36,7 +40,8 @@
   --color-status-critical: #d03b3b;
   --color-status-severe: #8b2222;
 
-  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-hanken), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-bricolage), var(--font-hanken), system-ui, sans-serif;
 }
 
 html,
@@ -45,6 +50,15 @@ body {
   color: var(--color-ink-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Headings and the score numbers carry the display face; body stays in Hanken.
+   One rule reskins every heading in the app. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 /* The chart's hover layer is keyboard reachable; this keeps the focus ring from

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Caveat } from "next/font/google";
+import { Bricolage_Grotesque, Caveat, Hanken_Grotesk } from "next/font/google";
 
 import { AccountBar } from "@/components/AccountBar";
 import { AuthProvider } from "@/components/AuthProvider";
@@ -12,9 +12,25 @@ import "./globals.css";
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://neighbourtrust.com";
 
-// One script face, loaded once and exposed as a CSS variable. Used only for
-// small handwritten flourishes (the visit counter's "and counting"), never for
-// body or headings — a cursive face at reading sizes hurts legibility.
+// The redesign type system, all self-hosted by next/font (no runtime request to
+// Google, no layout shift). Hanken Grotesk is the body face; Bricolage Grotesque
+// is the display face for headings and the score numbers; Caveat is the one
+// script face, used only for the visit counter's handwritten aside. Each is
+// exposed as a CSS variable and wired into the @theme tokens in globals.css.
+const hanken = Hanken_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-hanken",
+  display: "swap",
+});
+
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  variable: "--font-bricolage",
+  display: "swap",
+});
+
 const caveat = Caveat({
   subsets: ["latin"],
   weight: ["600"],
@@ -76,7 +92,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   // Colours the Android status bar to match the hero, so an installed copy
   // reads as one surface rather than a page inside a browser.
-  themeColor: "#147a56",
+  themeColor: "#ff2d78",
   width: "device-width",
   initialScale: 1,
   // Not `maximumScale: 1`. Locking zoom is the standard way to make a web app
@@ -91,7 +107,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en-IN" className={caveat.variable}>
+    <html
+      lang="en-IN"
+      className={`${hanken.variable} ${bricolage.variable} ${caveat.variable}`}
+    >
       <body className="min-h-screen bg-page-plane">
         {/* Sign-in appears only once Google credentials are configured; until
           * then the site renders exactly as it did without accounts. */}
