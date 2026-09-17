@@ -58,7 +58,12 @@ export const metadata: Metadata = {
   },
 
   icons: {
-    icon: "/favicon.ico",
+    // SVG first so modern browsers show the brand mark (a check in a pin);
+    // favicon.ico stays as the fallback for browsers that ignore SVG icons.
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico" },
+    ],
     apple: "/icons/apple-touch-icon.png",
   },
 

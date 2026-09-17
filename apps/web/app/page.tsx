@@ -6,6 +6,7 @@ import { LocalitySearch } from "@/components/LocalitySearch";
 import { NearMe } from "@/components/NearMe";
 import { ShortlistShortcut } from "@/components/ShortlistShortcut";
 import { Bone, SkeletonRegion, SlowNotice } from "@/components/Skeleton";
+import { LogoMark } from "@/components/Logo";
 import { VisitorBadge } from "@/components/VisitorBadge";
 import { authConfigured } from "@/lib/auth";
 import {
@@ -191,9 +192,7 @@ function Masthead() {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <div className="flex items-center gap-2.5">
-        <div className="flex h-[34px] w-[34px] items-center justify-center rounded-xl bg-brand text-[17px] font-bold text-white">
-          N
-        </div>
+        <LogoMark />
         <div className="font-display text-[20px] font-bold tracking-[-0.02em]">
           Neighbour Trust
         </div>
