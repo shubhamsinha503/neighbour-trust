@@ -34,7 +34,7 @@ export function VisitorBadge({ initial }: { initial: number }) {
   }, []);
 
   return (
-    <p className="mt-2.5 inline-flex items-center gap-1.5 text-[12px] font-medium text-ink-muted">
+    <p className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-ink-muted">
       <span aria-hidden="true">👥</span>
       {/* Indian grouping: 12,384 → 12,384; 1234567 → 12,34,567. */}
       {total.toLocaleString("en-IN")} page views and counting

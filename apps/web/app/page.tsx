@@ -53,16 +53,6 @@ export default function HomePage() {
           Now live in Bengaluru, Gurugram, Hyderabad &amp; Mumbai
         </p>
 
-        {/* The visit tally sits right under coverage: it is social proof, so it
-          * belongs beside the "we are here" line, not buried in the stats strip.
-          * Wrapped in its own Suspense and allowed to fail to nothing — a
-          * counter must never hold up or break the page above the search box. */}
-        <div className="min-h-[22px]">
-          <Suspense fallback={null}>
-            <VisitCount />
-          </Suspense>
-        </div>
-
         <h1 className="mt-4 text-[30px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[38px]">
           Know the neighbourhood
           <br />
@@ -205,11 +195,20 @@ function SearchSkeleton() {
  */
 function Masthead() {
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-brand text-[13px] font-bold text-white">
-        N
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <div className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-brand text-[13px] font-bold text-white">
+          N
+        </div>
+        <div className="text-[14px] font-bold tracking-[-0.01em]">Neighbour Trust</div>
       </div>
-      <div className="text-[14px] font-bold tracking-[-0.01em]">Neighbour Trust</div>
+      {/* The visit tally lives top-right, opposite the logo: social proof at
+        * the masthead, in the space the old decorative panel used to waste.
+        * Its own Suspense, and allowed to fail to nothing — a counter never
+        * holds up or breaks the header. */}
+      <Suspense fallback={null}>
+        <VisitCount />
+      </Suspense>
     </div>
   );
 }
