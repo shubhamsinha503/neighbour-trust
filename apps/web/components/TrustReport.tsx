@@ -161,9 +161,11 @@ export function TrustReport({
             />
           ))}
       </div>
-      <EmptyCategories
-        categories={report.categories.filter((c) => !c.available)}
-      />
+      {/* Categories we have no data for are simply not shown. We still never
+        * estimate them — a blank card is just left out rather than announced,
+        * because "No data yet for Safety, Water" read to a buyer as the product
+        * being broken, not as candour. The score chip already states how many
+        * categories fed it, which is where the honest count belongs. */}
 
       {/* One route in per page, whatever the categories hold. The per-card link
         * only appears on a card with nothing measured, and a category with
@@ -188,26 +190,6 @@ export function TrustReport({
   );
 }
 
-/**
- * The categories with no data, as one line rather than a card each.
- *
- * Still shown. Leaving them out entirely would let the page imply we looked at
- * everything, and what we do not cover is part of what the reader is owed.
- */
-function EmptyCategories({ categories }: { categories: ReportCategory[] }) {
-  if (categories.length === 0) return null;
-
-  return (
-    <div className="mt-2.5 rounded-2xl border border-dashed border-hairline px-3.5 py-3">
-      <p className="text-[11.5px] leading-[1.5] text-ink-secondary">
-        <span className="font-semibold text-ink-primary">
-          No data yet for {categories.map((c) => c.label).join(", ")}.
-        </span>{" "}
-        We leave these empty rather than estimating them.
-      </p>
-    </div>
-  );
-}
 
 
 /** The categories actually behind the number, lowercased for inline use.

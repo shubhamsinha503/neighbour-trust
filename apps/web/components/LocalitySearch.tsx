@@ -429,7 +429,11 @@ function ResultRow({ locality }: { locality: LocalitySummary }) {
           <span className="text-[11px] text-ink-muted">{locality.city}</span>
         </div>
 
-        {flag ? (
+        {/* Only a real flag earns a subline. "Nothing flagged here" and "No
+          * data yet" both read to a searcher as an empty, half-built card, so a
+          * locality with nothing to warn about simply shows its name and score
+          * — the chip already carries how many categories fed that score. */}
+        {flag && (
           <p className="mt-1 flex items-start gap-1.5 text-[11.5px] leading-[1.45] text-ink-secondary">
             <span
               aria-hidden="true"
@@ -440,18 +444,6 @@ function ResultRow({ locality }: { locality: LocalitySummary }) {
               }
             />
             <span className="line-clamp-2">{flag.headline}</span>
-          </p>
-        ) : (
-          <p className="mt-1 text-[11.5px] leading-[1.45] text-ink-muted">
-            {/* Deliberately no longer a count. This read "3 categories of
-              * data" beside a chip reading "2 of 5 categories" — two different
-              * true statements (how many hold data, how many fed the score)
-              * worded almost identically, on the same card, disagreeing at a
-              * glance. The chip owns the counting now; this says the one thing
-              * it cannot, which is that we found nothing to warn about. */}
-            {locality.categoriesWithData > 0
-              ? "Nothing flagged here"
-              : "No data yet"}
           </p>
         )}
       </div>

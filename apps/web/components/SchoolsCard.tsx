@@ -63,7 +63,12 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
         </div>
       </header>
 
-      {/* 2 — stat tiles */}
+      {/* 2 — stat tiles.
+          The count tiles always show. The two staffing tiles only appear when
+          there is staffing data to report: a "—" / "not enough data" tile and a
+          "0 of 17 nearby" tile read to a buyer as a broken product rather than
+          as honesty, so an empty staffing block is left out entirely instead.
+          The card never estimates — it just omits what it cannot fill. */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <StatTile
           label="Within 2 km"
@@ -75,27 +80,24 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
           value={payload.schoolsWithin5km.toString()}
           sub="schools"
         />
-        <StatTile
-          label="Pupils per teacher"
-          value={
-            payload.medianPupilTeacherRatio !== undefined
-              ? payload.medianPupilTeacherRatio.toFixed(0)
-              : "—"
-          }
-          sub={
-            payload.medianPupilTeacherRatio !== undefined
-              ? "median, where known"
-              : "not enough data"
-          }
-        />
-        {/* The most important tile on this card: it is the one that stops the
-            count above from being over-read. */}
-        <StatTile
-          label="Staffing known for"
-          value={payload.schoolsWithStaffingData.toString()}
-          sub={`of ${payload.schoolsWithin2km} nearby`}
-          muted={staffingGap}
-        />
+        {payload.medianPupilTeacherRatio !== undefined && (
+          <StatTile
+            label="Pupils per teacher"
+            value={payload.medianPupilTeacherRatio.toFixed(0)}
+            sub="median, where known"
+          />
+        )}
+        {/* When we do know staffing for some schools, this tile stops the count
+            above from being over-read. When we know it for none, it is hidden
+            rather than shown as "0 of N". */}
+        {payload.schoolsWithStaffingData > 0 && (
+          <StatTile
+            label="Staffing known for"
+            value={payload.schoolsWithStaffingData.toString()}
+            sub={`of ${payload.schoolsWithin2km} nearby`}
+            muted={staffingGap}
+          />
+        )}
       </div>
 
       {payload.boardsAvailable.length > 0 && (
