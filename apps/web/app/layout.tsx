@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Caveat } from "next/font/google";
 
 import { AccountBar } from "@/components/AccountBar";
 import { AuthProvider } from "@/components/AuthProvider";
@@ -10,6 +11,16 @@ import "./globals.css";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://neighbourtrust.com";
+
+// One script face, loaded once and exposed as a CSS variable. Used only for
+// small handwritten flourishes (the visit counter's "and counting"), never for
+// body or headings — a cursive face at reading sizes hurts legibility.
+const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["600"],
+  variable: "--font-caveat",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -80,7 +91,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en-IN">
+    <html lang="en-IN" className={caveat.variable}>
       <body className="min-h-screen bg-page-plane">
         {/* Sign-in appears only once Google credentials are configured; until
           * then the site renders exactly as it did without accounts. */}
