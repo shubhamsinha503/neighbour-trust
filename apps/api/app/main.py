@@ -33,11 +33,12 @@ from apps.api.app.schools_verdict import build_verdict as build_schools_verdict 
 from apps.api.app.verdict import build_verdict  # noqa: E402
 from apps.api.app.accounts import router as accounts_router  # noqa: E402
 from apps.api.app.locality_requests import router as locality_requests_router  # noqa: E402
+from apps.api.app.visits import router as visits_router  # noqa: E402
 
 app = FastAPI(
     title="Neighbour Trust API",
     version="0.1.0",
-    description="Sourced, confidence-tagged neighbourhood data for Bengaluru and Gurugram.",
+    description="Sourced, confidence-tagged neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai.",
 )
 
 # Allowed browser origins. Local dev origins are always permitted; production
@@ -56,6 +57,8 @@ _EXTRA_ORIGINS = [
 app.include_router(accounts_router)
 # Anonymous "please cover this place" requests. See locality_requests.py.
 app.include_router(locality_requests_router)
+# Front-page visit tally — one anonymous number. See visits.py.
+app.include_router(visits_router)
 
 app.add_middleware(
     CORSMiddleware,

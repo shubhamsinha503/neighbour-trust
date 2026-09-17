@@ -446,6 +446,21 @@ export async function fetchStats(): Promise<CoverageStats> {
   };
 }
 
+export async function fetchVisitTotal(): Promise<number> {
+  // A single-row read, and the number people watch tick up — so it is fetched
+  // fresh on every render rather than cached. The client bumps it live on load;
+  // this is only the figure the page first paints with, and a stale one would
+  // show a count lower than the visitor's own view a beat later.
+  const response = await fetch(`${API_BASE}/api/v1/visits`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load visit count (${response.status})`);
+  }
+  const raw = (await response.json()) as Record<string, unknown>;
+  return typeof raw.total === "number" ? raw.total : 0;
+}
+
 // ---------------------------------------------------------------------------
 // Locality summaries — what a search result needs to answer, not just link
 // ---------------------------------------------------------------------------

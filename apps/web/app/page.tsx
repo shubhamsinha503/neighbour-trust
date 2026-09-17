@@ -6,8 +6,14 @@ import { LocalitySearch } from "@/components/LocalitySearch";
 import { NearMe } from "@/components/NearMe";
 import { ShortlistShortcut } from "@/components/ShortlistShortcut";
 import { Bone, SkeletonRegion, SlowNotice } from "@/components/Skeleton";
+import { VisitorBadge } from "@/components/VisitorBadge";
 import { authConfigured } from "@/lib/auth";
-import { fetchLocalitySummaries, fetchStats, type LocalitySummary } from "@/lib/api";
+import {
+  fetchLocalitySummaries,
+  fetchStats,
+  fetchVisitTotal,
+  type LocalitySummary,
+} from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +52,16 @@ export default function HomePage() {
           <span aria-hidden="true">📍</span>
           Now live in Bengaluru, Gurugram, Hyderabad &amp; Mumbai
         </p>
+
+        {/* The visit tally sits right under coverage: it is social proof, so it
+          * belongs beside the "we are here" line, not buried in the stats strip.
+          * Wrapped in its own Suspense and allowed to fail to nothing — a
+          * counter must never hold up or break the page above the search box. */}
+        <div className="min-h-[22px]">
+          <Suspense fallback={null}>
+            <VisitCount />
+          </Suspense>
+        </div>
 
         <h1 className="mt-4 text-[30px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[38px]">
           Know the neighbourhood
@@ -144,6 +160,17 @@ function Coverage({ localities }: { localities: LocalitySummary[] }) {
       </div>
     </div>
   );
+}
+
+/**
+ * Reads the running tally server-side and hands it to the badge to render and
+ * then bump live on load. Fails to nothing: if the API is asleep, the front
+ * page simply shows no counter rather than an error where social proof should be.
+ */
+async function VisitCount() {
+  const total = await fetchVisitTotal().catch(() => null);
+  if (total === null) return null;
+  return <VisitorBadge initial={total} />;
 }
 
 /** Stats are decoration on top of the search; losing them must not cost the page. */
