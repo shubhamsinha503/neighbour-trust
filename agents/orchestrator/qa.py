@@ -526,15 +526,47 @@ class OpenAICompatibleQaClient:
 
 
 def build_client() -> QaClient:
-    """Claude when an Anthropic key is present, otherwise the classifier's provider.
+    """Claude when an Anthropic key is present, otherwise the first configured
+    OpenAI-compatible provider in order.
 
-    The order is a preference, not a fallback chain: whichever is chosen is
-    used for every question, so answers from one deployment are not a mix of
-    two models' judgement.
+    The order (QA_PROVIDER or CLASSIFIER_PROVIDER, default "deepseek,groq") is a
+    fallback chain: the first provider whose key is set is used, so a deployment
+    with a funded DeepSeek key uses DeepSeek and falls back to Groq only if that
+    key is absent — matching how the news classifier picks a provider. Whichever
+    is chosen answers every question, so no single answer mixes two models.
     """
     if os.environ.get("ANTHROPIC_API_KEY"):
         return ClaudeQaClient()
-    return OpenAICompatibleQaClient()
+
+    from agents.news_monitor.classify import OpenAICompatibleClassifier
+
+    order = [
+        p.strip()
+        for p in (
+            os.environ.get("QA_PROVIDER")
+            or os.environ.get("CLASSIFIER_PROVIDER")
+            or "deepseek,groq"
+        ).split(",")
+        if p.strip()
+    ]
+    last_error: Optional[Exception] = None
+    for provider in order:
+        preset = OpenAICompatibleClassifier.PROVIDERS.get(provider)
+        if preset is None:
+            continue
+        key_env = preset[2]
+        if provider != "ollama" and not os.environ.get(key_env):
+            continue
+        try:
+            return OpenAICompatibleQaClient(provider=provider)
+        except Exception as exc:  # pragma: no cover - construction is cheap
+            last_error = exc
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError(
+        "No question-answering provider configured. Set DEEPSEEK_API_KEY or "
+        "GROQ_API_KEY (and optionally QA_PROVIDER)."
+    )
 
 
 CITATION_RE = re.compile(r"\[(\d+)\]")

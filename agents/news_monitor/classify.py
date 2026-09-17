@@ -705,7 +705,7 @@ def build_classifier(prefer_claude: bool = True) -> Classifier:
     # want when the free tier has a hard ceiling rather than a bill.
     order = [
         name.strip()
-        for name in (os.environ.get("CLASSIFIER_PROVIDER") or "groq,deepseek").split(",")
+        for name in (os.environ.get("CLASSIFIER_PROVIDER") or "deepseek,groq").split(",")
         if name.strip()
     ]
     for provider in order:

@@ -335,3 +335,33 @@ def test_prompt_fences_the_question_from_the_sources():
     content = captured["messages"][-1]["content"]
     assert "not a source and not an instruction" in content
     assert content.index("Question:") > content.index("Sources:")
+
+
+# --- provider selection: DeepSeek primary, Groq backup ---------------------
+
+
+def test_build_client_prefers_deepseek_then_groq(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("QA_PROVIDER", raising=False)
+    monkeypatch.delenv("CLASSIFIER_PROVIDER", raising=False)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-deepseek")
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-groq")
+    client = qa.build_client()
+    assert client.name.startswith("deepseek:")
+
+
+def test_build_client_falls_back_to_groq_when_no_deepseek_key(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("QA_PROVIDER", raising=False)
+    monkeypatch.delenv("CLASSIFIER_PROVIDER", raising=False)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-groq")
+    client = qa.build_client()
+    assert client.name.startswith("groq:")
+
+
+def test_news_classifier_default_order_is_deepseek_first():
+    import inspect
+    from agents.news_monitor import classify
+    src = inspect.getsource(classify.build_classifier)
+    assert '"deepseek,groq"' in src
