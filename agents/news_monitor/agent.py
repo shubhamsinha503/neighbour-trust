@@ -23,6 +23,7 @@ caveat as text so the UI cannot quietly drop it.
 from __future__ import annotations
 
 import logging
+import os
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -199,8 +200,11 @@ CLASSIFY_CONCURRENCY = 8
 
 # How many mentions one run may classify. A guard against a fetch explosion
 # running up a bill, not a routine limit — the time budget below is what
-# actually bounds a run.
-CLASSIFY_LIMIT = 4000
+# actually bounds a run. Raised from 4,000 once classification moved to a
+# provider with no per-day cap (DeepSeek): at ~600/min the 45-minute budget
+# allows far more than this, so a single run can now clear a whole backlog
+# rather than leaving thousands for tomorrow. Override with CLASSIFY_LIMIT.
+CLASSIFY_LIMIT = int(os.environ.get("CLASSIFY_LIMIT") or 12000)
 
 
 # Judgements are committed in batches of this size.
