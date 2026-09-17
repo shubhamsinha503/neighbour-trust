@@ -545,7 +545,7 @@ def build_client() -> QaClient:
         for p in (
             os.environ.get("QA_PROVIDER")
             or os.environ.get("CLASSIFIER_PROVIDER")
-            or "deepseek,groq"
+            or "scalemax,deepseek,groq"
         ).split(",")
         if p.strip()
     ]

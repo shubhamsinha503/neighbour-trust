@@ -364,4 +364,4 @@ def test_news_classifier_default_order_is_deepseek_first():
     import inspect
     from agents.news_monitor import classify
     src = inspect.getsource(classify.build_classifier)
-    assert '"deepseek,groq"' in src
+    assert '"scalemax,deepseek,groq"' in src

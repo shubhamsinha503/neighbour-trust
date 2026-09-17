@@ -388,6 +388,11 @@ class OpenAICompatibleClassifier:
         # Cheap rather than free — roughly seventy cents to judge the whole
         # corpus at off-peak rates, and no meaningful rate ceiling.
         "deepseek": ("https://api.deepseek.com", "deepseek-v4-flash", "DEEPSEEK_API_KEY", 600),
+        # ScaleMax is an OpenAI-compatible gateway; one key reaches DeepSeek
+        # variants and Claude. Default to the uncapped flash model for
+        # classification — override with CLASSIFIER_MODEL. Q&A sets QA_MODEL to
+        # a stronger model (e.g. claude-sonnet-4-6).
+        "scalemax": ("https://api.scalemax.pro/token/v1", "dsv4-flash-unlimited", "SCALEMAX_API_KEY", 600),
         "openrouter": ("https://openrouter.ai/api/v1", "", "OPENROUTER_API_KEY", 60),
         "cerebras": ("https://api.cerebras.ai/v1", "", "CEREBRAS_API_KEY", 30),
         # A model you host yourself. No key, no rate limit, no bill.
@@ -705,7 +710,7 @@ def build_classifier(prefer_claude: bool = True) -> Classifier:
     # want when the free tier has a hard ceiling rather than a bill.
     order = [
         name.strip()
-        for name in (os.environ.get("CLASSIFIER_PROVIDER") or "deepseek,groq").split(",")
+        for name in (os.environ.get("CLASSIFIER_PROVIDER") or "scalemax,deepseek,groq").split(",")
         if name.strip()
     ]
     for provider in order:
