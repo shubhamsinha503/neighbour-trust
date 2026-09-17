@@ -387,7 +387,7 @@ class OpenAICompatibleClassifier:
         "groq": ("https://api.groq.com/openai/v1", "qwen/qwen3.8-27b", "GROQ_API_KEY", 14),
         # Cheap rather than free — roughly seventy cents to judge the whole
         # corpus at off-peak rates, and no meaningful rate ceiling.
-        "deepseek": ("https://api.deepseek.com", "deepseek-v4-flash", "DEEPSEEK_API_KEY", 600),
+        "deepseek": ("https://api.deepseek.com", "deepseek-chat", "DEEPSEEK_API_KEY", 600),
         # ScaleMax is an OpenAI-compatible gateway; one key reaches DeepSeek
         # variants and Claude. Default to the uncapped flash model for
         # classification — override with CLASSIFIER_MODEL. Q&A sets QA_MODEL to
@@ -723,7 +723,7 @@ def build_classifier(prefer_claude: bool = True) -> Classifier:
     # want when the free tier has a hard ceiling rather than a bill.
     order = [
         name.strip()
-        for name in (os.environ.get("CLASSIFIER_PROVIDER") or "scalemax,deepseek,groq").split(",")
+        for name in (os.environ.get("CLASSIFIER_PROVIDER") or "deepseek,scalemax,groq").split(",")
         if name.strip()
     ]
     for provider in order:
