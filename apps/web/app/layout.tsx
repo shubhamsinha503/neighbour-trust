@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     template: "%s · Neighbour Trust",
   },
   description:
-    "Sourced, confidence-tagged neighbourhood data for Bengaluru and Gurugram. " +
+    "Sourced, confidence-tagged neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai. " +
     "Air quality, schools, and what local press reports about safety and water.",
   applicationName: "Neighbour Trust",
 
@@ -51,14 +51,14 @@ export const metadata: Metadata = {
     // than a number that impresses once and then quietly misleads.
     description:
       "Know the neighbourhood before you commit to it. Sourced, dated " +
-      "neighbourhood data for Bengaluru and Gurugram.",
+      "neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Neighbour Trust",
     description:
       "Know the neighbourhood before you commit to it. Sourced, dated " +
-      "neighbourhood data for Bengaluru and Gurugram.",
+      "neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai.",
   },
 };
 

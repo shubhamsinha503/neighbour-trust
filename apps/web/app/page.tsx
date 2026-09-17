@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
  * place they care about — and buried the one thing they most need to know
  * before typing anything, which is whether we cover their city at all.
  *
- * So the order is: where we are (Bengaluru and Gurugram, said before anything
+ * So the order is: where we are (the four launch cities, said before anything
  * else), then the box, with examples of the three kinds of thing it accepts,
  * then "near me". Results appear only once something is typed. The full list
  * still exists, one link away on /localities, which also keeps every locality
@@ -44,7 +44,7 @@ export default function HomePage() {
           * getting nothing. */}
         <p className="inline-flex items-center gap-2 rounded-full bg-brand-soft px-3 py-1.5 text-[12px] font-semibold text-brand-deep">
           <span aria-hidden="true">📍</span>
-          Now live in Bengaluru &amp; Gurugram
+          Now live in Bengaluru, Gurugram, Hyderabad &amp; Mumbai
         </p>
 
         <h1 className="mt-4 text-[30px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[38px]">

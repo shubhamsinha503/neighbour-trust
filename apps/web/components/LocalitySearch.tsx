@@ -598,7 +598,7 @@ function PlaceResult({
         <p className="mt-1.5 text-[12px] leading-[1.55] text-ink-secondary">
           {place.nearest
             ? `The closest locality we cover is ${place.nearest.locality.name}, ${place.nearest.locality.city} — ${formatKm(place.nearest.km)} away.`
-            : "We cover parts of Bengaluru and Gurugram so far."}
+            : "We cover parts of Bengaluru, Gurugram, Hyderabad and Mumbai so far."}
         </p>
         <RequestLocality
           context={{

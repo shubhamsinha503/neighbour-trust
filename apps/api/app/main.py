@@ -11,7 +11,10 @@ Run from the repo root:
 from __future__ import annotations
 
 import hmac
+import logging
 import os
+import threading
+import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -344,15 +347,14 @@ class LocalitySummary(BaseModel):
     )
 
 
-@app.get("/api/v1/localities/summary", response_model=list[LocalitySummary])
-def get_locality_summaries() -> list[dict[str, Any]]:
-    """Every locality with its score and worst flag.
+def _build_locality_summaries() -> list[dict[str, Any]]:
+    """Build every locality's summary — a report per locality. The expensive part.
 
-    Builds each report rather than storing a summary: the scoring rules and flag
-    thresholds change often, and a stored copy would drift from the reports it
-    claims to summarise. Cached at the edge instead — see the frontend's
-    revalidate — so the cost is paid once every few minutes rather than per
-    visitor.
+    Kept as a report build rather than a stored column so the score and flags
+    never drift from what a locality page shows. At a few hundred localities
+    that is a couple of seconds; across two more cities it is ~20, which is why
+    the endpoint below serves this from a cache and refreshes it off the request
+    path rather than paying it per request.
     """
     out: list[dict[str, Any]] = []
     with db.connect() as conn:
@@ -371,9 +373,6 @@ def get_locality_summaries() -> list[dict[str, Any]]:
                     "lon": locality["lon"],
                     "categories_with_data": coverage.get(locality["h3_cell"], 0),
                     "score": report.trust_score.score,
-                    # From the same report object the locality page renders, so
-                    # the two views cannot disagree about how the number was
-                    # built.
                     "scored_categories": [
                         score_mod.LABELS.get(c.category, c.category)
                         for c in report.trust_score.categories
@@ -383,6 +382,56 @@ def get_locality_summaries() -> list[dict[str, Any]]:
                 }
             )
     return out
+
+
+# In-process cache for the summary. One Render instance, one worker, so a module
+# global is the whole story — no Redis for a value that is the same for everyone
+# and cheap to rebuild. A background thread keeps it warm; the request path only
+# reads it. Stale-while-revalidate: an expired cache is still served while a
+# refresh runs, so a visitor never waits on the ~20s build.
+_SUMMARY_TTL_SECONDS = int(os.environ.get("SUMMARY_TTL_SECONDS", "300"))
+_summary_cache: dict[str, Any] = {"data": None, "at": 0.0}
+_summary_lock = threading.Lock()
+
+
+def _refresh_summary_cache() -> None:
+    try:
+        data = _build_locality_summaries()
+    except Exception as exc:  # a transient DB error must not kill the refresher
+        logging.getLogger(__name__).warning("summary refresh failed: %s", exc)
+        return
+    _summary_cache["data"] = data
+    _summary_cache["at"] = time.time()
+
+
+def _summary_refresher() -> None:
+    while True:
+        _refresh_summary_cache()
+        time.sleep(_SUMMARY_TTL_SECONDS)
+
+
+@app.get("/api/v1/localities/summary", response_model=list[LocalitySummary])
+def get_locality_summaries() -> list[dict[str, Any]]:
+    """Every locality with its score and worst flag, served from a warm cache.
+
+    The build is paid by a background refresher, not by the request. If the
+    cache is still cold (first request after a restart, before the warmer has
+    finished), this builds once under a lock so concurrent requests do not all
+    build at the same time.
+    """
+    if _summary_cache["data"] is not None:
+        return _summary_cache["data"]
+    with _summary_lock:
+        if _summary_cache["data"] is None:
+            _refresh_summary_cache()
+    return _summary_cache["data"] or []
+
+
+@app.on_event("startup")
+def _start_summary_refresher() -> None:
+    # Daemon so it never blocks shutdown. Warms the cache immediately, then
+    # every TTL, so the first real request after startup already has data.
+    threading.Thread(target=_summary_refresher, daemon=True).start()
 
 
 @app.get("/api/v1/localities", response_model=list[Locality])

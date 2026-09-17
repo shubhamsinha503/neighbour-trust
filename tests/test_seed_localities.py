@@ -17,6 +17,8 @@ from agents.common.seed_localities import LOCALITIES
 CITY_BOX = {
     "Bengaluru": (12.70, 13.25, 77.30, 77.90),
     "Gurugram": (28.25, 28.60, 76.80, 77.20),
+    "Hyderabad": (17.10, 17.70, 78.15, 78.80),
+    "Mumbai": (18.85, 19.35, 72.60, 73.15),
 }
 
 
@@ -45,9 +47,9 @@ def test_coordinates_are_in_the_stated_city(row):
     assert lon_min <= lon <= lon_max, f"{slug}: longitude {lon} is outside {city}"
 
 
-def test_both_launch_cities_are_represented():
+def test_all_seeded_cities_are_represented():
     cities = {row[2] for row in LOCALITIES}
-    assert cities == {"Bengaluru", "Gurugram"}
+    assert cities == {"Bengaluru", "Gurugram", "Hyderabad", "Mumbai"}
 
 
 def test_pincodes_look_like_pincodes():

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "All localities",
   description:
-    "Every locality Neighbour Trust covers in Bengaluru and Gurugram, with its Trust Score and anything flagged.",
+    "Every locality Neighbour Trust covers in Bengaluru, Gurugram, Hyderabad and Mumbai, with its Trust Score and anything flagged.",
 };
 
 /**
@@ -43,7 +43,7 @@ export default async function LocalitiesPage({
       </Link>
       <h1 className="mt-3 text-[23px] font-bold tracking-[-0.01em]">All localities</h1>
       <p className="mt-1 text-[13px] text-ink-secondary">
-        Bengaluru and Gurugram. Best documented first.
+        Bengaluru, Gurugram, Hyderabad and Mumbai. Best documented first.
       </p>
 
       <div className="mt-5">

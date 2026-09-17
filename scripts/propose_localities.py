@@ -118,6 +118,29 @@ CITIES: dict[str, dict[str, Any]] = {
         # seed list as a Gurugram locality, so its neighbourhoods belong here.
         "aliases": ["Gurgaon", "Manesar"],
     },
+    "Hyderabad": {
+        "state": "Telangana",
+        "extract": "southern-zone",
+        "centre": (17.3850, 78.4867),
+        "radius_km": 28.0,
+        # Secunderabad is the twin city (place=city on its own centre); a buyer
+        # searching it means Hyderabad. HITEC City / Gachibowli sprawl to the
+        # west is within the radius. Aliases are tuned after the first run once
+        # the rejection reasons show which settlement names swallow real
+        # neighbourhoods.
+        "aliases": ["Hyderabad", "Secunderabad"],
+    },
+    "Mumbai": {
+        "state": "Maharashtra",
+        "extract": "western-zone",
+        # Colaba is the southern tip; the suburbs run ~25 km north to Dahisar.
+        "centre": (19.1000, 72.8700),
+        "radius_km": 25.0,
+        # Navi Mumbai and Thane are separate municipalities (place=city), so
+        # their neighbourhoods are attributed to them and left out of Mumbai for
+        # now — a deliberate first-pass boundary, widened later if wanted.
+        "aliases": ["Bombay"],
+    },
 }
 
 # Two candidates closer than this with the same name are the same place mapped

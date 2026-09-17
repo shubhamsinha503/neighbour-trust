@@ -53,6 +53,9 @@ SOURCE_URL = "https://www.openstreetmap.org/copyright"
 EXTRACTS: dict[str, str] = {
     "southern-zone": "https://download.geofabrik.de/asia/india/southern-zone-latest.osm.pbf",
     "northern-zone": "https://download.geofabrik.de/asia/india/northern-zone-latest.osm.pbf",
+    # Maharashtra (Mumbai) and Gujarat. Added for the Hyderabad/Mumbai launch —
+    # Hyderabad rides in southern-zone, Mumbai needs this one.
+    "western-zone": "https://download.geofabrik.de/asia/india/western-zone-latest.osm.pbf",
 }
 
 DEFAULT_CACHE = pathlib.Path(".cache/osm")
