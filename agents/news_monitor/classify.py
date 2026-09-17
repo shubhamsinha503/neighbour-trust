@@ -392,7 +392,13 @@ class OpenAICompatibleClassifier:
         # variants and Claude. Default to the uncapped flash model for
         # classification — override with CLASSIFIER_MODEL. Q&A sets QA_MODEL to
         # a stronger model (e.g. claude-sonnet-4-6).
-        "scalemax": ("https://api.scalemax.pro/token/v1", "dsv4-flash-unlimited", "SCALEMAX_API_KEY", 600),
+        #
+        # 60 calls/min, not the hundreds the others allow: this account's plan
+        # rate-limits concurrent requests (a 429 with Retry-After: 60), so the
+        # shared pacing serialises calls ~1s apart, keeping one or two in flight
+        # rather than the eight the worker pool would otherwise launch at once.
+        # Raise CLASSIFIER_CALLS_PER_MINUTE if the ScaleMax plan allows more.
+        "scalemax": ("https://api.scalemax.pro/token/v1", "dsv4-flash-unlimited", "SCALEMAX_API_KEY", 60),
         "openrouter": ("https://openrouter.ai/api/v1", "", "OPENROUTER_API_KEY", 60),
         "cerebras": ("https://api.cerebras.ai/v1", "", "CEREBRAS_API_KEY", 30),
         # A model you host yourself. No key, no rate limit, no bill.
@@ -481,6 +487,13 @@ class OpenAICompatibleClassifier:
         self._client = OpenAI(
             api_key=key or "not-needed",
             base_url=base_url or default_url,
+            # The SDK's default is 2 retries that honour a rate-limit
+            # Retry-After — and ScaleMax answers a 429 with Retry-After: 60, so
+            # a rate-limited call blocked a worker for up to 120 seconds and the
+            # 45-minute classify budget evaporated on waiting. Fail fast instead:
+            # a 429 becomes an undecided mention that the next run picks up, and
+            # the per-provider pacing below is what keeps us under the limit.
+            max_retries=0,
         )
         self.name = f"{provider}:{self._model}"
 
