@@ -34,18 +34,25 @@ export function VisitorBadge({ initial }: { initial: number }) {
   }, []);
 
   return (
-    <p className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-ink-muted">
-      <span aria-hidden="true">👥</span>
-      {/* Indian grouping: 12,384 → 12,384; 1234567 → 12,34,567. */}
-      <span>{total.toLocaleString("en-IN")} page views</span>
-      {/* The one handwritten flourish on the site: a crisp number, then a
-        * cursive aside. The number stays legible; the personality lives in the
-        * tag. Caveat is loaded in the root layout as var(--font-caveat). */}
+    <p className="inline-flex shrink-0 items-baseline gap-x-2 whitespace-nowrap">
+      <span aria-hidden="true" className="self-center text-[17px]">
+        👥
+      </span>
+      {/* The number leads, big and crisp in the display face. Indian grouping:
+        * 12,384 → 12,384; 1234567 → 12,34,567. */}
+      <span className="font-display font-bold leading-none tracking-[-0.02em] text-ink-primary text-[clamp(22px,5.5vw,30px)]">
+        {total.toLocaleString("en-IN")}
+      </span>
+      <span className="text-[clamp(13px,2.4vw,15px)] font-medium text-ink-secondary">
+        page views
+      </span>
+      {/* The one handwritten flourish on the site: a cursive aside in the brand
+        * colour. Caveat is loaded in the root layout as var(--font-caveat). */}
       <span
-        className="-ml-0.5 inline-block text-brand"
+        className="inline-block text-brand"
         style={{
           fontFamily: "var(--font-caveat), cursive",
-          fontSize: "16px",
+          fontSize: "clamp(24px, 6vw, 34px)",
           lineHeight: 1,
           transform: "rotate(-4deg)",
         }}

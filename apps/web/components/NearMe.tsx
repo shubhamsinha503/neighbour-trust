@@ -148,20 +148,23 @@ export function NearMe({ localities }: { localities: LocalitySummary[] }) {
         {state.status === "locating" ? "Finding you…" : "Show my neighbourhood"}
       </button>
 
-      <p className="mt-2 text-center text-[11px] leading-[1.5] text-ink-muted">
-        {state.status === "idle" || state.status === "locating" ? (
-          <>Your location stays in your browser — it is never sent to us.</>
-        ) : state.status === "uncovered" ? (
-          <>
-            We don&apos;t cover your area yet — we&apos;re in Bengaluru and
-            Gurugram so far. Search for a locality there instead.
-          </>
-        ) : state.status === "denied" ? (
-          <>No problem — search for the area you have in mind below.</>
-        ) : (
-          <>{state.message} Search for a locality below instead.</>
-        )}
-      </p>
+      {/* Only shown when there's something to say — a coverage miss, a denied
+        * permission, or an error. The idle reassurance line was removed. */}
+      {state.status !== "idle" && state.status !== "locating" && (
+        <p className="mt-2 text-center text-[11px] leading-[1.5] text-ink-muted">
+          {state.status === "uncovered" ? (
+            <>
+              We don&apos;t cover your area yet — we&apos;re in Bengaluru,
+              Gurugram, Hyderabad and Mumbai so far. Search for a locality there
+              instead.
+            </>
+          ) : state.status === "denied" ? (
+            <>No problem — search for the area you have in mind below.</>
+          ) : (
+            <>{state.message} Search for a locality below instead.</>
+          )}
+        </p>
+      )}
     </div>
   );
 }

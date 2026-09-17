@@ -45,15 +45,9 @@ export default function HomePage() {
       <Masthead />
 
       <section className="mt-8 sm:mt-12">
-        {/* Coverage first. Someone in Pune should learn in one second that this
-          * is not for them yet, not after searching for their locality and
-          * getting nothing. */}
-        <p className="inline-flex items-center gap-2 rounded-full bg-brand-soft px-3 py-1.5 text-[12px] font-semibold text-brand-deep">
-          <span aria-hidden="true">📍</span>
-          Now live in Bengaluru, Gurugram, Hyderabad &amp; Mumbai
-        </p>
-
-        <h1 className="mt-4 text-[30px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[38px]">
+        {/* Coverage is stated by the city tiles further down rather than a badge
+          * here, so the hero opens straight on the headline. */}
+        <h1 className="text-[30px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[38px]">
           Know the neighbourhood
           <br />
           before you commit to it.
@@ -195,20 +189,26 @@ function SearchSkeleton() {
  */
 function Masthead() {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2">
-        <div className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-brand text-[13px] font-bold text-white">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-[34px] w-[34px] items-center justify-center rounded-xl bg-brand text-[17px] font-bold text-white">
           N
         </div>
-        <div className="text-[14px] font-bold tracking-[-0.01em]">Neighbour Trust</div>
+        <div className="font-display text-[20px] font-bold tracking-[-0.02em]">
+          Neighbour Trust
+        </div>
       </div>
-      {/* The visit tally lives top-right, opposite the logo: social proof at
-        * the masthead, in the space the old decorative panel used to waste.
-        * Its own Suspense, and allowed to fail to nothing — a counter never
-        * holds up or breaks the header. */}
-      <Suspense fallback={null}>
-        <VisitCount />
-      </Suspense>
+      {/* The visit tally, enlarged to own the top-right rather than sit tiny in
+        * the corner: social proof at the masthead, in the space the old
+        * decorative panel used to waste. `ml-auto` keeps it right-aligned both
+        * inline and when it wraps below the logo on a narrow screen. Its own
+        * Suspense, and allowed to fail to nothing — a counter never holds up or
+        * breaks the header. */}
+      <div className="ml-auto">
+        <Suspense fallback={null}>
+          <VisitCount />
+        </Suspense>
+      </div>
     </div>
   );
 }
