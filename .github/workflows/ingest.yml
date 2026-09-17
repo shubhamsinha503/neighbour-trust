@@ -95,8 +95,13 @@ jobs:
       OPENAQ_API_KEY: ${{ secrets.OPENAQ_API_KEY }}
       AQICN_TOKEN: ${{ secrets.AQICN_TOKEN }}
       DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+      # Direct Anthropic key is out of credit, and ScaleMax reaches Claude
+      # (claude-sonnet-4-6) through its gateway anyway — so it is unmapped to
+      # stop the classifier probing a dead key and logging "credit balance too
+      # low" every run. Re-add these two lines to use a recharged Anthropic key
+      # directly (build_classifier tries it first when ANTHROPIC_API_KEY is set).
+      # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
       # Free-tier fallback for the headline classifier. The classifier is the
       # only per-item cost here, and exhausting it stops the news pipeline dead
       # — which it did, leaving 802 headlines unjudged and every safety card
@@ -106,7 +111,12 @@ jobs:
       # Paid fallback for when the free tier's 8,000 tokens a minute runs out.
       # About a dollar a month at current volumes.
       DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-      # Which providers to try and in what order; blank means groq,deepseek.
+      # ScaleMax: OpenAI-compatible gateway, the default primary provider. A
+      # repo secret alone is not enough — GitHub only exposes a secret to the
+      # job when it is mapped here, which is why adding the secret without this
+      # line left the run falling through to Groq.
+      SCALEMAX_API_KEY: ${{ secrets.SCALEMAX_API_KEY }}
+      # Which providers to try and in what order; blank means scalemax,deepseek,groq.
       # An unset repository variable arrives as an empty string rather than as
       # absent, so every reader of these uses `or` and not a dict default.
       CLASSIFIER_PROVIDER: ${{ vars.CLASSIFIER_PROVIDER }}

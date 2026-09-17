@@ -699,10 +699,10 @@ def build_classifier(prefer_claude: bool = True) -> Classifier:
                 return claude
             log.warning(
                 "Claude built but could not answer a test headline — usually an "
-                "exhausted credit balance. Trying Groq."
+                "exhausted credit balance. Falling through to the next provider."
             )
         except Exception as exc:
-            log.warning("Claude classifier unavailable (%s); trying Groq", exc)
+            log.warning("Claude classifier unavailable (%s); falling through to the next provider", exc)
 
     # Providers are tried in the order named by CLASSIFIER_PROVIDER, so which
     # one leads is a deployment decision rather than a code change. Default order
