@@ -88,7 +88,7 @@ jobs:
     # The scheduled crons each run one agent and fit comfortably; this ceiling
     # is for the manual `all` run. Minutes are free on a public repository, so
     # the only thing a generous limit costs is a later failure signal.
-    timeout-minutes: 90
+    timeout-minutes: 110
 
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}

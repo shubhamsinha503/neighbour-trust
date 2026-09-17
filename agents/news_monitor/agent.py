@@ -204,7 +204,7 @@ CLASSIFY_CONCURRENCY = 8
 # provider with no per-day cap (DeepSeek): at ~600/min the 45-minute budget
 # allows far more than this, so a single run can now clear a whole backlog
 # rather than leaving thousands for tomorrow. Override with CLASSIFY_LIMIT.
-CLASSIFY_LIMIT = int(os.environ.get("CLASSIFY_LIMIT") or 12000)
+CLASSIFY_LIMIT = int(os.environ.get("CLASSIFY_LIMIT") or 25000)
 
 
 # Judgements are committed in batches of this size.
@@ -226,7 +226,7 @@ COMMIT_EVERY = 50
 # locality's envelopes afterwards, inside the workflow's 90-minute limit, and a
 # run that is killed publishes nothing while one that stops early publishes what
 # it judged. Override with NEWS_RUN_BUDGET_MINUTES.
-DEFAULT_RUN_BUDGET_MINUTES = 70.0
+DEFAULT_RUN_BUDGET_MINUTES = 85.0
 
 # How long fetching may take before the rest of the localities wait for the
 # next run, oldest-fetched first. Leaves most of the run for classification,
