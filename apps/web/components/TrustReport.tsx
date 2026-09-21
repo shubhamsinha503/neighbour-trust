@@ -333,7 +333,7 @@ function NearbyList({ connectivity }: { connectivity: ConnectivityView }) {
               <div className="text-[12.5px] font-medium text-ink-primary">
                 {row.label}
               </div>
-              <div className="text-[10.5px] text-ink-muted">{row.count} nearby</div>
+              <div className="text-[10.5px] text-ink-secondary">{row.count} nearby</div>
             </div>
             <div className="shrink-0 text-right">
               {row.km !== null ? (
@@ -341,19 +341,19 @@ function NearbyList({ connectivity }: { connectivity: ConnectivityView }) {
                   <div className="text-[13px] font-bold text-ink-primary">
                     {distanceText(row.km)}
                   </div>
-                  <div className="text-[10px] text-ink-muted">
+                  <div className="text-[10px] text-ink-secondary">
                     nearest · {walkText(row.km)}
                   </div>
                 </>
               ) : (
-                <div className="text-[11px] text-ink-muted">count only</div>
+                <div className="text-[11px] text-ink-secondary">count only</div>
               )}
             </div>
           </li>
         ))}
       </ul>
       {industrial > 0 && (
-        <p className="mt-2 text-[10.5px] leading-[1.5] text-ink-muted">
+        <p className="mt-2 text-[10.5px] leading-[1.5] text-ink-secondary">
           Also nearby: {industrial} industrial{" "}
           {industrial === 1 ? "site" : "sites"} — worth noting for a home.
         </p>

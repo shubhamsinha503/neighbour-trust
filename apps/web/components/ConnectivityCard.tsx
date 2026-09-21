@@ -28,18 +28,19 @@
 
 import { useState } from "react";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL, relativeAge } from "@/lib/aqi";
-import { LocalityMap } from "@/components/LocalityMap";
 import { MeasureFrom, haversineKm, type Origin } from "@/components/MeasureFrom";
 import type { ConnectivityFeature, ConnectivityView } from "@/lib/api";
 
-const KIND_LABEL: Record<ConnectivityFeature["kind"], string> = {
-  metro_rail: "Station",
-  hospitals: "Hospital",
-  clinics: "Clinic",
-  parks: "Park",
-  markets: "Supermarket",
-  industrial_sites: "Industrial land",
-};
+function distanceText(km: number): string {
+  const m = km * 1000;
+  return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${km.toFixed(1)} km`;
+}
+
+/** ~80 m/min is an unhurried walk; past a quarter-hour it is really a drive. */
+function walkText(km: number): string {
+  const mins = Math.max(1, Math.round((km * 1000) / 80));
+  return mins <= 15 ? `~${mins} min walk` : "a short drive";
+}
 
 /** Nearest feature of a kind to a point, or undefined if there is none. */
 export function nearestOf(
@@ -63,29 +64,36 @@ export function ConnectivityCard({ view }: { view: ConnectivityView }) {
   const canMeasure = features.length > 0;
   const from = origin ?? { lat: locality.lat, lon: locality.lon };
 
-  // Recomputed when we have the features; otherwise the stored centroid
-  // distances stand, which is what older envelopes carry.
-  const rows: Array<{
-    kind: ConnectivityFeature["kind"];
-    km?: number;
-    name?: string;
-    count: number;
-  }> = (
+  // The amenities a buyer weighs, each as its nearest with a walk time.
+  // Re-measured from the reader's address when given, otherwise from the
+  // centroid; older envelopes without per-feature coordinates keep the stored
+  // centroid distance where one exists. Industrial land is not an amenity, so
+  // it is a footnote below rather than a row.
+  const storedKm: Record<string, number | undefined> = {
+    metro_rail: nearest.stationKm,
+    hospitals: nearest.hospitalKm,
+    parks: nearest.parkKm,
+  };
+  const rows = (
     [
-      ["metro_rail", nearest.stationKm, counts.metroRail],
-      ["hospitals", nearest.hospitalKm, counts.hospitals],
-      ["parks", nearest.parkKm, counts.parks],
-      ["industrial_sites", nearest.industryKm, counts.industrialSites],
+      ["hospitals", "Hospitals", counts.hospitals],
+      ["parks", "Parks", counts.parks],
+      ["markets", "Supermarkets", counts.markets],
+      ["clinics", "Clinics", counts.clinics],
+      ["metro_rail", "Transit stations", counts.metroRail],
     ] as const
-  ).map(([kind, storedKm, count]) => {
-    const live = canMeasure ? nearestOf(features, kind, from) : undefined;
-    return {
-      kind,
-      km: live ? live.km : storedKm,
-      name: live?.name,
-      count,
-    };
-  });
+  )
+    .map(([kind, label, count]) => {
+      const live = canMeasure ? nearestOf(features, kind, from) : undefined;
+      return {
+        kind,
+        label,
+        count,
+        km: live ? live.km : storedKm[kind],
+        name: live?.name,
+      };
+    })
+    .filter((row) => row.count > 0);
 
   return (
     <article className="rounded-[20px] border border-hairline bg-surface-1 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
@@ -101,16 +109,9 @@ export function ConnectivityCard({ view }: { view: ConnectivityView }) {
         </div>
       </header>
 
-      {/* Above the address box on purpose. The map is the answer to "what is it
-          like around here", which is the question that brought someone to the
-          page; measuring from a specific address is a refinement of it. */}
-      <LocalityMap
-        localityName={locality.name}
-        lat={locality.lat}
-        lon={locality.lon}
-        features={view.features}
-      />
-
+      {/* The amenity-icon map is gone — a dot cloud looked like information and
+          was noise. The nearest-distance list below answers what a reader came
+          to ask; the address box refines it. */}
       {canMeasure ? (
         <MeasureFrom
           localityName={locality.name}
@@ -127,49 +128,51 @@ export function ConnectivityCard({ view }: { view: ConnectivityView }) {
         </p>
       )}
 
-      <ul className="mt-4 flex flex-col gap-2">
+      <ul className="mt-4 flex flex-col">
         {rows.map((row) => (
           <li
             key={row.kind}
-            className="flex items-baseline justify-between gap-3 border-b border-gridline pb-2 last:border-0"
+            className="flex items-baseline justify-between gap-3 border-b border-gridline py-2 last:border-0"
           >
             <div className="min-w-0">
               <div className="text-[12.5px] font-medium text-ink-primary">
-                {KIND_LABEL[row.kind]}
+                {row.label}
                 {row.name ? (
                   <span className="font-normal text-ink-secondary"> · {row.name}</span>
                 ) : null}
               </div>
-              <div className="text-[10.5px] text-ink-muted">
-                {row.count} within the locality
-              </div>
+              <div className="text-[10.5px] text-ink-secondary">{row.count} nearby</div>
             </div>
             <div className="shrink-0 text-right">
               {row.km !== undefined ? (
-                <div className="text-[13px] font-bold text-ink-primary">
-                  {row.km.toFixed(2)} km
-                </div>
+                <>
+                  <div className="text-[13px] font-bold text-ink-primary">
+                    {distanceText(row.km)}
+                  </div>
+                  <div className="text-[10px] text-ink-secondary">
+                    nearest · {walkText(row.km)}
+                  </div>
+                </>
               ) : (
-                /* The absence is the finding: nothing of this kind was mapped
-                   inside the search radius at all. */
-                <div className="text-[11px] text-ink-muted">none nearby</div>
+                <div className="text-[11px] text-ink-secondary">count only</div>
               )}
             </div>
           </li>
         ))}
       </ul>
-
-      <div className="mt-4 rounded-2xl bg-brand-soft px-3.5 py-3">
-        <b className="text-[12px] text-brand-deep">What this does and does not say</b>
-        <p className="mt-1 text-[11.5px] leading-[1.5] text-ink-secondary">
-          {view.scopeNote}
-          {origin
-            ? " Distances are measured from your address; the counts beside them" +
-              " describe the whole locality and are not recounted from it, because" +
-              " they were gathered in a circle around the centre."
-            : ""}
+      {counts.industrialSites > 0 && (
+        <p className="mt-2 text-[10.5px] leading-[1.5] text-ink-secondary">
+          Also nearby: {counts.industrialSites} industrial{" "}
+          {counts.industrialSites === 1 ? "site" : "sites"} — worth noting for a
+          home.
         </p>
-      </div>
+      )}
+      {origin && (
+        <p className="mt-2 text-[10px] leading-[1.5] text-ink-muted">
+          Distances are measured from your address; counts describe the whole
+          locality.
+        </p>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-gridline pt-3">
         <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-ink-secondary">
