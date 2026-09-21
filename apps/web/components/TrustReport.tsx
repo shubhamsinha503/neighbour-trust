@@ -21,11 +21,12 @@
 import Link from "next/link";
 import type { Confidence } from "@schema/envelope";
 import { ExpandableCard } from "@/components/ExpandableCard";
-import { LocalityMap } from "@/components/LocalityMap";
+import { haversineKm } from "@/components/MeasureFrom";
 import { UpcomingCard } from "@/components/UpcomingCard";
 import { joinCategoryLabels } from "@/lib/categories";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
 import type {
+  ConnectivityFeature,
   ConnectivityView,
   Flag,
   LocalityReport,
@@ -101,24 +102,18 @@ export function TrustReport({
           </div>
         )}
 
-        {/* 3 — the place itself.
+        {/* 3 — what's nearby, answered as distances rather than a map.
           *
-          * Directly under the verdict and the flags, because this is the report
-          * page: it is where people land, and it was the one page with nothing
-          * on it that distinguished one neighbourhood from another. Every
-          * locality rendered the same ring above the same paragraphs.
+          * This replaced a scatter of ~200 amenity icons across distance rings.
+          * That map looked like information and was noise: a buyer cannot read
+          * "is this well connected" out of a dot cloud. The question they have is
+          * "how close is what I need", so the answer is that — the nearest of
+          * each kind, with a walk time, and industrial land flagged as the
+          * downside it is rather than mixed in with the amenities.
           *
-          * It sits after the flags rather than before, so a serious warning is
-          * still the first thing read. Absent connectivity simply means no map,
-          * never a gap where one should be. */}
-        {connectivity && connectivity.features.length > 0 && (
-          <LocalityMap
-            localityName={locality.name}
-            lat={locality.lat}
-            lon={locality.lon}
-            features={connectivity.features}
-          />
-        )}
+          * Absent connectivity simply means this section does not render, never a
+          * gap where it should be. */}
+        {connectivity && <NearbyList connectivity={connectivity} />}
 
         {/* 6 — source strip, kept with the score where it does its work */}
         {report.sourcesUsed.length > 0 && (
@@ -232,15 +227,121 @@ function FlagCard({ flag }: { flag: Flag }) {
         <path d="M10.3 3.9L2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
       </svg>
       <div>
+        {/* Just the finding. The paragraph of caveat that used to sit here — that
+          * press coverage is not a crime rate, that flooding is a property of a
+          * place, that no official water source exists — is true and important,
+          * but it is the same on every locality and belongs in the policy page,
+          * not repeated under every flag. */}
         <b className="text-[12.5px] leading-[1.4]">{flag.headline}</b>
-        <p className="mt-1 text-[11.5px] leading-[1.5] text-ink-secondary">
-          {flag.detail}
-        </p>
       </div>
     </div>
   );
 }
 
+
+/**
+ * What's nearby, as the nearest of each kind with a walk time — the honest
+ * answer to the question a buyer actually has, in place of the amenity-icon map.
+ *
+ * Counts come from the stored locality-wide totals; the nearest distance is
+ * measured from the centroid over the mapped features, so a locality whose
+ * envelope predates per-feature coordinates still shows counts, just without a
+ * distance. Industrial land is not an amenity, so it is a footnote, not a row.
+ */
+const NEARBY_KINDS: Array<{
+  countKey: keyof ConnectivityView["counts"];
+  kind: ConnectivityFeature["kind"];
+  label: string;
+}> = [
+  { countKey: "hospitals", kind: "hospitals", label: "Hospitals" },
+  { countKey: "parks", kind: "parks", label: "Parks" },
+  { countKey: "markets", kind: "markets", label: "Supermarkets" },
+  { countKey: "clinics", kind: "clinics", label: "Clinics" },
+  { countKey: "metroRail", kind: "metro_rail", label: "Transit stations" },
+];
+
+function nearestKm(
+  features: ConnectivityFeature[],
+  kind: ConnectivityFeature["kind"],
+  from: { lat: number; lon: number },
+): number | null {
+  let best = Infinity;
+  for (const f of features) {
+    if (f.kind !== kind) continue;
+    const km = haversineKm(from.lat, from.lon, f.lat, f.lon);
+    if (km < best) best = km;
+  }
+  return best === Infinity ? null : best;
+}
+
+function distanceText(km: number): string {
+  const m = km * 1000;
+  return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${km.toFixed(1)} km`;
+}
+
+/** ~80 m/min is an unhurried walk; past a quarter-hour it is really a drive. */
+function walkText(km: number): string {
+  const mins = Math.max(1, Math.round((km * 1000) / 80));
+  return mins <= 15 ? `~${mins} min walk` : "a short drive";
+}
+
+function NearbyList({ connectivity }: { connectivity: ConnectivityView }) {
+  const { locality, counts, features } = connectivity;
+  const from = { lat: locality.lat, lon: locality.lon };
+
+  const rows = NEARBY_KINDS.map(({ countKey, kind, label }) => ({
+    label,
+    count: counts[countKey],
+    km: nearestKm(features, kind, from),
+  })).filter((row) => row.count > 0);
+
+  if (rows.length === 0) return null;
+
+  const industrial = counts.industrialSites;
+
+  return (
+    <div className="mt-4">
+      <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[0.05em] text-brand">
+        What&apos;s nearby
+      </div>
+      <ul className="flex flex-col">
+        {rows.map((row) => (
+          <li
+            key={row.label}
+            className="flex items-baseline justify-between gap-3 border-b border-gridline py-2 last:border-0"
+          >
+            <div className="min-w-0">
+              <div className="text-[12.5px] font-medium text-ink-primary">
+                {row.label}
+              </div>
+              <div className="text-[10.5px] text-ink-muted">{row.count} nearby</div>
+            </div>
+            <div className="shrink-0 text-right">
+              {row.km !== null ? (
+                <>
+                  <div className="text-[13px] font-bold text-ink-primary">
+                    {distanceText(row.km)}
+                  </div>
+                  <div className="text-[10px] text-ink-muted">
+                    nearest · {walkText(row.km)}
+                  </div>
+                </>
+              ) : (
+                <div className="text-[11px] text-ink-muted">count only</div>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+      {industrial > 0 && (
+        <p className="mt-2 text-[10.5px] leading-[1.5] text-ink-muted">
+          Also nearby: {industrial} industrial{" "}
+          {industrial === 1 ? "site" : "sites"} — worth noting for a home.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function ScoreMeter({ trust }: { trust: LocalityReport["trustScore"] }) {
   const radius = 32;

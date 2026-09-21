@@ -128,16 +128,10 @@ export function UpcomingCard({
           );
         })}
       </ul>
-
-      {/* The caveat that decides whether this section helps or misleads.
-        * Announced is not built, and in India the gap is measured in years. */}
-      <p className="mt-4 border-t border-dashed border-gridline pt-3 text-[11px] leading-[1.55] text-ink-muted">
-        These are press reports, not commitments. Indian infrastructure projects
-        are announced years before they open and many are delayed or dropped —
-        several of the headlines above may themselves be about a delay. Nothing
-        here counts toward the Trust Score, because how much a locality gets
-        written about is not how much is being built there.
-      </p>
+      {/* The "these are reports, not commitments" caveat moved to the policy
+        * page. The section title ("Reported as coming") and the per-item dates
+        * and sources already carry that this is press, not a promise, and the
+        * paragraph read the same under every locality. */}
     </section>
   );
 }
