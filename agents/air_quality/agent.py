@@ -38,6 +38,7 @@ from agents.air_quality import aqi as aqi_lib
 from agents.air_quality.sources import aqicn as aqicn_src
 from agents.air_quality.sources import cpcb as cpcb_src
 from agents.air_quality.sources import openaq as openaq_src
+from agents.air_quality.sources import openmeteo as openmeteo_src
 from agents.common import db
 from agents.common.config import AQICN, DATA_GOV_IN, OPENAQ
 from agents.common.geo import cell_for, haversine_km
@@ -75,6 +76,12 @@ PM25_ONLY_FALLBACK = True
 # A PM2.5-only sensor must be close to be worth reporting — with no second
 # pollutant to corroborate it, distance is the only quality signal left.
 PM25_ONLY_MAX_KM = 8.0
+
+# The floor beneath every station source: when no live station of any kind is in
+# range, the Copernicus CAMS model (via Open-Meteo, free and keyless) gives a
+# modelled PM2.5 concentration for the locality's own coordinates. Published at
+# LOW confidence with aqi_basis="cams_model" so it reads as the estimate it is.
+CAMS_FALLBACK = True
 
 
 @dataclass
@@ -422,7 +429,33 @@ def run_for_locality(
         except Exception as exc:
             log.warning("[%s] PM2.5 fallback failed: %s", slug, exc)
 
-    if reading is None and pm25_only is None:
+    # Final fallback: the CAMS model, which answers for any coordinate. Only
+    # reached when no station of any kind could — which, with CPCB silent, is
+    # most localities. It is a modelled estimate, carried at LOW confidence and
+    # basis="cams_model" so it never passes for a measurement.
+    cams: Optional[StationReading] = None
+    if reading is None and pm25_only is None and CAMS_FALLBACK:
+        try:
+            cams_reading = openmeteo_src.cams_pm25(lat, lon, now=now)
+        except Exception as exc:
+            cams_reading = None
+            log.warning("[%s] CAMS fallback failed: %s", slug, exc)
+        if cams_reading is not None:
+            cams = StationReading(
+                source_name=openmeteo_src.SOURCE_NAME,
+                source_url=openmeteo_src.SOURCE_URL,
+                source_key="cams",
+                external_id=f"cams-{locality['h3_cell']}",
+                name=openmeteo_src.SOURCE_NAME,
+                lat=lat,
+                lon=lon,
+                distance_km=0.0,
+                observed_at=cams_reading.observed_at,
+                concentrations={"pm2_5": cams_reading.pm2_5_24h},
+                latest_hour={"pm2_5": cams_reading.pm2_5_latest},
+            )
+
+    if reading is None and pm25_only is None and cams is None:
         return LocalityResult(
             slug=slug,
             ok=False,
@@ -435,15 +468,16 @@ def run_for_locality(
             ),
         )
 
-    # Adopt the fallback if that is all we have. `result` stays None, which is
-    # what every branch below keys off to know it is publishing a PM2.5 reading
-    # rather than an AQI.
+    # Adopt the best fallback we have, nearest kind of evidence first: a real
+    # community sensor before the model. `result` stays None, which is what every
+    # branch below keys off to know it is publishing a PM2.5 reading, not an AQI.
     pm25_mode = reading is None
+    model_mode = pm25_mode and pm25_only is None  # nothing real; using CAMS
     if pm25_mode:
-        reading = pm25_only
+        reading = pm25_only if pm25_only is not None else cams
         log.info(
-            "[%s] no CPCB-capable station; falling back to PM2.5 only from %s",
-            slug, reading.name,
+            "[%s] no CPCB-capable station; falling back to %s from %s",
+            slug, "CAMS model" if model_mode else "PM2.5-only", reading.name,
         )
 
     sources_used: list[str] = [reading.source_name]
@@ -451,8 +485,9 @@ def run_for_locality(
     confidence = assess_confidence(reading.distance_km, age)
     if confidence is not None and pm25_mode:
         # A single-pollutant reading from a low-cost sensor is a different kind
-        # of evidence, not a lesser grade of the official kind.
-        confidence = Confidence.COMMUNITY_ESTIMATED
+        # of evidence, not a lesser grade of the official kind. A modelled figure
+        # is lower still — it measured nothing here — so it sits at LOW.
+        confidence = Confidence.LOW if model_mode else Confidence.COMMUNITY_ESTIMATED
     if confidence is None:
         return LocalityResult(
             slug=slug,
@@ -488,9 +523,11 @@ def run_for_locality(
         sensor_ids = reading.sensor_ids
         openaq_station_id = station_id
 
-        if reading.source_key != "openaq":
+        if reading.source_key != "openaq" and not model_mode:
             # Primary reading came from data.gov.in, which has no history. Find
             # the matching OpenAQ station for the same place to seed the trend.
+            # Skipped for CAMS: OpenAQ already had nothing (that is why we are on
+            # the model), so this would only spend rate budget to find nothing.
             openaq_reading = None
             try:
                 openaq_reading = next(
@@ -556,7 +593,7 @@ def run_for_locality(
         headline_aqi = round(sub_index, 1)
         band = aqi_lib.band_for(headline_aqi)
         dominant = "PM2.5"
-        basis = "pm2_5_only"
+        basis = "cams_model" if model_mode else "pm2_5_only"
     else:
         headline_aqi = result.aqi
         band = result.band

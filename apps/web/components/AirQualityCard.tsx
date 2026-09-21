@@ -90,13 +90,15 @@ export function AirQualityCard({ view }: { view: AirQualityView }) {
           sub="µg/m³"
         />
         <StatTile
-          label="Nearest station"
+          label={payload.aqiBasis === "cams_model" ? "Source" : "Nearest station"}
           value={
-            payload.nearestStationKm !== undefined
-              ? `${payload.nearestStationKm.toFixed(1)}`
-              : "—"
+            payload.aqiBasis === "cams_model"
+              ? "Model"
+              : payload.nearestStationKm !== undefined
+                ? `${payload.nearestStationKm.toFixed(1)}`
+                : "—"
           }
-          sub="km away"
+          sub={payload.aqiBasis === "cams_model" ? "no live station" : "km away"}
         />
       </div>
 
@@ -107,9 +109,24 @@ export function AirQualityCard({ view }: { view: AirQualityView }) {
             <strong className="font-semibold">{payload.dominantPollutant}</strong>
           </>
         )}
-        {payload.stationName && <> · measured at {payload.stationName}</>}
+        {payload.stationName && (
+          <>
+            {" "}
+            · {payload.aqiBasis === "cams_model" ? "modelled by" : "measured at"}{" "}
+            {payload.stationName}
+          </>
+        )}
         {payload.observedAt && <> · latest reading {relativeAge(payload.observedAt)}</>}
       </p>
+
+      {payload.aqiBasis === "cams_model" && (
+        <p className="mt-2 rounded-2xl bg-page-plane px-3 py-2 text-[11px] leading-[1.5] text-ink-secondary">
+          No live monitoring station is reporting near here, so this is a
+          <strong className="font-semibold"> modelled estimate</strong> of PM2.5
+          from the Copernicus (CAMS) atmospheric model — an approximation, not a
+          ground measurement. Shown at low confidence.
+        </p>
+      )}
 
       {/* The 24-hour figure is the headline because that's how CPCB defines the
           index. The latest hour is shown alongside it rather than hidden — it's

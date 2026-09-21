@@ -249,7 +249,13 @@ def _category_summary(category: str, envelope: Optional[dict[str, Any]]) -> str:
         # localities are being served by the *same* sensor, so they all show an
         # identical figure. Saying "station 8.0 km away" invites that number to be
         # read as this neighbourhood's air. Naming what produced it does not.
-        if payload.get("aqi_basis") == "pm2_5_only":
+        basis = payload.get("aqi_basis")
+        if basis == "cams_model":
+            return (
+                f"PM2.5 index {round(aqi)} ({band}) · modelled estimate (CAMS), "
+                f"no live station nearby"
+            )
+        if basis == "pm2_5_only":
             return (
                 f"PM2.5 index {round(aqi)} ({band}) · low-cost sensor "
                 f"{km} km away, no regulatory station reporting"
