@@ -38,6 +38,21 @@ export default function AboutPage() {
         don&apos;t know something, the page says so instead of estimating.
       </p>
 
+      <Section title="What we cover">
+        <p>
+          Five categories can appear on a locality report. Air quality, schools
+          and connectivity are wired to live sources. Safety and water carry
+          local press coverage only. Power has no card of its own — no source
+          publishes it at locality level — so reported outages appear as a flag
+          on the report instead.
+        </p>
+        <p>
+          Neighbour Trust is in early access, across Bengaluru, Gurugram,
+          Hyderabad and Mumbai. A category with nothing sourced yet is left off
+          a report rather than shown as a blank or filled with an estimate.
+        </p>
+      </Section>
+
       <Section title="Air quality">
         <p>
           The headline figure is the CPCB National AQI, computed from 24-hour
@@ -87,6 +102,22 @@ export default function AboutPage() {
           Every headline is judged individually for whether it describes an
           incident in that specific locality. The card shows how many were read
           and how many survived, so the count never reads as an exhaustive tally.
+        </p>
+      </Section>
+
+      <Section title="Reported as coming">
+        <p>
+          Some reports carry a short list of infrastructure the local press has
+          written about — a metro extension, a flyover, a new hospital. These
+          are press reports, not commitments. Indian infrastructure projects are
+          announced years before they open, and many are delayed or dropped;
+          some of the headlines are themselves about a delay.
+        </p>
+        <p>
+          Nothing in that list counts toward the Trust Score. How much a
+          locality gets written about is not how much is being built there, so
+          the section shows the dated headline and its source and leaves the
+          reader to weigh it.
         </p>
       </Section>
 
