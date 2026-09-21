@@ -21,6 +21,7 @@
 import Link from "next/link";
 import type { Confidence } from "@schema/envelope";
 import { ExpandableCard } from "@/components/ExpandableCard";
+import { SunlightCard } from "@/components/SunlightCard";
 import { UpcomingCard } from "@/components/UpcomingCard";
 import { joinCategoryLabels } from "@/lib/categories";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
@@ -176,6 +177,10 @@ export function TrustReport({
         * it carries no score, no confidence tag and no weight. Reading it as a
         * sixth category would invite the comparison it must not support — that
         * a locality written about more has more planned. */}
+      {/* Sunlight — pure astronomy from the locality's coordinates, so it is
+        * exact and present on every report, not gated by data coverage. */}
+      <SunlightCard name={locality.name} lat={locality.lat} lon={locality.lon} />
+
       <UpcomingCard localityName={locality.name} items={report.upcoming} />
     </div>
   );
