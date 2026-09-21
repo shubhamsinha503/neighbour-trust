@@ -413,7 +413,16 @@ def _build_locality_summaries() -> list[dict[str, Any]]:
 # and cheap to rebuild. A background thread keeps it warm; the request path only
 # reads it. Stale-while-revalidate: an expired cache is still served while a
 # refresh runs, so a visitor never waits on the ~20s build.
-_SUMMARY_TTL_SECONDS = int(os.environ.get("SUMMARY_TTL_SECONDS", "300"))
+#
+# The TTL is also the refresher's period, and each refresh rebuilds a report for
+# every locality — reading every category's envelope for all ~1,300 of them,
+# including the large connectivity payloads. At the old 300s that ran 288 times a
+# day and was the dominant database-compute cost (it is what pushed the free tier
+# over its transfer limit). The summary only needs each locality's score and top
+# flag, and those change no more often than ingest writes them — hourly at most,
+# usually daily — so 1,800s (30 min) keeps it fresh enough while cutting the
+# refresher's database load ~6x. Override with SUMMARY_TTL_SECONDS if needed.
+_SUMMARY_TTL_SECONDS = int(os.environ.get("SUMMARY_TTL_SECONDS", "1800"))
 _summary_cache: dict[str, Any] = {"data": None, "at": 0.0}
 _summary_lock = threading.Lock()
 

@@ -478,11 +478,13 @@ export interface LocalitySummary extends Locality {
 }
 
 export async function fetchLocalitySummaries(): Promise<LocalitySummary[]> {
-  // Builds 44 reports server-side, so it is cached rather than paid per visitor.
-  // Five minutes matches the report pages' own revalidate, so a search result
-  // and the page it opens can never disagree by more than one refresh.
+  // Builds a report per locality server-side (~1,300 of them now), so it is
+  // cached rather than paid per visitor. Thirty minutes matches the API's own
+  // summary cache TTL: the search list only changes when ingest writes new
+  // scores, which is hourly at most, so a shorter window just re-fetched the
+  // same bytes and kept the API's warm cache busy for nothing.
   const response = await fetch(`${API_BASE}/api/v1/localities/summary`, {
-    next: { revalidate: 300 },
+    next: { revalidate: 1800 },
   });
   if (!response.ok) {
     throw new Error(`Failed to load localities (${response.status})`);
