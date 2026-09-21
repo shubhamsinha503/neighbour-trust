@@ -21,7 +21,6 @@
 import Link from "next/link";
 import type { Confidence } from "@schema/envelope";
 import { ExpandableCard } from "@/components/ExpandableCard";
-import { haversineKm } from "@/components/MeasureFrom";
 import { UpcomingCard } from "@/components/UpcomingCard";
 import { joinCategoryLabels } from "@/lib/categories";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
@@ -259,6 +258,26 @@ const NEARBY_KINDS: Array<{
   { countKey: "clinics", kind: "clinics", label: "Clinics" },
   { countKey: "metroRail", kind: "metro_rail", label: "Transit stations" },
 ];
+
+/** Great-circle distance in km. Defined here rather than imported from
+ *  MeasureFrom because that is a "use client" module and this component renders
+ *  on the server — importing the helper across that boundary and calling it
+ *  during server render throws. */
+function haversineKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
 
 function nearestKm(
   features: ConnectivityFeature[],
