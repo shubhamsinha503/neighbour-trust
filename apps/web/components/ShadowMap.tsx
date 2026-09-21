@@ -80,6 +80,11 @@ export function ShadowMap({
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibre>(null);
   const readyRef = useRef(false);
+  // The map's own event handlers (load, moveend) capture drawShadows once, so
+  // they must not read the sun from the render closure — that would freeze the
+  // shadows at whatever time the map first loaded. They read this ref instead,
+  // which every render keeps current.
+  const sunRef = useRef({ altitude: 0, azimuth: 0, isDay: false });
 
   const [mins, setMins] = useState(() => {
     const d = new Date();
@@ -92,6 +97,7 @@ export function ShadowMap({
   const altitude = sun.altitude; // degrees in this suncalc build
   const azimuth = sun.azimuth; // compass bearing, degrees from north
   const isDay = altitude > 0;
+  sunRef.current = { altitude, azimuth, isDay };
 
   function drawShadows() {
     const map = mapRef.current;
@@ -99,6 +105,7 @@ export function ShadowMap({
     const source = map.getSource("nt-shadows");
     if (!source) return;
 
+    const { altitude, azimuth, isDay } = sunRef.current;
     if (!isDay) {
       source.setData(featureCollection([]));
       return;
@@ -179,9 +186,14 @@ export function ShadowMap({
           );
           readyRef.current = true;
           drawShadows();
+          // Building tiles can finish parsing just after 'load'; redraw once so
+          // the first view is not shadowless.
+          setTimeout(drawShadows, 800);
         });
 
-        map.on("idle", drawShadows);
+        // Redraw for the new area after a pan or zoom — not on every render,
+        // which would recompute thousands of hulls in a loop.
+        map.on("moveend", drawShadows);
       })
       .catch(() => {
         /* handled by the fallback UI when the map never becomes ready */
