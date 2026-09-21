@@ -179,7 +179,12 @@ export function TrustReport({
         * a locality written about more has more planned. */}
       {/* Sunlight — pure astronomy from the locality's coordinates, so it is
         * exact and present on every report, not gated by data coverage. */}
-      <SunlightCard name={locality.name} lat={locality.lat} lon={locality.lon} />
+      <SunlightCard
+        slug={locality.slug}
+        name={locality.name}
+        lat={locality.lat}
+        lon={locality.lon}
+      />
 
       <UpcomingCard localityName={locality.name} items={report.upcoming} />
     </div>

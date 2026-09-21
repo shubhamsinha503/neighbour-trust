@@ -18,6 +18,7 @@
  * verified against Bengaluru — so no radian conversion is applied here.
  */
 
+import Link from "next/link";
 import { useState } from "react";
 import * as SunCalc from "suncalc";
 
@@ -52,10 +53,12 @@ const FACING_LIGHT: Record<Facing, string> = {
 };
 
 export function SunlightCard({
+  slug,
   name,
   lat,
   lon,
 }: {
+  slug: string;
   name: string;
   lat: number;
   lon: number;
@@ -182,14 +185,12 @@ export function SunlightCard({
       <p className="mt-4 text-[10.5px] leading-[1.55] text-ink-muted">
         This is the sun&apos;s path for {name}. How a specific flat is lit also
         depends on its floor and the buildings around it —{" "}
-        <a
-          href={`https://app.shadowmap.org/?lat=${lat}&lng=${lon}&zoom=17`}
-          target="_blank"
-          rel="noreferrer"
+        <Link
+          href={`/${slug}/sunlight`}
           className="font-semibold text-brand hover:underline"
         >
-          see it in 3D sun &amp; shadow →
-        </a>
+          see the sun &amp; shadow map →
+        </Link>
       </p>
     </section>
   );
