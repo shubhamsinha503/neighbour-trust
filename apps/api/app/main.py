@@ -360,10 +360,25 @@ def _build_locality_summaries() -> list[dict[str, Any]]:
     path rather than paying it per request.
     """
     out: list[dict[str, Any]] = []
+    skipped = 0
     with db.connect() as conn:
         coverage = db.coverage_by_cell(conn)
         for locality in db.list_localities(conn):
-            report = orchestrator.build_report(conn, locality)
+            # Per-locality guard. This builds a report for every locality in one
+            # pass, and it used to do so with no error handling — so a single
+            # locality whose report raised (a new city's first news payload in an
+            # unexpected shape, say) killed the whole build. The refresher then
+            # caught that, logged it, and left the cache empty, which served the
+            # homepage an empty list: no search, no city tiles, from one bad row.
+            # One locality failing must cost that locality, not the whole index.
+            try:
+                report = orchestrator.build_report(conn, locality)
+            except Exception:
+                skipped += 1
+                logging.getLogger(__name__).exception(
+                    "summary: skipping %s — build_report failed", locality["slug"]
+                )
+                continue
             flags = report.flags
             out.append(
                 {
@@ -384,6 +399,12 @@ def _build_locality_summaries() -> list[dict[str, Any]]:
                     "top_flag": flags[0] if flags else None,
                 }
             )
+    if skipped:
+        logging.getLogger(__name__).warning(
+            "summary: built %d localities, skipped %d that failed to build",
+            len(out),
+            skipped,
+        )
     return out
 
 
