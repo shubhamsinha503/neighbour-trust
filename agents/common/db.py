@@ -753,6 +753,40 @@ def coverage_stats(conn: psycopg.Connection) -> dict[str, Any]:
     return row
 
 
+# The five categories a report shows as its "n of 5". Power and development also
+# exist in data_envelope but have no card, so a coverage stat that counted them
+# would not match the fraction a reader sees.
+CONSUMER_CATEGORIES = ("air_quality", "schools", "crime", "water", "infrastructure")
+
+
+def coverage_distribution(conn: psycopg.Connection) -> list[dict[str, Any]]:
+    """Per city, how many localities hold how many of the five consumer categories.
+
+    Returns rows of {city, n, localities} where n is 0..5. Counts the existence
+    of an envelope, not its freshness — this is a coverage map, so it stays one
+    cheap query rather than a report build per locality, and it may read a shade
+    higher than a live report where a stale reading is withheld. Only the five
+    carded categories are counted, so the buckets match the "n of 5" on a report.
+    """
+    return conn.execute(
+        """
+        WITH consumer AS (
+            SELECT DISTINCT h3_cell, category
+            FROM data_envelope
+            WHERE category IN ('air_quality','schools','crime','water','infrastructure')
+        ),
+        per_cell AS (
+            SELECT h3_cell, COUNT(*) AS n FROM consumer GROUP BY h3_cell
+        )
+        SELECT l.city AS city, COALESCE(pc.n, 0) AS n, COUNT(*) AS localities
+        FROM locality l
+        LEFT JOIN per_cell pc ON pc.h3_cell = l.h3_cell
+        GROUP BY l.city, COALESCE(pc.n, 0)
+        ORDER BY l.city, n
+        """
+    ).fetchall()
+
+
 def coverage_by_cell(conn: psycopg.Connection) -> dict[str, int]:
     """How many categories hold data, per H3 cell.
 

@@ -467,6 +467,39 @@ def _start_summary_refresher() -> None:
     threading.Thread(target=_summary_refresher, daemon=True).start()
 
 
+@app.get("/api/v1/coverage")
+def get_coverage() -> dict[str, Any]:
+    """How many localities hold how many of the five carded categories, by city.
+
+    A founder-facing readout, public on purpose — it is a transparency figure of
+    the same kind the home page already shows, not anything sensitive. Buckets
+    are keyed "0".."5"; a city's `total` is its locality count.
+    """
+    with db.connect() as conn:
+        rows = db.coverage_distribution(conn)
+
+    def blank() -> dict[str, Any]:
+        return {"buckets": {str(i): 0 for i in range(6)}, "total": 0}
+
+    cities: dict[str, dict[str, Any]] = {}
+    overall = blank()
+    for row in rows:
+        city = row["city"]
+        n = str(int(row["n"]))
+        count = int(row["localities"])
+        bucket = cities.setdefault(city, blank())
+        bucket["buckets"][n] += count
+        bucket["total"] += count
+        overall["buckets"][n] += count
+        overall["total"] += count
+
+    return {
+        "categories": list(db.CONSUMER_CATEGORIES),
+        "cities": cities,
+        "overall": overall,
+    }
+
+
 @app.get("/api/v1/localities", response_model=list[Locality])
 def get_localities() -> list[dict[str, Any]]:
     with db.connect() as conn:

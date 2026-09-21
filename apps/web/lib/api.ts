@@ -508,6 +508,32 @@ export async function fetchLocalitySummaries(): Promise<LocalitySummary[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Coverage distribution — how complete each locality's report is, in aggregate
+// ---------------------------------------------------------------------------
+
+export interface CoverageBuckets {
+  /** Keyed "0".."5": how many localities hold that many of the five categories. */
+  buckets: Record<string, number>;
+  total: number;
+}
+
+export interface CoverageDistribution {
+  categories: string[];
+  cities: Record<string, CoverageBuckets>;
+  overall: CoverageBuckets;
+}
+
+export async function fetchCoverage(): Promise<CoverageDistribution> {
+  const response = await fetch(`${API_BASE}/api/v1/coverage`, {
+    next: { revalidate: 300 },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load coverage (${response.status})`);
+  }
+  return (await response.json()) as CoverageDistribution;
+}
+
+// ---------------------------------------------------------------------------
 // Connectivity — what is already built nearby
 // ---------------------------------------------------------------------------
 
