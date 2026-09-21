@@ -110,7 +110,17 @@ export function ShadowMap({
   function collectFootprints() {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
-    const feats = map.queryRenderedFeatures({ layers: ["building"] });
+    // querySourceFeatures returns every building in the loaded tiles and works
+    // reliably here (queryRenderedFeatures returned nothing). It over-returns —
+    // the whole loaded area, with duplicates — so filter to the padded viewport
+    // and dedupe, leaving a few hundred footprints to project per time step.
+    const b = map.getBounds();
+    const pad = 0.004;
+    const west = b.getWest() - pad;
+    const east = b.getEast() + pad;
+    const south = b.getSouth() - pad;
+    const north = b.getNorth() + pad;
+    const feats = map.querySourceFeatures("openmaptiles", { sourceLayer: "building" });
     const out: { ring: Position[][]; h: number }[] = [];
     const seen = new Set<string>();
     for (const f of feats) {
@@ -129,7 +139,10 @@ export function ShadowMap({
             : [];
       for (const ring of rings) {
         if (!ring[0] || ring[0].length < 4) continue;
-        const key = ring[0][0].join(",") + ":" + h;
+        const lng = ring[0][0][0];
+        const lat = ring[0][0][1];
+        if (lng < west || lng > east || lat < south || lat > north) continue;
+        const key = Math.round(lng * 1e5) + "," + Math.round(lat * 1e5) + ":" + h;
         if (seen.has(key)) continue;
         seen.add(key);
         out.push({ ring, h });
@@ -203,9 +216,22 @@ export function ShadowMap({
           );
           readyRef.current = true;
           collectFootprints();
-          // Building tiles can finish parsing just after 'load'; re-collect once
-          // so the first view is not shadowless.
+          // Building tiles finish parsing after 'load'; re-collect a few times so
+          // the first view fills in even on a slow tile load.
           setTimeout(collectFootprints, 800);
+          setTimeout(collectFootprints, 2500);
+        });
+
+        // Also collect when the building source finishes loading tiles — the
+        // reliable signal that buildings are queryable — until we have some.
+        map.on("sourcedata", (e: { sourceId?: string; isSourceLoaded?: boolean }) => {
+          if (
+            e.sourceId === "openmaptiles" &&
+            e.isSourceLoaded &&
+            footprintsRef.current.length === 0
+          ) {
+            collectFootprints();
+          }
         });
 
         // Re-collect footprints for the new area after a pan or zoom.
