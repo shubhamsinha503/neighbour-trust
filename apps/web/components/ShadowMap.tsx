@@ -85,6 +85,10 @@ export function ShadowMap({
   // shadows at whatever time the map first loaded. They read this ref instead,
   // which every render keeps current.
   const sunRef = useRef({ altitude: 0, azimuth: 0, isDay: false });
+  // Building footprints (geometry + height) cached from the current view, so a
+  // time change recomputes only the cheap shadow projection — not the query and
+  // parse — which is what keeps dragging the slider smooth.
+  const footprintsRef = useRef<{ ring: Position[][]; h: number }[]>([]);
 
   const [mins, setMins] = useState(() => {
     const d = new Date();
@@ -99,7 +103,45 @@ export function ShadowMap({
   const isDay = altitude > 0;
   sunRef.current = { altitude, azimuth, isDay };
 
-  function drawShadows() {
+  // Cache the footprints in view. Runs on load and after a pan/zoom — not on
+  // every time step — because querying and parsing the buildings is the slow
+  // part. Uses only the buildings actually rendered in the viewport (hundreds),
+  // not every loaded tile (thousands).
+  function collectFootprints() {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    const feats = map.queryRenderedFeatures({ layers: ["building"] });
+    const out: { ring: Position[][]; h: number }[] = [];
+    const seen = new Set<string>();
+    for (const f of feats) {
+      if (!f.geometry) continue;
+      const props = (f.properties || {}) as Record<string, unknown>;
+      const h =
+        (typeof props.render_height === "number" && props.render_height) ||
+        (typeof props.height === "number" && props.height) ||
+        DEFAULT_HEIGHT_M;
+      const geom = f.geometry as Polygon | { type: "MultiPolygon"; coordinates: Position[][][] };
+      const rings: Position[][][] =
+        geom.type === "Polygon"
+          ? [geom.coordinates]
+          : geom.type === "MultiPolygon"
+            ? geom.coordinates
+            : [];
+      for (const ring of rings) {
+        if (!ring[0] || ring[0].length < 4) continue;
+        const key = ring[0][0].join(",") + ":" + h;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ ring, h });
+      }
+    }
+    footprintsRef.current = out;
+    paintShadows();
+  }
+
+  // The per-time-step work: project each cached footprint into a drop shadow.
+  // Cheap enough to run as the slider drags.
+  function paintShadows() {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
     const source = map.getSource("nt-shadows");
@@ -111,44 +153,19 @@ export function ShadowMap({
       return;
     }
 
-    const feats = map.querySourceFeatures("openmaptiles", { sourceLayer: "building" });
     const bearing = (azimuth + 180) % 360; // shadow falls away from the sun
+    const tan = Math.tan((altitude * Math.PI) / 180);
     const shadows: Feature<Polygon>[] = [];
-    const seen = new Set<string>();
-
-    for (const f of feats) {
-      if (!f.geometry) continue;
-      const props = (f.properties || {}) as Record<string, unknown>;
-      const h =
-        (typeof props.render_height === "number" && props.render_height) ||
-        (typeof props.height === "number" && props.height) ||
-        DEFAULT_HEIGHT_M;
-      const shadowLen = h / Math.tan((altitude * Math.PI) / 180); // metres
-
-      const geom = f.geometry as Polygon | { type: "MultiPolygon"; coordinates: Position[][][] };
-      const rings: Position[][][] =
-        geom.type === "Polygon"
-          ? [geom.coordinates]
-          : geom.type === "MultiPolygon"
-            ? geom.coordinates
-            : [];
-
-      for (const ring of rings) {
-        if (!ring[0] || ring[0].length < 4) continue;
-        const key = ring[0][0].join(",") + ":" + h;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        try {
-          const foot = polygon(ring);
-          const moved = transformTranslate(foot, shadowLen / 1000, bearing);
-          const hull = convex(featureCollection([foot, moved]));
-          if (hull) shadows.push(hull);
-        } catch {
-          /* a malformed ring just contributes no shadow */
-        }
+    for (const { ring, h } of footprintsRef.current) {
+      try {
+        const foot = polygon(ring);
+        const moved = transformTranslate(foot, h / tan / 1000, bearing);
+        const hull = convex(featureCollection([foot, moved]));
+        if (hull) shadows.push(hull);
+      } catch {
+        /* a malformed ring just contributes no shadow */
       }
     }
-
     source.setData(featureCollection(shadows));
   }
 
@@ -185,15 +202,14 @@ export function ShadowMap({
             firstSymbol,
           );
           readyRef.current = true;
-          drawShadows();
-          // Building tiles can finish parsing just after 'load'; redraw once so
-          // the first view is not shadowless.
-          setTimeout(drawShadows, 800);
+          collectFootprints();
+          // Building tiles can finish parsing just after 'load'; re-collect once
+          // so the first view is not shadowless.
+          setTimeout(collectFootprints, 800);
         });
 
-        // Redraw for the new area after a pan or zoom — not on every render,
-        // which would recompute thousands of hulls in a loop.
-        map.on("moveend", drawShadows);
+        // Re-collect footprints for the new area after a pan or zoom.
+        map.on("moveend", collectFootprints);
       })
       .catch(() => {
         /* handled by the fallback UI when the map never becomes ready */
@@ -210,10 +226,10 @@ export function ShadowMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lon]);
 
-  // Debounced so dragging the slider does not recompute thousands of hulls on
-  // every intermediate value — it redraws once the slider settles.
+  // Only the cheap projection reruns as the slider moves, off the cached
+  // footprints, with a short debounce to coalesce rapid steps.
   useEffect(() => {
-    const t = setTimeout(drawShadows, 90);
+    const t = setTimeout(paintShadows, 20);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mins]);
