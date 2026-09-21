@@ -82,20 +82,27 @@ def main(argv: Optional[list[str]] = None) -> int:
         print("\nDry run — all writes rolled back.")
 
     # Exit code semantics, which matter because CI reads them: a run where some
-    # localities had no usable data is a *success*. Upstream feeds go down
-    # routinely — that is why the skip logic exists — and failing on a partial
-    # skip turns an ordinary Tuesday into a red build, and worse, stops the
-    # workflow steps that come after it.
+    # localities had no usable data is a success. Upstream feeds go down
+    # routinely, which is why the skip logic exists, and failing on a partial
+    # skip turns an ordinary Tuesday into a red build.
     #
-    # Non-zero is reserved for "this run achieved nothing": every locality
-    # skipped, which means a broken credential, a dead upstream, or a bug.
+    # All-skipped used to be a failure — the assumption being it was rare and
+    # meant a broken credential, a dead upstream, or a bug. That assumption no
+    # longer holds: India's regulatory air network (CPCB) has been silent since
+    # 2026-08-27, and the OpenAQ/AQICN fallbacks frequently have no *live* station
+    # within range of any locality, so all-skipped is now the routine state.
+    # Failing the hourly build on it is noise the cards already state in words
+    # ("no regulatory station reporting"). So warn loudly and still exit 0. A
+    # genuinely broken credential surfaces as fetch errors in the log above, and
+    # a total misconfiguration still exits non-zero via NoSourcesConfigured.
     stored = len(outcome.results) - outcome.skipped
     if stored == 0 and outcome.results:
         print(
-            f"\nAll {outcome.skipped} localities skipped — nothing stored.",
+            f"\nAll {outcome.skipped} localities skipped — nothing stored. No live "
+            f"air-quality station within range of any locality; upstream feeds are "
+            f"dry. Not treated as a build failure.",
             file=sys.stderr,
         )
-        return 1
     return 0
 
 
