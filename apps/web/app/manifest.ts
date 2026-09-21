@@ -28,9 +28,11 @@ export default function manifest(): MetadataRoute.Manifest {
 
     // The background shows during launch before the page paints, so it matches
     // the page's own surface rather than flashing white.
-    background_color: "#f7f7f5",
-    // Colours the Android status bar. The brand green, matching the hero.
-    theme_color: "#147a56",
+    background_color: "#fbfbfa",
+    // Colours the Android status bar and the TWA splash. The brand pink, matching
+    // viewport.themeColor in layout.tsx — they must agree or an installed copy
+    // launches a different colour than the site it opens.
+    theme_color: "#ff2d78",
 
     lang: "en-IN",
     dir: "ltr",

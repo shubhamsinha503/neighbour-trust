@@ -39,3 +39,13 @@ Thumbs.db
 
 # Local working files — smoke scripts, logs, paste lists.
 .scratch/
+
+# Android / TWA signing keys and build output — the keystore is your Play
+# identity; losing or leaking it means you can't ship updates. Never commit it.
+*.keystore
+*.jks
+android.keystore
+android/app-release-bundle.aab
+android/app-release-signed.apk
+android/.gradle/
+android/build/
