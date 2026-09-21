@@ -180,16 +180,15 @@ export function SunlightCard({
       </div>
 
       <p className="mt-4 text-[10.5px] leading-[1.55] text-ink-muted">
-        This is the sun&apos;s path for {name}. Whether a specific flat gets that
-        light also depends on its floor and the buildings around it, which no
-        source maps reliably here —{" "}
+        This is the sun&apos;s path for {name}. How a specific flat is lit also
+        depends on its floor and the buildings around it —{" "}
         <a
-          href={`https://shademap.app/@${lat},${lon},17z`}
+          href={`https://shadowmap.org/?lat=${lat}&lng=${lon}&zoom=17`}
           target="_blank"
           rel="noreferrer"
           className="font-semibold text-brand hover:underline"
         >
-          see live shadows on the map →
+          see it in 3D sun &amp; shadow →
         </a>
       </p>
     </section>
