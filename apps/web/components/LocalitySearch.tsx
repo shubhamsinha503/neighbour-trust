@@ -4,10 +4,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 
 import type { LocalitySummary } from "@/lib/api";
-import {
-  categoryCoverageLabel,
-  joinCategoryLabels,
-} from "@/lib/categories";
+import { joinCategoryLabels } from "@/lib/categories";
 import { browseList, citiesOf, coverageOf } from "@/lib/ordering";
 import {
   looksLikePincode,
@@ -393,8 +390,8 @@ export function LocalitySearch({
       {(showBrowseList || searching) && results.length > 0 && (
         <p className="mt-3 px-1 text-[11px] leading-[1.5] text-ink-muted">
           The score is out of 100, built from up to five categories — schools,
-          safety, air quality, water and connectivity. Each card says how many
-          it actually rests on, because that varies by locality.
+          safety, air quality, water and connectivity — using whichever a
+          locality has data for.
         </p>
       )}
 
@@ -499,36 +496,9 @@ function ScoreChip({
         </span>
       </div>
 
-      {/* What the number covers, beside the number.
-        *
-        * Without this a green 95 sits directly next to "Violence reported in
-        * local press" and reads as though the 95 had weighed it. A confident
-        * figure next to a contradicting flag, with nothing reconciling them, is
-        * worse than either alone.
-        *
-        * This read "air+schools", hardcoded. True when written, and false on
-        * almost every card by the time anyone noticed: safety and connectivity
-        * now count for 41 of 44 localities, and Yelahanka's chip was naming air
-        * quality — which Yelahanka has none of. The count comes from the report
-        * itself now, and a count is the one form that cannot misname a
-        * category. The full list is in the tooltip and on the locality page. */}
-      {score !== null && (
-        <span
-          // The caveat gets louder exactly when it matters. A score resting on
-          // two categories is a far weaker claim than one resting on five, and
-          // in identical grey type the reader has no reason to notice the
-          // difference — they see two confident numbers side by side.
-          className={
-            "text-[8.5px] leading-none " +
-            (scoredCategories.length <= 2
-              ? "font-semibold text-[#c9860a]"
-              : "text-ink-muted")
-          }
-          title={joinCategoryLabels(scoredCategories)}
-        >
-          {categoryCoverageLabel(scoredCategories)}
-        </span>
-      )}
+      {/* The "n of 5 categories" caption used to sit here. Removed: it read as
+        * clutter under every card, and the coverage is still available on hover
+        * (the chip's title) and stated in full on the locality page. */}
     </div>
   );
 }
