@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { CoverageStats } from "@/lib/api";
 
 /**
@@ -47,8 +49,18 @@ export function HomeIntro({ stats }: { stats: CoverageStats | null }) {
         <Sources names={stats.sourceNames} />
       )}
 
-      {/* Below the evidence, never above it. See the pratfall note above. */}
-      <Honesty stats={stats} />
+      {/* The longer "what we don't know" explanation — empty categories, why
+        * press coverage is not a safety score, why a thin locality gets no
+        * number — moved to the policy page. A visitor reads it once, and it
+        * belongs where the full method lives rather than on the front page. */}
+      <div className="mt-5">
+        <Link
+          href="/about"
+          className="text-[12.5px] font-semibold text-brand hover:underline"
+        >
+          How this works, and what we don&apos;t know →
+        </Link>
+      </div>
     </>
   );
 }
@@ -117,25 +129,3 @@ function Sources({ names }: { names: string[] }) {
   );
 }
 
-function Honesty({ stats }: { stats: CoverageStats | null }) {
-  return (
-    <div className="mt-5 rounded-2xl border border-hairline bg-surface-1 p-4">
-      <p className="text-[12.5px] font-semibold">We show what we don&apos;t know, too</p>
-      <p className="mt-1.5 text-[12px] leading-[1.6] text-ink-secondary">
-        Five categories appear on a report. Schools and connectivity cover
-        almost every locality; air quality only reaches those with a monitoring
-        station near enough, and we leave the rest empty rather than estimating.
-        Safety and water come from local press, which measures{" "}
-        <span className="text-ink-primary">
-          how much an area gets written about
-        </span>{" "}
-        as much as what happens there — so we describe the kind of incident
-        reported and refuse to turn it into a safety score.
-      </p>
-      <p className="mt-2 text-[12px] leading-[1.6] text-ink-secondary">
-        A locality with too little data gets no overall score at all. That is the
-        intended behaviour, not a gap to be filled in later with a guess.
-      </p>
-    </div>
-  );
-}
