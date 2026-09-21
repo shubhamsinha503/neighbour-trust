@@ -427,6 +427,7 @@ LOCALITIES: list[tuple[str, str, str, str, str, float, float]] = [
     ("jubilee-hills", "Jubilee Hills", "Hyderabad", "Telangana", None, 17.4308, 78.4103),
     ("gagan-mahal", "Gagan Mahal", "Hyderabad", "Telangana", None, 17.4094, 78.4801),
     ("ameerpet", "Ameerpet", "Hyderabad", "Telangana", None, 17.4375, 78.4483),
+    ("mehdipatnam", "Mehdipatnam", "Hyderabad", "Telangana", "500028", 17.3944, 78.4386),
     ("himayat-nagar", "Himayat Nagar", "Hyderabad", "Telangana", None, 17.4040, 78.4835),
     ("pioneer-colony", "Pioneer Colony", "Hyderabad", "Telangana", None, 17.3928, 78.3788),
     ("nyaya-vihar", "Nyaya Vihar", "Hyderabad", "Telangana", None, 17.4169, 78.3987),
