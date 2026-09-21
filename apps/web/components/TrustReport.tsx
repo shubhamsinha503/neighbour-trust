@@ -131,11 +131,8 @@ export function TrustReport({
       </section>
 
       {/* 4 — the category grid, empties included */}
-      <h3 className="mb-2.5 mt-6 flex items-center justify-between text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
+      <h3 className="mb-2.5 mt-6 text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
         Categories
-        <span className="text-[11px] font-medium normal-case tracking-normal text-ink-muted">
-          {trust.categoriesCounted} scored · {trust.categoriesTotal - trust.categoriesCounted} not yet
-        </span>
       </h3>
       {/* Categories we have something for get a card. Categories we have nothing
         * for get one line between them, rather than a full card each saying
