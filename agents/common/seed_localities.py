@@ -433,7 +433,6 @@ LOCALITIES: list[tuple[str, str, str, str, str, float, float]] = [
     # scripts/geocode_localities.py before treating any as exact.
     ("charminar", "Charminar", "Hyderabad", "Telangana", "500002", 17.3616, 78.4747),
     ("secunderabad", "Secunderabad", "Hyderabad", "Telangana", "500003", 17.4399, 78.4983),
-    ("dilsukhnagar", "Dilsukhnagar", "Hyderabad", "Telangana", "500060", 17.3687, 78.5247),
     ("uppal", "Uppal", "Hyderabad", "Telangana", "500039", 17.4056, 78.5590),
     ("lakdikapul", "Lakdikapul", "Hyderabad", "Telangana", "500004", 17.4009, 78.4636),
     ("tarnaka", "Tarnaka", "Hyderabad", "Telangana", "500017", 17.4270, 78.5290),
@@ -1350,11 +1349,9 @@ LOCALITIES: list[tuple[str, str, str, str, str, float, float]] = [
     # (Vijayanagar, DLF Phase 4/5) are deliberately still excluded.
     ("kammanahalli", "Kammanahalli", "Bengaluru", "Karnataka", None, 13.0149, 77.6382),
     ("cv-raman-nagar", "CV Raman Nagar", "Bengaluru", "Karnataka", None, 12.9856, 77.6681),
-    ("ulsoor", "Ulsoor", "Bengaluru", "Karnataka", None, 12.9779, 77.6247),
     ("ejipura", "Ejipura", "Bengaluru", "Karnataka", None, 12.9452, 77.6275),
     ("yeshwanthpur", "Yeshwanthpur", "Bengaluru", "Karnataka", None, 13.0177, 77.5555),
     ("nagarbhavi", "Nagarbhavi", "Bengaluru", "Karnataka", None, 12.9512, 77.5191),
-    ("rajarajeshwari-nagar", "Rajarajeshwari Nagar", "Bengaluru", "Karnataka", None, 12.9274, 77.5155),
     ("hulimavu", "Hulimavu", "Bengaluru", "Karnataka", None, 12.8773, 77.6028),
     ("arekere", "Arekere", "Bengaluru", "Karnataka", None, 12.8872, 77.5960),
     ("kadugodi", "Kadugodi", "Bengaluru", "Karnataka", None, 12.9957, 77.7579),
