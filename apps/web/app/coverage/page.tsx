@@ -78,6 +78,31 @@ export default async function CoveragePage() {
           Couldn&apos;t load coverage just now. Refresh in a moment.
         </p>
       )}
+
+      {data && data.empty.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-2 text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
+            No data at all ({data.empty.length})
+          </h2>
+          <p className="mb-3 text-[12px] leading-[1.6] text-ink-secondary">
+            Localities whose cell holds none of the five categories — usually a
+            seed point too granular to sit in a mapped area. Candidates to prune.
+          </p>
+          <div className="rounded-[16px] border border-hairline bg-surface-1 p-4">
+            <ul className="flex flex-wrap gap-1.5">
+              {data.empty.map((l) => (
+                <li
+                  key={l.slug}
+                  className="rounded-md bg-page-plane px-2 py-1 text-[11px] text-ink-secondary"
+                  title={`${l.slug} · ${l.city}`}
+                >
+                  {l.name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
     </main>
   );
 }

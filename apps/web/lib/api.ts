@@ -521,6 +521,8 @@ export interface CoverageDistribution {
   categories: string[];
   cities: Record<string, CoverageBuckets>;
   overall: CoverageBuckets;
+  /** Localities holding none of the five categories — the 0-of-5 rows. */
+  empty: Array<{ slug: string; name: string; city: string }>;
 }
 
 export async function fetchCoverage(): Promise<CoverageDistribution> {

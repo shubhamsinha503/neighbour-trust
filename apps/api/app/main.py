@@ -477,6 +477,7 @@ def get_coverage() -> dict[str, Any]:
     """
     with db.connect() as conn:
         rows = db.coverage_distribution(conn)
+        empty = db.empty_localities(conn)
 
     def blank() -> dict[str, Any]:
         return {"buckets": {str(i): 0 for i in range(6)}, "total": 0}
@@ -497,6 +498,7 @@ def get_coverage() -> dict[str, Any]:
         "categories": list(db.CONSUMER_CATEGORIES),
         "cities": cities,
         "overall": overall,
+        "empty": [dict(r) for r in empty],
     }
 
 

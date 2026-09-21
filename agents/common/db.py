@@ -787,6 +787,29 @@ def coverage_distribution(conn: psycopg.Connection) -> list[dict[str, Any]]:
     ).fetchall()
 
 
+def empty_localities(conn: psycopg.Connection) -> list[dict[str, Any]]:
+    """Localities whose H3 cell holds none of the five carded categories.
+
+    These are the 0-of-5 rows: no school, nothing mapped nearby, no station, no
+    press. Because schools and connectivity run for every locality, an empty cell
+    is a strong sign the seed point is too granular or mis-placed (an apartment
+    complex rather than an area) rather than a real neighbourhood awaiting data.
+    """
+    return conn.execute(
+        """
+        WITH consumer AS (
+            SELECT DISTINCT h3_cell
+            FROM data_envelope
+            WHERE category IN ('air_quality','schools','crime','water','infrastructure')
+        )
+        SELECT slug, name, city
+        FROM locality
+        WHERE h3_cell NOT IN (SELECT h3_cell FROM consumer)
+        ORDER BY city, name
+        """
+    ).fetchall()
+
+
 def coverage_by_cell(conn: psycopg.Connection) -> dict[str, int]:
     """How many categories hold data, per H3 cell.
 
