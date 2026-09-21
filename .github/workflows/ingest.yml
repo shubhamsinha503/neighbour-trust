@@ -156,11 +156,22 @@ jobs:
           esac
 
       - name: Apply migrations
-        # Idempotent, and cheap. Running it every time means a schema change
-        # ships with the commit that needs it rather than as a remembered step.
+        # Runs every time on purpose, and it is cheap: it reads which migrations
+        # have applied and does nothing when none are pending. Keeping it
+        # unconditional means a schema change ships with the commit that needs it
+        # rather than as a remembered step, and no agent ever runs against a
+        # schema its migration has not reached yet.
         run: python -m infra.migrate
 
       - name: Seed localities
+        # Not free, unlike migrations: this upserts every locality (~1,300 rows),
+        # and the hourly air-quality schedule was paying that ~24 times a day for
+        # nothing — the locality list only changes on a deploy. So skip it on the
+        # air-quality cron and let it run where a new locality can actually appear:
+        # every manual dispatch, and the daily news and weekly schools/
+        # connectivity schedules. A locality added by a deploy is seeded within a
+        # day at worst, or immediately by a manual run.
+        if: ${{ !(github.event_name == 'schedule' && steps.which.outputs.agent == 'air_quality') }}
         run: python -m agents.common.seed_localities
 
       - name: Run air quality
