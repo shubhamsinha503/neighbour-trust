@@ -183,7 +183,7 @@ export function SunlightCard({
         This is the sun&apos;s path for {name}. How a specific flat is lit also
         depends on its floor and the buildings around it —{" "}
         <a
-          href={`https://shadowmap.org/?lat=${lat}&lng=${lon}&zoom=17`}
+          href={`https://app.shadowmap.org/?lat=${lat}&lng=${lon}&zoom=17`}
           target="_blank"
           rel="noreferrer"
           className="font-semibold text-brand hover:underline"
