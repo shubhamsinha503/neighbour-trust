@@ -15,7 +15,6 @@
  */
 
 import type { AirQualityPayload, Confidence } from "@schema/envelope";
-import { TrendChart } from "@/components/TrendChart";
 import {
   BAND_COLOR,
   BAND_LABEL,
@@ -119,15 +118,6 @@ export function AirQualityCard({ view }: { view: AirQualityView }) {
         {payload.observedAt && <> · latest reading {relativeAge(payload.observedAt)}</>}
       </p>
 
-      {payload.aqiBasis === "cams_model" && (
-        <p className="mt-2 rounded-2xl bg-page-plane px-3 py-2 text-[11px] leading-[1.5] text-ink-secondary">
-          No live monitoring station is reporting near here, so this is a
-          <strong className="font-semibold"> modelled estimate</strong> of PM2.5
-          from the Copernicus (CAMS) atmospheric model — an approximation, not a
-          ground measurement. Shown at low confidence.
-        </p>
-      )}
-
       {/* The 24-hour figure is the headline because that's how CPCB defines the
           index. The latest hour is shown alongside it rather than hidden — it's
           what a resident standing outside right now is actually breathing, and
@@ -140,48 +130,6 @@ export function AirQualityCard({ view }: { view: AirQualityView }) {
         </p>
       )}
 
-      {/* 3 — trend */}
-      <section className="mt-5 border-t border-gridline pt-4">
-        <div className="mb-2 flex items-baseline justify-between">
-          <h3 className="text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
-            Daily AQI, last 30 days
-          </h3>
-          {verdict.trendDirection && (
-            <span className="text-[11px] text-ink-muted">
-              {verdict.trendDirection === "worsening" && "Worsening this week"}
-              {verdict.trendDirection === "improving" && "Improving this week"}
-              {verdict.trendDirection === "steady" && "Steady"}
-            </span>
-          )}
-        </div>
-        <TrendChart points={payload.trend30d} />
-      </section>
-
-      {/* 4 — the honest caveat, after the data, never before it */}
-      <div className="mt-5 flex items-start gap-2.5 rounded-2xl bg-brand-soft px-3.5 py-3">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--color-brand)"
-          strokeWidth="2.2"
-          className="mt-0.5 shrink-0"
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="12" r="9" />
-          <path d="M12 8h.01M11 12h1v4h1" />
-        </svg>
-        <div>
-          <b className="text-[12.5px] text-brand-deep">What this number can and can't tell you</b>
-          <p className="mt-1 text-[11.5px] leading-[1.5] text-ink-secondary">
-            {verdict.caveat} AQI is measured at fixed monitoring stations, so it
-            describes the air across a neighbourhood rather than a single
-            building — a flat beside a construction site or an arterial road can
-            be meaningfully worse than the figure above.
-          </p>
-        </div>
-      </div>
 
       {/* 5 — sources and confidence, in the main flow */}
       <footer className="mt-4 border-t border-dashed border-gridline pt-3">
