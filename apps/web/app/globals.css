@@ -68,3 +68,75 @@ h3 {
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Mobile-native baseline.
+
+   This app ships as an installed Android TWA and a phone-first PWA, so the
+   platform-layer tells that give a web page away are removed here. Each rule is
+   scoped to where its reason applies. (Tailwind v4 already compiles the `hover:`
+   variant to `@media (hover: hover)`, so sticky-hover on utility classes is
+   already handled — these rules cover everything else.)
+   ───────────────────────────────────────────────────────────────────────── */
+html {
+  /* Kill the grey/blue box the browser paints over any tapped element — the
+     single loudest "this is a website" tell. Press feedback is restored via
+     :active below, so nothing is lost. */
+  -webkit-tap-highlight-color: transparent;
+  /* Don't let the browser inflate font sizes when the phone is turned sideways. */
+  -webkit-text-size-adjust: 100%;
+  /* An app, not a document: no accidental pull-to-refresh reload and no
+     whole-page rubber-band at the top and bottom of a scroll. */
+  overscroll-behavior: none;
+}
+
+/* Fire the tap immediately (no 300ms double-tap-zoom wait) on everything
+   interactive. */
+button,
+a,
+[role="button"],
+input,
+label,
+summary {
+  touch-action: manipulation;
+}
+
+/* A control is not selectable text: no long-press text selection or iOS
+   copy/share callout on buttons. Real content (names, numbers, addresses) is
+   left selectable — this is scoped to controls only. */
+button,
+[role="button"] {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Press feedback, since the tap highlight is gone. Subtle, fast, and fired on
+   pointer-down by :active, so a tapped control responds the instant the finger
+   lands rather than when it lifts. */
+button:active,
+[role="button"]:active {
+  opacity: 0.7;
+  transition: opacity 60ms ease-out;
+}
+
+/* iOS zooms the page in when a focused input's text is below 16px and never
+   zooms back out. The search box (15px) and the Ask box (13.5px) both trip it.
+   Bump inputs to 16px on touch pointers only, leaving the desktop sizes intact. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* viewport-fit=cover (set in the viewport export) lets content sit under the
+   notch and the home-indicator; pad it back out of those zones so nothing is
+   clipped — the side insets in landscape and the bottom inset for the last
+   element on the page. Values are 0 on hardware without insets. */
+body {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

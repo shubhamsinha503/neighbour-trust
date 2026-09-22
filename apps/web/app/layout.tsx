@@ -104,6 +104,10 @@ export const viewport: Viewport = {
   // feel native and it takes pinch-zoom away from anyone who needs it; this app
   // is read by people checking a number before spending a lot of money.
   viewportFit: "cover",
+  // When the software keyboard opens (the Ask box, the search), shrink the
+  // layout viewport instead of overlaying it — so a focused input is never
+  // hidden behind the keyboard, matching iOS behaviour on Android too.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({
