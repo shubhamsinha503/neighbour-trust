@@ -6,6 +6,7 @@ import { useMemo, useRef, useState } from "react";
 import type { LocalitySummary } from "@/lib/api";
 import { joinCategoryLabels } from "@/lib/categories";
 import { browseList, citiesOf, coverageOf } from "@/lib/ordering";
+import { PREF_CITY_COOKIE, clearPref, writePref } from "@/lib/preferences";
 import {
   looksLikePincode,
   nearbyLocalities,
@@ -115,9 +116,11 @@ export function LocalitySearch({
   belowInput?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
-  // Held in memory only. app/privacy/page.tsx states that nothing is written to
-  // your browser, and a remembered city preference in localStorage would make
-  // that false for the sake of saving one tap.
+  // Remembered across visits in a first-party preference cookie (see
+  // lib/preferences.ts). `initialCity` is what the server read from that cookie,
+  // so the right city is chosen on the first frame; picking a chip below rewrites
+  // it, and "All" clears it. app/privacy/page.tsx describes this cookie — the two
+  // must never disagree.
   const [city, setCity] = useState<string | null>(initialCity);
   const inputRef = useRef<HTMLInputElement>(null);
   const [place, setPlace] = useState<PlaceLookup>({ status: "idle" });
@@ -300,7 +303,13 @@ export function LocalitySearch({
               <button
                 key={option ?? "all"}
                 type="button"
-                onClick={() => setCity(option)}
+                onClick={() => {
+                  setCity(option);
+                  // Persist the choice so the next visit opens here; "All"
+                  // (option === null) forgets it entirely.
+                  if (option) writePref(PREF_CITY_COOKIE, option);
+                  else clearPref(PREF_CITY_COOKIE);
+                }}
                 aria-pressed={active}
                 className={
                   "rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-colors " +

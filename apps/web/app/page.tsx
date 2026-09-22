@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -11,6 +12,7 @@ import {
   fetchLocalitySummaries,
   type LocalitySummary,
 } from "@/lib/api";
+import { PREF_CITY_COOKIE } from "@/lib/preferences";
 
 export const dynamic = "force-dynamic";
 
@@ -80,12 +82,20 @@ async function SearchSection() {
     );
   }
 
+  // The city filter the visitor last chose, kept in a preference cookie. Painted
+  // on the first frame so there is no flash from empty to filtered. A stale value
+  // (a city we no longer carry) is ignored rather than shown as an empty list.
+  const savedCity = (await cookies()).get(PREF_CITY_COOKIE)?.value ?? null;
+  const knownCities = new Set(localities.map((l) => l.city));
+  const initialCity = savedCity && knownCities.has(savedCity) ? savedCity : null;
+
   return (
     <>
       <LocalitySearch
         localities={localities}
         showBrowseList={false}
         examples={EXAMPLES}
+        initialCity={initialCity}
         belowInput={
           <div className="mt-5">
             <NearMe key="near-me" localities={localities} />

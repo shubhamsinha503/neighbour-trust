@@ -18,12 +18,14 @@ export const metadata = {
  *
  * IMPORTANT: this describes a build with optional Google sign-in (session
  * cookies only for people who sign in, and an account table holding the Google
- * id, email, name and what they save), no client-side storage, and one
- * cookieless analytics script that counts page views and cannot identify a
- * reader. That is verifiable in the source. If
- * any of it changes — resident reporting, sign-in, an analytics tool that sets
- * cookies or assigns a persistent id — this page has to change in the same
- * commit, or it becomes a false statement rather than a stale one.
+ * id, email, name and what they save), one functional preference cookie that
+ * remembers the city filter last chosen (see apps/web/lib/preferences.ts) and
+ * no other client-side storage, and one cookieless analytics script that counts
+ * page views and cannot identify a reader. That is verifiable in the source. If
+ * any of it changes — resident reporting, sign-in, another preference cookie, an
+ * analytics tool that sets cookies or assigns a persistent id — this page has to
+ * change in the same commit, or it becomes a false statement rather than a stale
+ * one.
  *
  * The analytics script was added on 2026-09-08 in the same commit as the
  * wording below, which is the rule working rather than the rule being tested.
@@ -48,7 +50,7 @@ export default function PrivacyPage() {
 
       <h1 className="mt-5 text-[24px] font-bold tracking-[-0.01em]">Privacy</h1>
       <p className="mt-1.5 text-[12px] text-ink-muted">
-        Last updated 15 September 2026
+        Last updated 22 September 2026
       </p>
 
       <Section title="The short version">
@@ -58,7 +60,9 @@ export default function PrivacyPage() {
           save localities, keep notes and compare them — we store your Google
           account id, email, name and what you save, and nothing else. You can
           delete all of it yourself, at any time, in one step. If you never sign
-          in, we store nothing about you and set no cookies.
+          in, we store nothing that identifies you — the only thing kept in your
+          browser is a small cookie remembering the city filter you last chose,
+          so your next visit opens there. It names no one; details below.
         </p>
         <p>
           It counts page views, so we can see which neighbourhoods people look
@@ -86,6 +90,22 @@ export default function PrivacyPage() {
           </strong>{" "}
           There is no newsletter, and signing in is optional. Without signing in
           we cannot identify you, and nothing you do here is tied to a profile.
+        </p>
+        <p className="mt-3">
+          <strong className="font-semibold text-ink-primary">
+            One preference cookie.
+          </strong>{" "}
+          So the front page opens where you left off, we keep one small
+          first-party cookie in your browser remembering the city filter you last
+          selected — for example that you were looking at Hyderabad. It holds that
+          one choice and nothing else, is sent to no one, and identifies nobody: a
+          note that says &ldquo;show Hyderabad first&rdquo; is not a profile.
+          Choosing &ldquo;All&rdquo; or clearing your browser&apos;s site data
+          removes it, and the site works exactly the same without it. Unless you
+          sign in, it is the only thing we write to your browser. We chose a plain
+          functional preference over anything that could follow you, which is why
+          there is no consent banner to click through — it does nothing but
+          remember a filter.
         </p>
         <p className="mt-3">
           <strong className="font-semibold text-ink-primary">
@@ -340,6 +360,20 @@ export default function PrivacyPage() {
           Signing in is the &ldquo;asking before anything about you is
           stored&rdquo; this page promised: nothing is stored until you choose
           to sign in.
+        </p>
+        <p>
+          <strong className="font-semibold text-ink-primary">
+            On 22 September 2026 a preference cookie was added
+          </strong>{" "}
+          — a single functional cookie that remembers the city filter you last
+          chose, so a return visit opens there rather than empty. Until this, the
+          app wrote nothing to the browser for signed-out visitors and said so on
+          this page; the 8 September note above even gave that as the reason for
+          picking a cookieless page-view counter. That is no longer true, so the
+          wording changed in the same commit as the cookie, before it went live.
+          It stores only a city name, is sent to no one, and identifies nobody —
+          the dull, honest kind of cookie, chosen so that no consent banner is
+          needed and the rest of this page can stay as plain as it is.
         </p>
         <p>
           The commitment stands, and now has a record attached to it. If
