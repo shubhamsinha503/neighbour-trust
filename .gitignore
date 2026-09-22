@@ -49,3 +49,7 @@ android/app-release-bundle.aab
 android/app-release-signed.apk
 android/.gradle/
 android/build/
+android/app/build/
+android/local.properties
+android/build-aab*.log
+*.aab
