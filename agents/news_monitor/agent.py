@@ -389,7 +389,7 @@ def build_envelope(
     # takes effect on the next ordinary run instead of requiring — and paying
     # for — a full re-judgement of the corpus.
     incidents, excluded = exclusions_mod.filter_incidents(
-        incidents, locality=locality["name"]
+        incidents, locality=locality["name"], city=locality["city"]
     )
     for title, reason in excluded:
         log.info("[%s/%s] excluded: %s (%s)", slug, category, title[:70], reason)
