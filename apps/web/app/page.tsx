@@ -1,18 +1,14 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { HomeIntro } from "@/components/HomeIntro";
 import { LocalitySearch } from "@/components/LocalitySearch";
 import { NearMe } from "@/components/NearMe";
 import { ShortlistShortcut } from "@/components/ShortlistShortcut";
 import { Bone, SkeletonRegion, SlowNotice } from "@/components/Skeleton";
 import { LogoMark } from "@/components/Logo";
-import { VisitorBadge } from "@/components/VisitorBadge";
 import { authConfigured } from "@/lib/auth";
 import {
   fetchLocalitySummaries,
-  fetchStats,
-  fetchVisitTotal,
   type LocalitySummary,
 } from "@/lib/api";
 
@@ -68,12 +64,6 @@ export default function HomePage() {
       </section>
 
       {authConfigured && <ShortlistShortcut />}
-
-      <div className="mt-10 border-t border-hairline pt-8">
-        <Suspense fallback={<HomeIntro stats={null} />}>
-          <IntroSection />
-        </Suspense>
-      </div>
     </main>
   );
 }
@@ -134,34 +124,13 @@ function Coverage({ localities }: { localities: LocalitySummary[] }) {
           </Link>
         ))}
       </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-0.5">
-        <p className="text-[11.5px] text-ink-muted">
-          Other cities aren&apos;t covered yet — we add areas only where we can
-          source data we trust.
-        </p>
+      <div className="mt-3 flex items-center justify-end px-0.5">
         <Link href="/localities" className="text-[12px] font-semibold text-brand hover:underline">
           Browse all localities →
         </Link>
       </div>
     </div>
   );
-}
-
-/**
- * Reads the running tally server-side and hands it to the badge to render and
- * then bump live on load. Fails to nothing: if the API is asleep, the front
- * page simply shows no counter rather than an error where social proof should be.
- */
-async function VisitCount() {
-  const total = await fetchVisitTotal().catch(() => null);
-  if (total === null) return null;
-  return <VisitorBadge initial={total} />;
-}
-
-/** Stats are decoration on top of the search; losing them must not cost the page. */
-async function IntroSection() {
-  const stats = await fetchStats().catch(() => null);
-  return <HomeIntro stats={stats} />;
 }
 
 function SearchSkeleton() {
@@ -190,23 +159,10 @@ function SearchSkeleton() {
  */
 function Masthead() {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-      <div className="flex items-center gap-2.5">
-        <LogoMark />
-        <div className="font-display text-[20px] font-bold tracking-[-0.02em]">
-          Neighbour Trust
-        </div>
-      </div>
-      {/* The visit tally, enlarged to own the top-right rather than sit tiny in
-        * the corner: social proof at the masthead, in the space the old
-        * decorative panel used to waste. `ml-auto` keeps it right-aligned both
-        * inline and when it wraps below the logo on a narrow screen. Its own
-        * Suspense, and allowed to fail to nothing — a counter never holds up or
-        * breaks the header. */}
-      <div className="ml-auto">
-        <Suspense fallback={null}>
-          <VisitCount />
-        </Suspense>
+    <div className="flex items-center gap-2.5">
+      <LogoMark />
+      <div className="font-display text-[20px] font-bold tracking-[-0.02em]">
+        Neighbour Trust
       </div>
     </div>
   );

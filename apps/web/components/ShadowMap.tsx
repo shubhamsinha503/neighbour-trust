@@ -282,12 +282,6 @@ export function ShadowMap({
           className="mt-2 w-full accent-brand"
           aria-label="Time of day"
         />
-        <p className="mt-2 text-[10.5px] leading-[1.5] text-ink-muted">
-          Shadows for {name} at the time above. Building heights are from
-          OpenStreetMap; where a height is not mapped the building is assumed
-          low-rise, so this is an estimate of shade, not a survey of a specific
-          flat.
-        </p>
       </div>
     </div>
   );

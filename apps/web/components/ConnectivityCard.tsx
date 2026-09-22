@@ -27,7 +27,7 @@
  */
 
 import { useState } from "react";
-import { CONFIDENCE_COLOR, CONFIDENCE_LABEL, relativeAge } from "@/lib/aqi";
+import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
 import { MeasureFrom, haversineKm, type Origin } from "@/components/MeasureFrom";
 import type { ConnectivityFeature, ConnectivityView } from "@/lib/api";
 
@@ -182,9 +182,6 @@ export function ConnectivityCard({ view }: { view: ConnectivityView }) {
             aria-hidden="true"
           />
           {CONFIDENCE_LABEL[view.confidence]}
-        </span>
-        <span className="text-[10px] text-ink-muted">
-          {view.sourceName} · mapped {relativeAge(view.dataVintage)}
         </span>
       </div>
     </article>

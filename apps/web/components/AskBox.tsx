@@ -104,10 +104,6 @@ export function AskBox({ slug, localityName }: { slug: string; localityName: str
       <div className="mb-1 text-[10.5px] font-bold uppercase tracking-[0.05em] text-brand">
         Ask about {localityName}
       </div>
-      <p className="text-[12.5px] leading-[1.5] text-ink-secondary">
-        Answered only from the data on this page, with every claim linked to its
-        source. If we don&apos;t hold something, it says so.
-      </p>
 
       <form
         className="mt-3 flex gap-2"

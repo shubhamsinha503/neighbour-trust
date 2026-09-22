@@ -197,24 +197,6 @@ export function AirQualityCard({ view }: { view: AirQualityView }) {
           ))}
           <ConfidenceChip confidence={view.confidence} />
         </div>
-        <p className="mt-2.5 text-[10px] leading-relaxed text-ink-muted">
-          Reading taken {formatIst(view.dataVintage)} IST · fetched{" "}
-          {relativeAge(view.fetchedAt)} · locality {locality.name}, H3 cell{" "}
-          <code className="font-mono">{view.h3Cell}</code>
-          {view.sourceUrl && (
-            <>
-              {" · "}
-              <a
-                href={view.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="underline decoration-dotted underline-offset-2 hover:text-ink-secondary"
-              >
-                source
-              </a>
-            </>
-          )}
-        </p>
       </footer>
     </article>
   );

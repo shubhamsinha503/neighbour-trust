@@ -1,29 +1,22 @@
 import Link from "next/link";
 
 /**
- * Site footer.
+ * Minimal site footer: a single, quiet Privacy link.
  *
- * Carries the privacy link, which the Play Store requires to be reachable from
- * inside the app rather than only from the store listing, and the methodology
- * page, which is the long form of the argument the home page makes in three
- * sentences.
+ * The old footer (methodology link + disclaimer paragraph) was removed for a
+ * cleaner page. The Privacy link stays because the Play Store requires the
+ * privacy policy to be reachable from inside the app, not only from the store
+ * listing — so this is the smallest footer that keeps the app compliant.
  */
 export function SiteFooter() {
   return (
-    <footer className="mx-auto mt-14 max-w-3xl border-t border-hairline px-4 py-6">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11.5px]">
-        <Link href="/about" className="font-medium text-ink-secondary hover:text-brand">
-          How these numbers are made
-        </Link>
-        <Link href="/privacy" className="font-medium text-ink-secondary hover:text-brand">
-          Privacy
-        </Link>
-      </div>
-      <p className="mt-3 text-[11px] leading-[1.6] text-ink-muted">
-        Neighbour Trust shows public data about public places, with its sources
-        and dates attached. Nothing here is a valuation or an investment
-        recommendation.
-      </p>
+    <footer className="mx-auto mt-12 max-w-3xl px-4 py-5">
+      <Link
+        href="/privacy"
+        className="text-[11px] text-ink-muted transition-colors hover:text-brand"
+      >
+        Privacy
+      </Link>
     </footer>
   );
 }

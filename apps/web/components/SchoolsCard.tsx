@@ -17,7 +17,7 @@
 
 import { useState } from "react";
 import type { Confidence } from "@schema/envelope";
-import { CONFIDENCE_COLOR, CONFIDENCE_LABEL, relativeAge } from "@/lib/aqi";
+import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
 import type { SchoolsView } from "@/lib/api";
 import { MeasureFrom, haversineKm, type Origin } from "@/components/MeasureFrom";
 
@@ -188,29 +188,6 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
           ))}
           <ConfidenceChip confidence={view.confidence} />
         </div>
-        <p className="mt-2.5 text-[10px] leading-relaxed text-ink-muted">
-          Underlying survey dated{" "}
-          {new Date(view.dataVintage).toLocaleDateString("en-IN", {
-            month: "short",
-            year: "numeric",
-          })}{" "}
-          · fetched {relativeAge(view.fetchedAt)} · locality{" "}
-          {view.locality.name}, H3 cell{" "}
-          <code className="font-mono">{view.h3Cell}</code>
-          {view.sourceUrl && (
-            <>
-              {" · "}
-              <a
-                href={view.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="underline decoration-dotted underline-offset-2 hover:text-ink-secondary"
-              >
-                source
-              </a>
-            </>
-          )}
-        </p>
       </footer>
     </article>
   );
