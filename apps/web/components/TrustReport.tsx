@@ -18,12 +18,13 @@
  *      Prominence-Interpretation Theory.
  */
 
+import { categoryLabel } from "@/lib/i18n";
+import { getServerT } from "@/lib/i18n-server";
 import Link from "next/link";
 import type { Confidence } from "@schema/envelope";
 import { ExpandableCard } from "@/components/ExpandableCard";
 import { SunlightCard } from "@/components/SunlightCard";
 import { UpcomingCard } from "@/components/UpcomingCard";
-import { joinCategoryLabels } from "@/lib/categories";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
 import type {
   ConnectivityFeature,
@@ -44,7 +45,7 @@ function colorForScore(score: number): string {
   return SCORE_COLORS.find(([floor]) => score >= floor)?.[1] ?? SCORE_COLORS[0][1];
 }
 
-export function TrustReport({
+export async function TrustReport({
   report,
   connectivity,
 }: {
@@ -55,6 +56,7 @@ export function TrustReport({
   connectivity?: ConnectivityView | null;
 }) {
   const { trustScore: trust, locality } = report;
+  const { t, locale } = await getServerT();
 
   return (
     <div>
@@ -75,8 +77,8 @@ export function TrustReport({
              * difference between a claim and an overclaim. */}
             <div className="mb-1 text-[10.5px] font-bold uppercase tracking-[0.05em] text-brand">
               {trust.score === null
-                ? "Our take"
-                : `Based on ${countedLabels(report) || "partial data"}`}
+                ? t("report.ourTake")
+                : `${t("report.basedOn")} ${countedLabels(report, t, locale) || t("report.partialData")}`}
             </div>
             <h2 className="text-[14.5px] font-semibold leading-[1.4] text-ink-primary">
               {report.verdict}
@@ -118,7 +120,7 @@ export function TrustReport({
         {/* 6 — source strip, kept with the score where it does its work */}
         {report.sourcesUsed.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-gridline pt-3">
-            <span className="w-full text-[9.5px] text-ink-muted">Data pulled from</span>
+            <span className="w-full text-[9.5px] text-ink-muted">{t("report.dataPulledFrom")}</span>
             {report.sourcesUsed.map((source) => (
               <span
                 key={source}
@@ -133,7 +135,7 @@ export function TrustReport({
 
       {/* 4 — the category grid, empties included */}
       <h3 className="mb-2.5 mt-6 text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
-        Categories
+        {t("report.categoriesHeader")}
       </h3>
       {/* Categories we have something for get a card. Categories we have nothing
         * for get one line between them, rather than a full card each saying
@@ -165,8 +167,7 @@ export function TrustReport({
         * resident could reach the form was a page that did not exist. */}
       <div className="mt-2.5 flex items-center justify-between gap-3 rounded-2xl border border-hairline bg-surface-1 px-3.5 py-3">
         <p className="text-[11.5px] leading-[1.5] text-ink-secondary">
-          Live in {locality.name}? Water, power, safety — what you have seen is
-          what no official source publishes.
+          {t("report.residentIntro").replace("{name}", locality.name)}
         </p>
         <ReportLink localityName={locality.name} />
       </div>
@@ -199,10 +200,17 @@ export function TrustReport({
  * this does. It did not, once: the card hardcoded "air+schools" while this
  * derived the real list, and the two pages contradicted each other in public.
  */
-function countedLabels(report: LocalityReport): string {
-  return joinCategoryLabels(
-    report.categories.filter((c) => c.counted).map((c) => c.label),
-  );
+function countedLabels(
+  report: LocalityReport,
+  t: (key: string) => string,
+  _locale: string,
+): string {
+  const labels = report.categories
+    .filter((c) => c.counted)
+    .map((c) => categoryLabel(t, c.category, c.label).toLowerCase());
+  if (labels.length === 0) return "";
+  if (labels.length === 1) return labels[0];
+  return labels.slice(0, -1).join(", ") + " " + t("common.and") + " " + labels[labels.length - 1];
 }
 
 
@@ -306,17 +314,18 @@ function distanceText(km: number): string {
 }
 
 /** ~80 m/min is an unhurried walk; past a quarter-hour it is really a drive. */
-function walkText(km: number): string {
+function walkText(km: number, t: (k: string) => string): string {
   const mins = Math.max(1, Math.round((km * 1000) / 80));
-  return mins <= 15 ? `~${mins} min walk` : "a short drive";
+  return mins <= 15 ? `~${mins} ${t("report.walk")}` : t("report.shortDrive");
 }
 
-function NearbyList({ connectivity }: { connectivity: ConnectivityView }) {
+async function NearbyList({ connectivity }: { connectivity: ConnectivityView }) {
+  const { t } = await getServerT();
   const { locality, counts, features } = connectivity;
   const from = { lat: locality.lat, lon: locality.lon };
 
   const rows = NEARBY_KINDS.map(({ countKey, kind, label }) => ({
-    label,
+    label: t("amenity." + kind) === "amenity." + kind ? label : t("amenity." + kind),
     count: counts[countKey],
     km: nearestKm(features, kind, from),
   })).filter((row) => row.count > 0);
@@ -328,7 +337,7 @@ function NearbyList({ connectivity }: { connectivity: ConnectivityView }) {
   return (
     <div className="mt-4">
       <div className="mb-1.5 text-[10.5px] font-bold uppercase tracking-[0.05em] text-brand">
-        What&apos;s nearby
+        {t("report.whatsNearby")}
       </div>
       <ul className="flex flex-col">
         {rows.map((row) => (
@@ -349,11 +358,11 @@ function NearbyList({ connectivity }: { connectivity: ConnectivityView }) {
                     {distanceText(row.km)}
                   </div>
                   <div className="text-[10px] font-medium text-brand">
-                    nearest · {walkText(row.km)}
+                    {t("report.nearest")} · {walkText(row.km, t)}
                   </div>
                 </>
               ) : (
-                <div className="text-[11px] font-medium text-brand">count only</div>
+                <div className="text-[11px] font-medium text-brand">{t("report.countOnly")}</div>
               )}
             </div>
           </li>
@@ -413,7 +422,7 @@ function ScoreMeter({ trust }: { trust: LocalityReport["trustScore"] }) {
   );
 }
 
-function CategoryCard({
+async function CategoryCard({
   category,
   slug,
   localityName,
@@ -422,6 +431,7 @@ function CategoryCard({
   slug: string;
   localityName: string;
 }) {
+  const { t } = await getServerT();
   // Connectivity earned a detail page when its distances became re-measurable
   // from an address — the tile can only show one line, and "nearest station
   // 0.21 km" is measured from the locality centre until someone says otherwise.
@@ -455,14 +465,14 @@ function CategoryCard({
     <>
       <div className="mb-1.5 flex items-start justify-between gap-2">
         <div className="text-[12.5px] font-semibold text-ink-primary">
-          {category.label}
+          {categoryLabel(t, category.category, category.label)}
         </div>
         {category.score !== null && (
           <div className="flex shrink-0 items-center gap-1.5">
             {/* A baseline is not a measurement, so it must not look like one. */}
             {category.isBaseline && (
               <span className="rounded bg-page-plane px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-ink-muted">
-                Baseline
+                {t("report.baselineTag")}
               </span>
             )}
             <div
@@ -513,17 +523,19 @@ function CategoryCard({
             style={{ background: CONFIDENCE_COLOR[category.confidence as Confidence] }}
             aria-hidden="true"
           />
-          {CONFIDENCE_LABEL[category.confidence as Confidence]}
+          {t("conf." + category.confidence) === "conf." + category.confidence
+            ? CONFIDENCE_LABEL[category.confidence as Confidence]
+            : t("conf." + category.confidence)}
         </span>
       ) : (
-        <span className="text-[10px] text-ink-muted">No data yet</span>
+        <span className="text-[10px] text-ink-muted">{t("common.noDataYet")}</span>
       )}
       {hasDetailPage && category.available && (
         <Link
           href={`/${slug}/${DETAIL_PATH[category.category]}`}
           className="text-[10px] text-brand hover:underline"
         >
-          Details →
+          {t("report.details")}
         </Link>
       )}
     </span>
@@ -593,7 +605,7 @@ const FORM_CATEGORY_OPTION: Record<string, string> = {
   Connectivity: "Roads, transport or nearby construction",
 };
 
-function ReportLink({
+async function ReportLink({
   category,
   localityName,
 }: {
@@ -603,6 +615,7 @@ function ReportLink({
 }) {
   const base = process.env.NEXT_PUBLIC_REPORT_URL;
   if (!base) return null;
+  const { t } = await getServerT();
 
   const params = new URLSearchParams({
     // Google's own marker for a prefilled link.
@@ -624,7 +637,7 @@ function ReportLink({
       rel="noopener noreferrer"
       className={`inline-flex shrink-0 items-center gap-1 text-[10.5px] font-semibold text-brand underline decoration-dotted underline-offset-2 hover:decoration-solid ${category ? "mt-2" : ""}`}
     >
-      Seen something? Tell us
+      {t("report.seenSomething")}
       <span aria-hidden="true">→</span>
     </a>
   );
