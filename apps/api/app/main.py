@@ -33,6 +33,7 @@ from apps.api.app.schools_verdict import build_verdict as build_schools_verdict 
 from apps.api.app.verdict import build_verdict  # noqa: E402
 from apps.api.app.accounts import router as accounts_router  # noqa: E402
 from apps.api.app.locality_requests import router as locality_requests_router  # noqa: E402
+from apps.api.app.prefs import router as prefs_router  # noqa: E402
 from apps.api.app.visits import router as visits_router  # noqa: E402
 
 app = FastAPI(
@@ -59,6 +60,10 @@ app.include_router(accounts_router)
 app.include_router(locality_requests_router)
 # Front-page visit tally — one anonymous number. See visits.py.
 app.include_router(visits_router)
+# Preferences for a consented, signed-out visitor, keyed by an opaque cookie id.
+# Called by the web app's server only — see prefs.py for why the browser cannot
+# reach it directly.
+app.include_router(prefs_router)
 
 app.add_middleware(
     CORSMiddleware,

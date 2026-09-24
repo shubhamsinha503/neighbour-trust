@@ -10,9 +10,10 @@ import { LogoMark } from "@/components/Logo";
 import { authConfigured } from "@/lib/auth";
 import {
   fetchLocalitySummaries,
+  fetchVisitorPrefCity,
   type LocalitySummary,
 } from "@/lib/api";
-import { PREF_CITY_COOKIE } from "@/lib/preferences";
+import { PREF_CITY_COOKIE, VISITOR_COOKIE } from "@/lib/preferences";
 
 export const dynamic = "force-dynamic";
 
@@ -82,10 +83,17 @@ async function SearchSection() {
     );
   }
 
-  // The city filter the visitor last chose, kept in a preference cookie. Painted
-  // on the first frame so there is no flash from empty to filtered. A stale value
-  // (a city we no longer carry) is ignored rather than shown as an empty list.
-  const savedCity = (await cookies()).get(PREF_CITY_COOKIE)?.value ?? null;
+  // The city filter the visitor last chose, painted on the first frame so there
+  // is no flash from empty to filtered. A consented visitor's server-side
+  // profile wins (it follows them across devices); otherwise the local
+  // functional cookie. A stale value (a city we no longer carry) is ignored
+  // rather than shown as an empty list.
+  const store = await cookies();
+  const visitorId = store.get(VISITOR_COOKIE)?.value ?? null;
+  const savedCity =
+    (visitorId ? await fetchVisitorPrefCity(visitorId) : null) ??
+    store.get(PREF_CITY_COOKIE)?.value ??
+    null;
   const knownCities = new Set(localities.map((l) => l.city));
   const initialCity = savedCity && knownCities.has(savedCity) ? savedCity : null;
 

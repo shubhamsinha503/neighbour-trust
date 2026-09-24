@@ -6,7 +6,7 @@ import { useMemo, useRef, useState } from "react";
 import type { LocalitySummary } from "@/lib/api";
 import { joinCategoryLabels } from "@/lib/categories";
 import { browseList, citiesOf, coverageOf } from "@/lib/ordering";
-import { PREF_CITY_COOKIE, clearPref, writePref } from "@/lib/preferences";
+import { saveCityPreference } from "@/lib/preferences";
 import {
   looksLikePincode,
   nearbyLocalities,
@@ -305,10 +305,10 @@ export function LocalitySearch({
                 type="button"
                 onClick={() => {
                   setCity(option);
-                  // Persist the choice so the next visit opens here; "All"
-                  // (option === null) forgets it entirely.
-                  if (option) writePref(PREF_CITY_COOKIE, option);
-                  else clearPref(PREF_CITY_COOKIE);
+                  // Persist the choice so the next visit opens here (locally
+                  // always, and server-side too if the visitor consented);
+                  // "All" (option === null) forgets it.
+                  saveCityPreference(option);
                 }}
                 aria-pressed={active}
                 className={

@@ -19,8 +19,57 @@
  * flash), matching how the rest of the app pre-fills from the request.
  */
 
-/** Remembers the city filter last selected in the search box. */
+/** Remembers the city filter last selected in the search box (functional, local). */
 export const PREF_CITY_COOKIE = "nt_city";
+
+/**
+ * The consented layer, on top of the functional cookie above.
+ *
+ * `nt_consent` ("granted" | "denied") is JS-readable so the banner knows whether
+ * it has already been answered. `nt_visitor` is the opaque per-person id and is
+ * set HttpOnly by the server (app/api/consent), so it is deliberately NOT
+ * readable here — the client never sees the identifier, it only knows whether
+ * consent was given. Both are described on the privacy page.
+ */
+export const CONSENT_COOKIE = "nt_consent";
+export const VISITOR_COOKIE = "nt_visitor";
+
+export type Consent = "granted" | "denied" | null;
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(
+    new RegExp(`(?:^|;\\s*)${name}=([^;]*)`),
+  );
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/** Whether the visitor has answered the personalisation banner, and how. */
+export function readConsent(): Consent {
+  const v = readCookie(CONSENT_COOKIE);
+  return v === "granted" || v === "denied" ? v : null;
+}
+
+/**
+ * Save the city preference. Always writes the local functional cookie (fast,
+ * needs no consent); if the visitor has consented to personalisation, also
+ * persists it server-side against their id via the web app's own route, so it
+ * follows them to another device. Fires and forgets — a preference save is never
+ * allowed to block or break the tap that triggered it.
+ */
+export function saveCityPreference(city: string | null): void {
+  if (city) writePref(PREF_CITY_COOKIE, city);
+  else clearPref(PREF_CITY_COOKIE);
+
+  if (readConsent() === "granted" && typeof fetch !== "undefined") {
+    void fetch("/api/prefs", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ city }),
+      keepalive: true,
+    }).catch(() => {});
+  }
+}
 
 // One year: long enough to survive the gap between house-hunting sessions,
 // which is measured in weeks. `SameSite=Lax` so it is never sent on a

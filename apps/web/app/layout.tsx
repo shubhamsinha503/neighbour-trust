@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Caveat, Hanken_Grotesk } from "next/font/google";
 
 import { AccountBar } from "@/components/AccountBar";
 import { AuthProvider } from "@/components/AuthProvider";
+import { ConsentBanner } from "@/components/ConsentBanner";
 import { RegisterServiceWorker } from "@/components/RegisterServiceWorker";
 import { authConfigured } from "@/lib/auth";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -128,6 +129,7 @@ export default function RootLayout({
           {children}
         </AuthProvider>
         <SiteFooter />
+        <ConsentBanner />
         <RegisterServiceWorker />
         <WebAnalytics />
       </body>

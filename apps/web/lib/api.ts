@@ -446,6 +446,25 @@ export async function fetchStats(): Promise<CoverageStats> {
   };
 }
 
+export async function fetchVisitorPrefCity(visitorId: string): Promise<string | null> {
+  // The consented visitor's stored city, read during the home page's server
+  // render so the right filter paints on the first frame — the id travels in a
+  // header, never the URL. Never throws: a preference is not worth failing a
+  // page render over, so any trouble reading it just means "no stored city".
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/prefs`, {
+      headers: { "x-visitor-id": visitorId },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return null;
+    const raw = (await response.json()) as Record<string, unknown>;
+    return typeof raw.city === "string" ? raw.city : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchVisitTotal(): Promise<number> {
   // A single-row read, and the number people watch tick up — so it is fetched
   // fresh on every render rather than cached. The client bumps it live on load;
