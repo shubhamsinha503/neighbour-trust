@@ -4,8 +4,10 @@ import { Bricolage_Grotesque, Caveat, Hanken_Grotesk } from "next/font/google";
 import { AccountBar } from "@/components/AccountBar";
 import { AuthProvider } from "@/components/AuthProvider";
 import { ConsentBanner } from "@/components/ConsentBanner";
+import { LanguageProvider } from "@/components/LanguageProvider";
 import { RegisterServiceWorker } from "@/components/RegisterServiceWorker";
 import { authConfigured } from "@/lib/auth";
+import { getLocale } from "@/lib/i18n-server";
 import { SiteFooter } from "@/components/SiteFooter";
 import { WebAnalytics } from "@/components/WebAnalytics";
 import "./globals.css";
@@ -111,27 +113,30 @@ export const viewport: Viewport = {
   interactiveWidget: "resizes-content",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
   return (
     <html
-      lang="en-IN"
+      lang={locale === "en" ? "en-IN" : locale}
       className={`${hanken.variable} ${bricolage.variable} ${caveat.variable}`}
     >
       <body className="min-h-screen bg-page-plane">
         {/* Sign-in appears only once Google credentials are configured; until
           * then the site renders exactly as it did without accounts. */}
-        <AuthProvider enabled={authConfigured}>
-          {authConfigured && <AccountBar />}
-          {children}
-        </AuthProvider>
-        <SiteFooter />
-        <ConsentBanner />
-        <RegisterServiceWorker />
-        <WebAnalytics />
+        <LanguageProvider locale={locale}>
+          <AuthProvider enabled={authConfigured}>
+            {authConfigured && <AccountBar />}
+            {children}
+          </AuthProvider>
+          <SiteFooter />
+          <ConsentBanner />
+          <RegisterServiceWorker />
+          <WebAnalytics />
+        </LanguageProvider>
       </body>
     </html>
   );

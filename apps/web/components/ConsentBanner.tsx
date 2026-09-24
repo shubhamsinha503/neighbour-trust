@@ -18,6 +18,7 @@
 
 import { useEffect, useState } from "react";
 
+import { useT } from "@/components/LanguageProvider";
 import { PREF_CITY_COOKIE, readConsent } from "@/lib/preferences";
 
 function readCity(): string | null {
@@ -31,6 +32,7 @@ function readCity(): string | null {
 export function ConsentBanner() {
   // `null` until mounted, so the server and the first client render agree on
   // "nothing", and the banner only appears once we have read the cookie.
+  const t = useT();
   const [show, setShow] = useState<boolean>(false);
   const [busy, setBusy] = useState(false);
 
@@ -73,20 +75,17 @@ export function ConsentBanner() {
   return (
     <div
       role="dialog"
-      aria-label="Remember my preferences and history"
+      aria-label={t("consent.title")}
       className="fixed inset-x-0 bottom-0 z-50 px-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-2"
     >
       <div className="mx-auto max-w-3xl rounded-2xl border border-hairline bg-surface-1 p-4 shadow-[0_6px_24px_rgba(0,0,0,0.12)]">
         <p className="text-[13px] leading-[1.6] text-ink-secondary">
           <span className="font-semibold text-ink-primary">
-            Remember your preferences and history?
+            {t("consent.title")}
           </span>{" "}
-          We can keep the city you filter to and a history of the localities
-          you open on our side, tied to a private id that never shows who you
-          are — so they&apos;re remembered for you, and carry across your
-          devices once you sign in. You can erase it all anytime.{" "}
+          {t("consent.body")}{" "}
           <a href="/privacy" className="font-semibold text-brand hover:underline">
-            How this works
+            {t("consent.how")}
           </a>
           .
         </p>
@@ -97,7 +96,7 @@ export function ConsentBanner() {
             onClick={() => answer(true)}
             className="rounded-xl bg-brand px-4 py-2 text-[13px] font-semibold text-white transition-opacity disabled:opacity-50"
           >
-            Yes, remember
+            {t("consent.yes")}
           </button>
           <button
             type="button"
@@ -105,7 +104,7 @@ export function ConsentBanner() {
             onClick={() => answer(false)}
             className="rounded-xl bg-page-plane px-4 py-2 text-[13px] font-semibold text-ink-secondary transition-opacity disabled:opacity-50"
           >
-            No thanks
+            {t("consent.no")}
           </button>
         </div>
       </div>

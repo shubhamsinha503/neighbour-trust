@@ -20,9 +20,9 @@ export const metadata = {
  *
  * IMPORTANT: this describes a build with optional Google sign-in (session
  * cookies only for people who sign in, and an account table holding the Google
- * id, email, name and what they save), one functional preference cookie that
- * remembers the city filter last chosen on the device (see
- * apps/web/lib/preferences.ts), an OPT-IN personalisation layer that — only
+ * id, email, name and what they save), two functional preference cookies that
+ * remember the city filter and the UI language last chosen on the device (see
+ * apps/web/lib/preferences.ts and apps/web/lib/i18n.ts), an OPT-IN personalisation layer that — only
  * after the consent banner is accepted — sets a random visitor id and stores
  * that same city preference against it server-side (apps/api/app/prefs.py,
  * infra/migrations/014_visitor_prefs.sql) together with a history of which
@@ -116,6 +116,17 @@ export default function PrivacyPage() {
           data removes it, and the site works exactly the same without it. This
           one is functional and needs no permission — it does nothing but remember
           a filter on the device it was set on.
+        </p>
+        <p className="mt-3">
+          <strong className="font-semibold text-ink-primary">
+            A language cookie, on your device.
+          </strong>{" "}
+          If you pick a language from the switcher, we keep one small first-party
+          cookie remembering that choice, so the site opens in your language next
+          time. Like the city cookie it holds one setting and nothing else, stays
+          on your device, is sent to no one, and identifies nobody. It is
+          functional and needs no permission; clearing your site data removes it
+          and the site falls back to English.
         </p>
         <p className="mt-3">
           <strong className="font-semibold text-ink-primary">

@@ -29,6 +29,7 @@
  * fire unprompted after all, this is the one line to change.
  */
 
+import { useT } from "@/components/LanguageProvider";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -87,6 +88,7 @@ type State =
   | { status: "unavailable"; message: string };
 
 export function NearMe({ localities }: { localities: LocalitySummary[] }) {
+  const t = useT();
   const router = useRouter();
   const [state, setState] = useState<State>({ status: "idle" });
 
@@ -145,7 +147,7 @@ export function NearMe({ localities }: { localities: LocalitySummary[] }) {
           <path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z" />
           <circle cx="12" cy="10" r="2.6" />
         </svg>
-        {state.status === "locating" ? "Finding you…" : "Show my neighbourhood"}
+        {state.status === "locating" ? t("nearme.finding") : t("nearme.show")}
       </button>
 
       {/* Only shown when there's something to say — a coverage miss, a denied
