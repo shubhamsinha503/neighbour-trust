@@ -7,7 +7,10 @@ export const metadata = { title: "Offline · Neighbour Trust" };
  * never cached: a stale air quality reading that looks current would break the
  * one promise this product makes.
  */
-export default function OfflinePage() {
+import { getServerT } from "@/lib/i18n-server";
+
+export default async function OfflinePage() {
+  const { t } = await getServerT();
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
       <div className="rounded-[20px] border border-hairline bg-surface-1 p-6">
@@ -16,18 +19,15 @@ export default function OfflinePage() {
         </div>
 
         <h1 className="mt-4 text-[19px] font-bold tracking-[-0.01em]">
-          You&apos;re offline
+          {t("offline.title")}
         </h1>
 
         <p className="mt-2 text-[13px] leading-[1.6] text-ink-secondary">
-          Neighbour Trust needs a connection. We don&apos;t keep neighbourhood
-          data on your device, because a saved reading would still look current
-          days later — and every figure here is supposed to tell you how old it
-          is.
+          {t("offline.body1")}
         </p>
 
         <p className="mt-3 text-[13px] leading-[1.6] text-ink-secondary">
-          Reconnect and reload, and you&apos;ll get the live version.
+          {t("offline.body2")}
         </p>
       </div>
     </main>

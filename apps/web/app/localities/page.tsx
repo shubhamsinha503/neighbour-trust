@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { LocalitySearch } from "@/components/LocalitySearch";
 import { fetchLocalitySummaries } from "@/lib/api";
+import { getServerT } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function LocalitiesPage({
   searchParams: Promise<{ city?: string }>;
 }) {
   const { city } = await searchParams;
+  const { t } = await getServerT();
   let localities = null;
   try {
     localities = await fetchLocalitySummaries();
@@ -39,11 +41,11 @@ export default async function LocalitiesPage({
         href="/"
         className="text-[11px] text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink-secondary"
       >
-        ← Search
+        ← {t("back.search")}
       </Link>
-      <h1 className="mt-3 text-[23px] font-bold tracking-[-0.01em]">All localities</h1>
+      <h1 className="mt-3 text-[23px] font-bold tracking-[-0.01em]">{t("localities.title")}</h1>
       <p className="mt-1 text-[13px] text-ink-secondary">
-        Bengaluru, Gurugram, Hyderabad and Mumbai. Best documented first.
+        {t("localities.subtitle")}
       </p>
 
       <div className="mt-5">
@@ -55,7 +57,7 @@ export default async function LocalitiesPage({
           />
         ) : (
           <div className="rounded-2xl border border-hairline bg-surface-1 p-4 text-[12.5px] text-ink-secondary">
-            Couldn&apos;t load the localities just now. Please refresh in a moment.
+            {t("home.loadError")}
           </div>
         )}
       </div>
