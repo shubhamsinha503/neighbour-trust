@@ -76,9 +76,9 @@ export function ConsentBanner() {
           <span className="font-semibold text-ink-primary">
             Remember your preferences?
           </span>{" "}
-          We can keep the city you look at, so the app opens there on any device.
-          It uses a private id, never shows who you are, and you can undo it
-          anytime.{" "}
+          We can keep the city you look at on our side, tied to a private id that
+          never shows who you are — so it&apos;s remembered for you, and carries
+          across your devices once you sign in. You can undo it anytime.{" "}
           <a href="/privacy" className="font-semibold text-brand hover:underline">
             How this works
           </a>

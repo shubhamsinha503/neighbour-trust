@@ -67,9 +67,10 @@ export default function PrivacyPage() {
           delete all of it yourself, at any time, in one step. If you never sign
           in, we keep a small cookie remembering the city filter you last chose,
           so your next visit opens there — and, only if you say yes to the banner
-          that asks, we remember that preference against a private id so it
-          follows you across devices. That id names no one, you can delete it in
-          one tap, and if you say no we keep nothing on our side. Details below.
+          that asks, we also keep that preference on our side against a private
+          id. That id names no one, you can delete it in one tap, and if you say
+          no we keep nothing on our side. On its own it stays with this browser;
+          it follows you between devices only if you sign in. Details below.
         </p>
         <p>
           It counts page views, so we can see which neighbourhoods people look
@@ -115,14 +116,16 @@ export default function PrivacyPage() {
         </p>
         <p className="mt-3">
           <strong className="font-semibold text-ink-primary">
-            Remembering it across your devices — only if you say yes.
+            Keeping it on our side — only if you say yes.
           </strong>{" "}
-          A banner asks, once, whether we may remember that preference for you
-          rather than just on one device. If you say yes, we create a random id —
-          a string like <code>a3f1…</code> that means nothing and is tied to no
-          name, email or account — put it in a cookie your browser keeps, and
-          store your city choice against it on our server so it follows you to
-          your phone or another browser. The id is set so that page scripts
+          A banner asks, once, whether we may keep that preference for you on our
+          server rather than only in this browser. If you say yes, we create a
+          random id — a string like <code>a3f1…</code> that means nothing and is
+          tied to no name, email or account — put it in a cookie your browser
+          keeps, and store your city choice against it. Because the id lives in a
+          cookie, on its own it keeps your preference for this browser; it begins
+          to follow you between your phone and laptop only once you sign in and it
+          can be attached to your account. The id is set so that page scripts
           cannot read it and it never appears in a web address. We store only the
           preference itself; we do not record where you go on the site, and this
           id is never joined to the page-view counter, the server logs, or a
@@ -406,8 +409,9 @@ export default function PrivacyPage() {
           — and this is the larger reversal, so it is worth naming plainly. For
           the first time the site can keep a per-person record for someone who has
           not signed in: if you accept the banner, a random id is set in a cookie
-          and your city preference is stored against it on our server, so it
-          follows you between devices. This page said, for months, that we
+          and your city preference is stored against it on our server. (On its
+          own that id stays with the browser it was set in; it spans devices only
+          once it is linked to a sign-in.) This page said, for months, that we
           assigned no identifier and tied nothing to a profile without sign-in.
           That is no longer true for anyone who opts in, and the change — the
           banner, the id, the &ldquo;forget me&rdquo; button, and this note — all
