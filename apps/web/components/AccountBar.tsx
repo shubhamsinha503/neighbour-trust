@@ -8,10 +8,12 @@
  * offers it rather than asks for it.
  */
 
+import { useT } from "@/components/LanguageProvider";
 import Link from "next/link";
 import { signIn, signOut, useSession } from "next-auth/react";
 
 export function AccountBar() {
+  const t = useT();
   const { data: session, status } = useSession();
 
   return (
@@ -21,13 +23,13 @@ export function AccountBar() {
       ) : session ? (
         <>
           <Link href="/shortlist" className="font-semibold text-brand hover:underline">
-            ♥ My shortlist
+            ♥ {t("acct.myShortlist")}
           </Link>
           <span className="hidden text-ink-muted sm:inline">
             {session.user?.name ?? session.user?.email}
           </span>
           <button type="button" onClick={() => signOut()} className="text-ink-muted hover:text-ink-secondary">
-            Sign out
+            {t("acct.signOut")}
           </button>
         </>
       ) : (
@@ -36,7 +38,7 @@ export function AccountBar() {
           onClick={() => signIn("google")}
           className="rounded-full border border-hairline bg-surface-1 px-3 py-1 font-semibold text-ink-secondary hover:border-brand hover:text-brand"
         >
-          Sign in to save localities
+          {t("acct.signInSave")}
         </button>
       )}
     </div>

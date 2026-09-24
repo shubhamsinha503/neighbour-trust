@@ -18,6 +18,7 @@
  * verified against Bengaluru — so no radian conversion is applied here.
  */
 
+import { useT } from "@/components/LanguageProvider";
 import Link from "next/link";
 import { useState } from "react";
 import * as SunCalc from "suncalc";
@@ -63,6 +64,7 @@ export function SunlightCard({
   lat: number;
   lon: number;
 }) {
+  const t = useT();
   const [facing, setFacing] = useState<Facing | null>(null);
   const now = new Date();
   const times = SunCalc.getTimes(now, lat, lon);
@@ -117,11 +119,13 @@ export function SunlightCard({
   return (
     <section className="mt-4 rounded-[20px] border border-hairline bg-surface-1 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
       <div className="mb-1 text-[10.5px] font-bold uppercase tracking-[0.05em] text-brand">
-        Sunlight &amp; orientation
+        {t("sun.header")}
       </div>
       <h2 className="text-[14.5px] font-semibold leading-[1.4] text-ink-primary">
-        Rises in the {compass(riseAz)}, sets in the {compass(setAz)} — {Math.round(noonAlt)}°
-        overhead at midday.
+        {t("sun.headline")
+          .replace("{rise}", compass(riseAz))
+          .replace("{set}", compass(setAz))
+          .replace("{alt}", String(Math.round(noonAlt)))}
       </h2>
 
       {/* Sun-height curve for today, drawn from the real position. */}
@@ -135,7 +139,7 @@ export function SunlightCard({
           {fmt(sunrise)}
         </text>
         <text x="160" y="104" textAnchor="middle" fill="var(--color-ink-muted)" style={{ fontSize: 9 }}>
-          {dayH}h {dayM}m of daylight
+          {t("sun.daylight").replace("{h}", String(dayH)).replace("{m}", String(dayM))}
         </text>
         <text x="296" y="104" textAnchor="middle" fill="var(--color-ink-muted)" style={{ fontSize: 9 }}>
           {fmt(sunset)}
@@ -143,20 +147,21 @@ export function SunlightCard({
       </svg>
 
       <div className="mt-3 grid grid-cols-3 gap-2">
-        <Stat label="Sunrise" value={fmt(sunrise)} sub={`in the ${compass(riseAz)}`} />
-        <Stat label="Sunset" value={fmt(sunset)} sub={`in the ${compass(setAz)}`} />
-        <Stat label="Midday sun" value={`${Math.round(noonAlt)}°`} sub="above the horizon" />
+        <Stat label={t("sun.sunrise")} value={fmt(sunrise)} sub={t("sun.inThe").replace("{dir}", compass(riseAz))} />
+        <Stat label={t("sun.sunset")} value={fmt(sunset)} sub={t("sun.inThe").replace("{dir}", compass(setAz))} />
+        <Stat label={t("sun.middaySun")} value={`${Math.round(noonAlt)}°`} sub={t("sun.aboveHorizon")} />
       </div>
 
       <p className="mt-3 text-[11.5px] leading-[1.55] text-ink-secondary">
-        Across the year the sunrise swings from the {compass(summerRise)} in June to the{" "}
-        {compass(winterRise)} in December.
+        {t("sun.seasonal")
+          .replace("{summer}", compass(summerRise))
+          .replace("{winter}", compass(winterRise))}
       </p>
 
       {/* Facing helper — the part a buyer actually decides on. */}
       <div className="mt-4 border-t border-gridline pt-4">
         <div className="text-[11.5px] font-semibold text-ink-primary">
-          Which way does the home face?
+          {t("sun.whichWay")}
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {DIRECTIONS.map((d) => (
@@ -177,19 +182,18 @@ export function SunlightCard({
         </div>
         {facing && (
           <p className="mt-2.5 rounded-2xl bg-brand-soft px-3.5 py-2.5 text-[12px] leading-[1.55] text-ink-primary">
-            {FACING_LIGHT[facing]}
+            {t("facing." + facing) === "facing." + facing ? FACING_LIGHT[facing] : t("facing." + facing)}
           </p>
         )}
       </div>
 
       <p className="mt-4 text-[10.5px] leading-[1.55] text-ink-muted">
-        This is the sun&apos;s path for {name}. How a specific flat is lit also
-        depends on its floor and the buildings around it —{" "}
+        {t("sun.footer").replace("{name}", name)}{" "}
         <Link
           href={`/${slug}/sunlight`}
           className="font-semibold text-brand hover:underline"
         >
-          see the sun &amp; shadow map →
+          {t("sun.mapLink")}
         </Link>
       </p>
     </section>

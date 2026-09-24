@@ -29,6 +29,7 @@
  * writes about is not a locality with nothing planned.
  */
 
+import { getServerT } from "@/lib/i18n-server";
 import type { UpcomingItem } from "@/lib/api";
 
 /**
@@ -77,22 +78,36 @@ function whenText(iso?: string): string | null {
   return then.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 }
 
-export function UpcomingCard({
+function tagLabel(t: (k: string) => string, tag: string): string {
+  const map: Record<string, string> = {
+    Transit: "upcoming.transit",
+    Roads: "upcoming.roads",
+    Legal: "upcoming.legal",
+    Utilities: "upcoming.utilities",
+    Civic: "upcoming.civic",
+    Project: "upcoming.project",
+  };
+  const key = map[tag];
+  return key ? t(key) : tag;
+}
+
+export async function UpcomingCard({
   localityName,
   items,
 }: {
   localityName: string;
   items: UpcomingItem[];
 }) {
+  const { t } = await getServerT();
   if (items.length === 0) return null;
 
   return (
     <section className="mt-4 rounded-[20px] border border-hairline bg-surface-1 p-5">
       <div className="mb-1 text-[10.5px] font-bold uppercase tracking-[0.05em] text-brand">
-        Reported as coming
+        {t("upcoming.title")}
       </div>
       <h2 className="text-[14.5px] font-semibold leading-[1.4] text-ink-primary">
-        What local press has reported about work near {localityName}
+        {t("upcoming.h2").replace("{name}", localityName)}
       </h2>
 
       <ul className="mt-3.5 space-y-3">
@@ -102,7 +117,7 @@ export function UpcomingCard({
             <li key={i} className="border-t border-gridline pt-3 first:border-t-0 first:pt-0">
               <div className="flex items-start gap-2.5">
                 <span className="mt-[3px] shrink-0 rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand-deep">
-                  {kindLabel(item.kind, item.headline)}
+                  {tagLabel(t, kindLabel(item.kind, item.headline))}
                 </span>
                 <div className="min-w-0">
                   {item.url ? (

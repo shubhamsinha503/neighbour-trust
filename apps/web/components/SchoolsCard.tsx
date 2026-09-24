@@ -15,6 +15,7 @@
  * its own stat tile rather than left to a footnote.
  */
 
+import { useT } from "@/components/LanguageProvider";
 import { useState } from "react";
 import type { Confidence } from "@schema/envelope";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
@@ -22,6 +23,7 @@ import type { SchoolsView } from "@/lib/api";
 import { MeasureFrom, haversineKm, type Origin } from "@/components/MeasureFrom";
 
 export function SchoolsCard({ view }: { view: SchoolsView }) {
+  const t = useT();
   const { payload, verdict, locality } = view;
   const [origin, setOrigin] = useState<Origin | null>(null);
 
@@ -71,20 +73,20 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
           The card never estimates — it just omits what it cannot fill. */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <StatTile
-          label="Within 2 km"
+          label={t("schools.within2")}
           value={payload.schoolsWithin2km.toString()}
-          sub="schools"
+          sub={t("schools.schoolsWord")}
         />
         <StatTile
-          label="Within 5 km"
+          label={t("schools.within5")}
           value={payload.schoolsWithin5km.toString()}
-          sub="schools"
+          sub={t("schools.schoolsWord")}
         />
         {payload.medianPupilTeacherRatio !== undefined && (
           <StatTile
-            label="Pupils per teacher"
+            label={t("schools.ppt")}
             value={payload.medianPupilTeacherRatio.toFixed(0)}
-            sub="median, where known"
+            sub={t("schools.medianWhereKnown")}
           />
         )}
         {/* When we do know staffing for some schools, this tile stops the count
@@ -92,7 +94,7 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
             rather than shown as "0 of N". */}
         {payload.schoolsWithStaffingData > 0 && (
           <StatTile
-            label="Staffing known for"
+            label={t("schools.staffingKnownFor")}
             value={payload.schoolsWithStaffingData.toString()}
             sub={`of ${payload.schoolsWithin2km} nearby`}
             muted={staffingGap}
@@ -176,7 +178,7 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
 
       {/* 5 — sources and confidence */}
       <footer className="mt-4 border-t border-dashed border-gridline pt-3">
-        <div className="mb-2 text-[9.5px] text-ink-muted">Data pulled from</div>
+        <div className="mb-2 text-[9.5px] text-ink-muted">{t("report.dataPulledFrom")}</div>
         <div className="flex flex-wrap items-center gap-2">
           {payload.sourcesUsed.map((source) => (
             <span

@@ -7,10 +7,12 @@
  * were looking at is not lost to the detour. Signed in, it toggles.
  */
 
+import { useT } from "@/components/LanguageProvider";
 import { signIn, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
 export function SaveButton({ slug, name }: { slug: string; name: string }) {
+  const t = useT();
   const { data: session, status } = useSession();
   const [saved, setSaved] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -51,7 +53,7 @@ export function SaveButton({ slug, name }: { slug: string; name: string }) {
     setBusy(false);
     if (!response || !response.ok) {
       const data = await response?.json().catch(() => null);
-      setError(data?.detail ?? "Could not update your shortlist.");
+      setError(data?.detail ?? t("save.updateError"));
       return;
     }
     setSaved(!currentlySaved);
@@ -71,7 +73,7 @@ export function SaveButton({ slug, name }: { slug: string; name: string }) {
         className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-surface-1 px-3 py-1.5 text-[12px] font-semibold text-ink-secondary hover:border-brand hover:text-brand"
         aria-label={`Sign in to save ${name}`}
       >
-        <span aria-hidden="true">♡</span> Save
+        <span aria-hidden="true">♡</span> {t("save.save")}
       </button>
     );
   }
@@ -91,7 +93,7 @@ export function SaveButton({ slug, name }: { slug: string; name: string }) {
         }
       >
         <span aria-hidden="true">{saved ? "♥" : "♡"}</span>
-        {saved ? "Saved" : "Save"}
+        {saved ? t("save.saved") : t("save.save")}
       </button>
       {error && <span className="text-[10.5px] text-[#c0442c]">{error}</span>}
     </span>

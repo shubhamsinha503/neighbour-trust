@@ -9,6 +9,7 @@
  * of date on the one page people decide from.
  */
 
+import { useT } from "@/components/LanguageProvider";
 import Link from "next/link";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -17,8 +18,9 @@ import { useEffect, useState } from "react";
 import { Bone, SkeletonRegion } from "@/components/Skeleton";
 
 function ShortlistSkeleton() {
+  const t = useT();
   return (
-    <SkeletonRegion label="Loading your shortlist">
+    <SkeletonRegion label={t("sv.loadingShortlist")}>
       <Bone className="mt-4 h-[46px] w-full rounded-2xl" />
       <div className="mt-3 flex flex-col gap-2.5">
         {[0, 1, 2].map((i) => (
@@ -58,6 +60,7 @@ function scoreColour(score: number | null): string {
 }
 
 export function ShortlistView() {
+  const t = useT();
   const { data: session, status } = useSession();
   const router = useRouter();
   const [items, setItems] = useState<Saved[] | null>(null);
@@ -70,7 +73,7 @@ export function ShortlistView() {
     fetch("/api/me/shortlist")
       .then(async (r) => {
         const data = await r.json().catch(() => null);
-        if (!r.ok) throw new Error(data?.detail ?? "Could not load your shortlist.");
+        if (!r.ok) throw new Error(data?.detail ?? t("sv.loadFail"));
         return data as Saved[];
       })
       .then(setItems)
@@ -83,15 +86,14 @@ export function ShortlistView() {
     return (
       <div className="mt-4 rounded-[20px] border border-hairline bg-surface-1 p-5">
         <p className="text-[13.5px] text-ink-secondary">
-          Sign in to save localities, keep private notes on them and compare
-          them side by side.
+          {t("sv.signinPrompt")}
         </p>
         <button
           type="button"
           onClick={() => signIn("google", { callbackUrl: "/shortlist" })}
           className="mt-3 rounded-xl bg-brand px-4 py-2.5 text-[13px] font-semibold text-white"
         >
-          Sign in with Google
+          {t("sv.signinGoogle")}
         </button>
       </div>
     );
@@ -111,7 +113,7 @@ export function ShortlistView() {
       await signOut({ redirect: false });
       router.push("/");
     } else {
-      setError("Could not delete your account. Please try again.");
+      setError(t("sv.deleteFail"));
     }
   }
 
@@ -124,8 +126,7 @@ export function ShortlistView() {
   return (
     <div className="mt-2">
       <p className="text-[12px] text-ink-muted">
-        Signed in as {session.user?.email}. Your shortlist and notes are visible
-        only to you.
+        {t("sv.signedInAs").replace("{email}", session.user?.email ?? "")}
       </p>
 
       {error && <p className="mt-4 text-[13px] text-[#c0442c]">{error}</p>}
@@ -133,7 +134,7 @@ export function ShortlistView() {
 
       {items?.length === 0 && (
         <div className="mt-4 rounded-[20px] border border-dashed border-hairline p-5 text-[13px] text-ink-secondary">
-          Nothing saved yet. Open any locality and tap <b>♡ Save</b>.
+          {t("sv.emptyPrefix")} <b>♡ {t("save.save")}</b>.
         </div>
       )}
 
@@ -142,19 +143,19 @@ export function ShortlistView() {
           <div className="sticky top-0 z-10 mt-4 flex items-center justify-between gap-3 rounded-2xl border border-hairline bg-surface-1 px-3.5 py-2.5">
             <span className="text-[12px] text-ink-secondary">
               {picked.length < 2
-                ? `Tick 2–${MAX_COMPARE} localities to compare`
-                : `${picked.length} selected`}
+                ? t("sv.tickToCompare").replace("{max}", String(MAX_COMPARE))
+                : t("sv.selected").replace("{n}", String(picked.length))}
             </span>
             {picked.length >= 2 ? (
               <Link
                 href={`/compare?slugs=${picked.join(",")}`}
                 className="rounded-xl bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-white"
               >
-                Compare
+                {t("sv.compare")}
               </Link>
             ) : (
               <span className="rounded-xl bg-page-plane px-3.5 py-2 text-[12.5px] font-semibold text-ink-muted">
-                Compare
+                {t("sv.compare")}
               </span>
             )}
           </div>
@@ -176,7 +177,7 @@ export function ShortlistView() {
 
       <section className="mt-10 border-t border-hairline pt-5">
         <h2 className="text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
-          Your account
+          {t("sv.yourAccount")}
         </h2>
         {!confirmDelete ? (
           <button
@@ -184,26 +185,25 @@ export function ShortlistView() {
             onClick={() => setConfirmDelete(true)}
             className="mt-2 text-[12px] font-semibold text-[#c0442c] hover:underline"
           >
-            Delete my account and everything saved
+            {t("sv.deleteAccount")}
           </button>
         ) : (
           <div className="mt-2 rounded-2xl border border-hairline bg-surface-1 p-4 text-[12.5px] text-ink-secondary">
-            This permanently deletes your account, your shortlist and all your
-            notes. It cannot be undone.
+            {t("sv.deleteConfirm")}
             <div className="mt-3 flex gap-3">
               <button
                 type="button"
                 onClick={deleteAccount}
                 className="rounded-xl bg-[#c0442c] px-3.5 py-2 font-semibold text-white"
               >
-                Yes, delete everything
+                {t("sv.yesDelete")}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmDelete(false)}
                 className="font-semibold text-ink-secondary"
               >
-                Cancel
+                {t("sv.cancel")}
               </button>
             </div>
           </div>
@@ -226,6 +226,7 @@ function ShortlistItem({
   onPick: () => void;
   onRemove: () => void;
 }) {
+  const t = useT();
   const [note, setNote] = useState(item.note);
   const [savedNote, setSavedNote] = useState(item.note);
   const [saving, setSaving] = useState<"idle" | "saving" | "saved" | "failed">("idle");
@@ -250,11 +251,11 @@ function ShortlistItem({
 
   const status =
     saving === "saving"
-      ? "Saving…"
+      ? t("sv.saving")
       : saving === "saved"
-        ? "Note saved"
+        ? t("sv.noteSaved")
         : saving === "failed"
-          ? "Couldn't save the note"
+          ? t("sv.noteSaveFail")
           : "";
 
   return (
@@ -265,7 +266,7 @@ function ShortlistItem({
           checked={picked}
           disabled={pickDisabled}
           onChange={onPick}
-          aria-label={`Compare ${item.name}`}
+          aria-label={t("sv.compareAria").replace("{name}", item.name)}
           className="mt-1.5 h-4 w-4"
         />
         <div className="min-w-0 flex-1">
@@ -287,7 +288,7 @@ function ShortlistItem({
             </p>
           )}
           <label className="mt-2 block">
-            <span className="sr-only">Private note on {item.name}</span>
+            <span className="sr-only">{t("sv.privateNoteOn").replace("{name}", item.name)}</span>
             <textarea
               value={note}
               maxLength={2000}
@@ -297,14 +298,14 @@ function ShortlistItem({
                 setSaving("idle");
               }}
               onBlur={saveNote}
-              placeholder="Private note, e.g. visited Sunday, traffic bad at 9am"
+              placeholder={t("sv.notePlaceholder")}
               className="w-full resize-y rounded-xl border border-hairline bg-white px-3 py-2 text-[12.5px] placeholder:text-ink-muted focus:border-brand focus:outline-none"
             />
           </label>
           <div className="mt-1 flex items-center justify-between text-[10.5px] text-ink-muted">
             <span aria-live="polite">{status}</span>
             <button type="button" onClick={onRemove} className="font-semibold hover:text-[#c0442c]">
-              Remove
+              {t("sv.remove")}
             </button>
           </div>
         </div>

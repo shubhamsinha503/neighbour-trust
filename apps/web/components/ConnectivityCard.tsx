@@ -26,6 +26,7 @@
  * disagreeing with the first.
  */
 
+import { useT } from "@/components/LanguageProvider";
 import { useState } from "react";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
 import { MeasureFrom, haversineKm, type Origin } from "@/components/MeasureFrom";
@@ -37,9 +38,9 @@ function distanceText(km: number): string {
 }
 
 /** ~80 m/min is an unhurried walk; past a quarter-hour it is really a drive. */
-function walkText(km: number): string {
+function walkText(km: number, t: (k: string) => string): string {
   const mins = Math.max(1, Math.round((km * 1000) / 80));
-  return mins <= 15 ? `~${mins} min walk` : "a short drive";
+  return mins <= 15 ? `~${mins} ${t("report.walk")}` : t("report.shortDrive");
 }
 
 /** Nearest feature of a kind to a point, or undefined if there is none. */
@@ -58,6 +59,7 @@ export function nearestOf(
 }
 
 export function ConnectivityCard({ view }: { view: ConnectivityView }) {
+  const t = useT();
   const [origin, setOrigin] = useState<Origin | null>(null);
   const { locality, counts, nearest, features } = view;
 
@@ -101,7 +103,7 @@ export function ConnectivityCard({ view }: { view: ConnectivityView }) {
         {view.score !== undefined && <Meter score={view.score} />}
         <div>
           <div className="mb-1 text-[10.5px] font-bold uppercase tracking-[0.05em] text-brand">
-            What is already built nearby
+            {t("conn.header")}
           </div>
           <h2 className="text-[14.5px] font-semibold leading-[1.4] text-ink-primary">
             {view.summary}
@@ -122,9 +124,7 @@ export function ConnectivityCard({ view }: { view: ConnectivityView }) {
         />
       ) : (
         <p className="rounded-2xl border border-hairline bg-page-plane p-3 text-[11px] leading-[1.5] text-ink-secondary">
-          Distances here are measured from the centre of {locality.name}. This
-          locality&apos;s data predates per-feature coordinates, so it cannot yet
-          be re-measured from an address — the next weekly refresh will fix that.
+          {t("conn.centroidNote").replace("{name}", locality.name)}
         </p>
       )}
 
@@ -136,12 +136,12 @@ export function ConnectivityCard({ view }: { view: ConnectivityView }) {
           >
             <div className="min-w-0">
               <div className="text-[12.5px] font-medium text-ink-primary">
-                {row.label}
+                {t("amenity." + row.kind) === "amenity." + row.kind ? row.label : t("amenity." + row.kind)}
                 {row.name ? (
                   <span className="font-normal text-ink-secondary"> · {row.name}</span>
                 ) : null}
               </div>
-              <div className="text-[10.5px] font-medium text-brand">{row.count} nearby</div>
+              <div className="text-[10.5px] font-medium text-brand">{row.count} {t("conn.nearby")}</div>
             </div>
             <div className="shrink-0 text-right">
               {row.km !== undefined ? (
@@ -150,11 +150,11 @@ export function ConnectivityCard({ view }: { view: ConnectivityView }) {
                     {distanceText(row.km)}
                   </div>
                   <div className="text-[10px] font-medium text-brand">
-                    nearest · {walkText(row.km)}
+                    {t("report.nearest")} · {walkText(row.km, t)}
                   </div>
                 </>
               ) : (
-                <div className="text-[11px] font-medium text-brand">count only</div>
+                <div className="text-[11px] font-medium text-brand">{t("report.countOnly")}</div>
               )}
             </div>
           </li>
@@ -162,9 +162,9 @@ export function ConnectivityCard({ view }: { view: ConnectivityView }) {
       </ul>
       {counts.industrialSites > 0 && (
         <p className="mt-2 text-[10.5px] font-medium leading-[1.5] text-brand">
-          Also nearby: {counts.industrialSites} industrial{" "}
-          {counts.industrialSites === 1 ? "site" : "sites"} — worth noting for a
-          home.
+          {t("conn.industrial")
+            .replace("{n}", String(counts.industrialSites))
+            .replace("{sites}", counts.industrialSites === 1 ? t("conn.site") : t("conn.sites"))}
         </p>
       )}
       {origin && (
