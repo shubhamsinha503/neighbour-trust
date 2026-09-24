@@ -30,13 +30,14 @@ export function ForgetMeButton() {
   if (state === "done") {
     return (
       <p className="mt-3 text-[13px] font-semibold text-brand-deep">
-        Done — your preference profile has been deleted and personalisation is
+        Done — your preferences and viewing history have been deleted and personalisation is
         off. You can turn it back on anytime from the banner.
       </p>
     );
   }
 
-  const consented = readConsent() === "granted";
+  const consent = readConsent();
+  const consented = consent === "granted" || consent === "outdated";
 
   return (
     <div className="mt-3">
@@ -46,7 +47,7 @@ export function ForgetMeButton() {
         onClick={forget}
         className="rounded-xl border border-hairline bg-surface-1 px-4 py-2 text-[13px] font-semibold text-ink-primary transition-opacity disabled:opacity-50"
       >
-        {state === "busy" ? "Deleting…" : "Forget me and delete my preferences"}
+        {state === "busy" ? "Deleting…" : "Forget me and delete my preferences and history"}
       </button>
       {!consented && (
         <p className="mt-1.5 text-[12px] text-ink-muted">

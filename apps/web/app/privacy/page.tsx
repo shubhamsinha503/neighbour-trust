@@ -25,7 +25,9 @@ export const metadata = {
  * apps/web/lib/preferences.ts), an OPT-IN personalisation layer that — only
  * after the consent banner is accepted — sets a random visitor id and stores
  * that same city preference against it server-side (apps/api/app/prefs.py,
- * infra/migrations/014_visitor_prefs.sql), and one cookieless analytics script
+ * infra/migrations/014_visitor_prefs.sql) together with a history of which
+ * locality reports that visitor opened (infra/migrations/015_visitor_view.sql,
+ * capped at 180 days and 500 entries), and one cookieless analytics script
  * that counts page views and cannot identify a reader. That is verifiable in the
  * source. If any of it changes — resident reporting, sign-in, another preference,
  * what the visitor id stores, an analytics tool that sets cookies or assigns a
@@ -97,8 +99,9 @@ export default function PrivacyPage() {
             Nothing that identifies you, unless you sign in or type it in yourself.
           </strong>{" "}
           There is no newsletter, and signing in is optional. Without signing in
-          we cannot identify you by name, and we build a per-person profile only
-          if you ask us to — the next two paragraphs are the whole of it.
+          we cannot identify you by name, and we build a per-person profile —
+          your city preference and which localities you opened — only if you ask
+          us to. The next two paragraphs are the whole of it.
         </p>
         <p className="mt-3">
           <strong className="font-semibold text-ink-primary">
@@ -122,16 +125,22 @@ export default function PrivacyPage() {
           server rather than only in this browser. If you say yes, we create a
           random id — a string like <code>a3f1…</code> that means nothing and is
           tied to no name, email or account — put it in a cookie your browser
-          keeps, and store your city choice against it. Because the id lives in a
-          cookie, on its own it keeps your preference for this browser; it begins
-          to follow you between your phone and laptop only once you sign in and it
+          keeps, and store two things against it: your city choice, and a
+          history of which locality reports you open (the locality and the time
+          — nothing about where you are, your device, or anything else you do).
+          That history is what the &ldquo;Recently viewed&rdquo; list on the
+          front page shows you, and it is kept for at most 180 days and 500
+          entries, with older ones deleted automatically. Because the id lives in
+          a cookie, on its own it keeps all this for this browser; it begins to
+          follow you between your phone and laptop only once you sign in and it
           can be attached to your account. The id is set so that page scripts
-          cannot read it and it never appears in a web address. We store only the
-          preference itself; we do not record where you go on the site, and this
-          id is never joined to the page-view counter, the server logs, or a
-          sign-in. If you say no, we set a plain &ldquo;no&rdquo; and create no id
-          and no server record. You can withdraw and erase the whole thing in one
-          tap, here:
+          cannot read it and it never appears in a web address, and it is never
+          joined to the page-view counter, the server logs, or a sign-in. If you
+          say no, we set a plain &ldquo;no&rdquo; and create no id and no server
+          record, and no history is kept. If you said yes before 24 September
+          2026, you agreed to the city preference only, so we record no history
+          for you until you answer the banner again. You can withdraw and erase
+          the whole thing — preference and history — in one tap, here:
         </p>
         <ForgetMeButton />
         <p className="mt-3">
@@ -419,6 +428,21 @@ export default function PrivacyPage() {
           it stores only the preference and never your movements, and it is
           erasable in one tap. We are telling you it happened rather than letting
           you discover it, which is the whole of the commitment below.
+        </p>
+        <p>
+          <strong className="font-semibold text-ink-primary">
+            On 24 September 2026, opt-in view history was added
+          </strong>{" "}
+          — which takes back part of the note above, so it is named here too. That
+          note said personalisation &ldquo;stores only the preference and never
+          your movements&rdquo;. For anyone who accepts the banner, that is no
+          longer true: we now also keep which locality reports you open, and
+          when. It is still opt-in, and the banner was reworded to say so; people
+          who accepted the older wording are asked again rather than being
+          counted as having agreed. It is shown back to you as &ldquo;Recently
+          viewed&rdquo;, pruned after 180 days, and erased with everything else
+          by the same one-tap &ldquo;forget me&rdquo;. The banner wording, the
+          storage, and this note shipped in the same commit.
         </p>
         <p>
           The commitment stands, and now has a record attached to it. If

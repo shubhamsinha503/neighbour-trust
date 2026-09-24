@@ -25,8 +25,12 @@ export const PREF_CITY_COOKIE = "nt_city";
 /**
  * The consented layer, on top of the functional cookie above.
  *
- * `nt_consent` ("granted" | "denied") is JS-readable so the banner knows whether
- * it has already been answered. `nt_visitor` is the opaque per-person id and is
+ * `nt_consent` is JS-readable so the banner knows whether it has already been
+ * answered. Its values are versioned by what was asked: "granted-v2" means the
+ * visitor accepted the banner that names view history, and is the only answer
+ * history is recorded for. A bare "granted" is the older answer, given to a
+ * banner that promised preferences only — it still keeps their city in sync,
+ * but it reads as "outdated" so the banner asks again under the new wording. `nt_visitor` is the opaque per-person id and is
  * set HttpOnly by the server (app/api/consent), so it is deliberately NOT
  * readable here — the client never sees the identifier, it only knows whether
  * consent was given. Both are described on the privacy page.
@@ -34,7 +38,10 @@ export const PREF_CITY_COOKIE = "nt_city";
 export const CONSENT_COOKIE = "nt_consent";
 export const VISITOR_COOKIE = "nt_visitor";
 
-export type Consent = "granted" | "denied" | null;
+/** The cookie value a grant under the current banner wording sets. */
+export const CONSENT_GRANTED = "granted-v2";
+
+export type Consent = "granted" | "outdated" | "denied" | null;
 
 function readCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
@@ -47,7 +54,9 @@ function readCookie(name: string): string | null {
 /** Whether the visitor has answered the personalisation banner, and how. */
 export function readConsent(): Consent {
   const v = readCookie(CONSENT_COOKIE);
-  return v === "granted" || v === "denied" ? v : null;
+  if (v === CONSENT_GRANTED) return "granted";
+  if (v === "granted") return "outdated";
+  return v === "denied" ? "denied" : null;
 }
 
 /**
@@ -61,7 +70,10 @@ export function saveCityPreference(city: string | null): void {
   if (city) writePref(PREF_CITY_COOKIE, city);
   else clearPref(PREF_CITY_COOKIE);
 
-  if (readConsent() === "granted" && typeof fetch !== "undefined") {
+  // An "outdated" grant still covers this: the older banner asked for exactly
+  // the city preference.
+  const consent = readConsent();
+  if ((consent === "granted" || consent === "outdated") && typeof fetch !== "undefined") {
     void fetch("/api/prefs", {
       method: "PUT",
       headers: { "content-type": "application/json" },

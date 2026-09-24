@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AskBox } from "@/components/AskBox";
+import { RecordView } from "@/components/RecordView";
 import { SaveButton } from "@/components/SaveButton";
 import { authConfigured } from "@/lib/auth";
 import { TrustReport } from "@/components/TrustReport";
@@ -135,6 +136,7 @@ export default async function LocalityPage({
 
       {report ? (
         <>
+          <RecordView slug={slug} />
           <TrustReport report={report} connectivity={connectivity} />
           {/* After the report, not before: a question is better asked once the
             * reader has seen what we hold, and the answer cites that record. */}

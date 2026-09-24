@@ -11,7 +11,9 @@ import { authConfigured } from "@/lib/auth";
 import {
   fetchLocalitySummaries,
   fetchVisitorPrefCity,
+  fetchVisitorViews,
   type LocalitySummary,
+  type RecentView,
 } from "@/lib/api";
 import { PREF_CITY_COOKIE, VISITOR_COOKIE } from "@/lib/preferences";
 
@@ -90,10 +92,10 @@ async function SearchSection() {
   // rather than shown as an empty list.
   const store = await cookies();
   const visitorId = store.get(VISITOR_COOKIE)?.value ?? null;
-  const savedCity =
-    (visitorId ? await fetchVisitorPrefCity(visitorId) : null) ??
-    store.get(PREF_CITY_COOKIE)?.value ??
-    null;
+  const [prefCity, recent] = visitorId
+    ? await Promise.all([fetchVisitorPrefCity(visitorId), fetchVisitorViews(visitorId)])
+    : [null, [] as RecentView[]];
+  const savedCity = prefCity ?? store.get(PREF_CITY_COOKIE)?.value ?? null;
   const knownCities = new Set(localities.map((l) => l.city));
   const initialCity = savedCity && knownCities.has(savedCity) ? savedCity : null;
 
@@ -106,12 +108,43 @@ async function SearchSection() {
         initialCity={initialCity}
         belowInput={
           <div className="mt-5">
+            {recent.length > 0 && <RecentlyViewed views={recent} />}
             <NearMe key="near-me" localities={localities} />
             <Coverage localities={localities} />
           </div>
         }
       />
     </>
+  );
+}
+
+/**
+ * The localities this visitor opened lately — only ever present for someone who
+ * accepted the banner, since history is recorded for no one else. Their own
+ * record, shown back to them; "forget me" on the privacy page erases it.
+ */
+function RecentlyViewed({ views }: { views: RecentView[] }) {
+  return (
+    <div className="mb-5">
+      <div className="mb-2 flex items-baseline justify-between px-0.5">
+        <div className="text-[12px] font-semibold text-ink-secondary">Recently viewed</div>
+        <Link href="/privacy" className="text-[11.5px] text-ink-muted hover:underline">
+          Manage
+        </Link>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {views.map((v) => (
+          <Link
+            key={v.slug}
+            href={`/${v.slug}`}
+            className="rounded-full border border-hairline bg-surface-1 px-3 py-1.5 text-[12.5px] font-semibold text-ink-primary transition-colors hover:bg-brand-soft"
+          >
+            {v.name}
+            <span className="ml-1 font-normal text-ink-muted">· {v.city}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 
