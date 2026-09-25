@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { LanguagePicker } from "@/components/LanguagePicker";
+import { LanguageButton } from "@/components/LanguageButton";
 import { fetchSummaries, type LocalitySummary } from "@/src/api";
 import { useI18n } from "@/src/i18n";
 import { scoreColor, theme } from "@/src/theme";
@@ -53,7 +53,7 @@ export default function HomeScreen() {
     <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
         <Text style={styles.brand}>{t("brand")}</Text>
-        <LanguagePicker />
+        <LanguageButton />
       </View>
 
       <Text style={styles.title}>{t("home.title")}</Text>

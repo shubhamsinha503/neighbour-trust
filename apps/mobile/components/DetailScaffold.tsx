@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { LanguageButton } from "@/components/LanguageButton";
 import { useI18n } from "@/src/i18n";
 import { theme } from "@/src/theme";
 
@@ -41,11 +42,14 @@ export function DetailScaffold({
         paddingHorizontal: 16,
       }}
     >
-      <Link href={`/${slug}`} asChild>
-        <Pressable>
-          <Text style={styles.back}>← {t("report.back")}</Text>
-        </Pressable>
-      </Link>
+      <View style={styles.topbar}>
+        <Link href={`/${slug}`} asChild>
+          <Pressable>
+            <Text style={styles.back}>← {t("report.back")}</Text>
+          </Pressable>
+        </Link>
+        <LanguageButton />
+      </View>
       <Text style={styles.title}>{title}</Text>
 
       {state === "loading" && (
@@ -129,7 +133,8 @@ export function VerdictBlock({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.page },
-  back: { fontSize: 12, color: theme.inkMuted, marginBottom: 8 },
+  back: { fontSize: 12, color: theme.inkMuted },
+  topbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   title: {
     fontSize: 23,
     fontWeight: "800",

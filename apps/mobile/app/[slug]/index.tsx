@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { LanguageButton } from "@/components/LanguageButton";
 import { fetchReport, type Report } from "@/src/api";
 import { useI18n } from "@/src/i18n";
 import { scoreColor, theme } from "@/src/theme";
@@ -49,11 +50,14 @@ export default function ReportScreen() {
         paddingHorizontal: 16,
       }}
     >
-      <Link href="/" asChild>
-        <Pressable>
-          <Text style={styles.back}>← {t("report.back")}</Text>
-        </Pressable>
-      </Link>
+      <View style={styles.topbar}>
+        <Link href="/" asChild>
+          <Pressable>
+            <Text style={styles.back}>← {t("report.back")}</Text>
+          </Pressable>
+        </Link>
+        <LanguageButton />
+      </View>
 
       {!report && !error && (
         <ActivityIndicator style={{ marginTop: 40 }} color={theme.brand} />
@@ -144,7 +148,8 @@ export default function ReportScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.page },
-  back: { fontSize: 12, color: theme.inkMuted, marginBottom: 8 },
+  back: { fontSize: 12, color: theme.inkMuted },
+  topbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   name: { fontSize: 24, fontWeight: "800", color: theme.ink, marginTop: 4 },
   place: { fontSize: 13, color: theme.inkSecondary, marginTop: 2 },
   scoreCard: {

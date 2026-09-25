@@ -4,11 +4,20 @@
  * The dictionaries are the same shape as apps/web/lib/i18n.ts — plain data, so
  * the two apps can eventually share one source. English is the base; every other
  * language is layered over it, so an untranslated key falls back to English
- * rather than showing blank. Locale lives in React state here (no cookies on a
- * phone); persisting it across launches with AsyncStorage is a later step.
+ * rather than showing blank. The chosen locale is persisted in AsyncStorage, so
+ * the app reopens in the language last picked.
  */
 
-import React, { createContext, useContext, useMemo, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+const STORAGE_KEY = "nt_lang";
 
 export const LOCALES = ["en", "hi", "kn", "te", "mr"] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -284,8 +293,34 @@ type Ctx = {
 
 const LanguageContext = createContext<Ctx | null>(null);
 
+function isLocale(v: unknown): v is Locale {
+  return typeof v === "string" && (LOCALES as readonly string[]).includes(v);
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocale] = useState<Locale>("en");
+  const [locale, setLocaleState] = useState<Locale>("en");
+
+  // Load the saved choice once on mount. Fails soft: if storage is unreadable
+  // the app just stays on English.
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((saved) => {
+        if (active && isLocale(saved)) setLocaleState(saved);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Set and persist. The write is fire-and-forget — a failed save only means the
+  // next launch reopens in English, never a broken UI now.
+  const setLocale = (next: Locale) => {
+    setLocaleState(next);
+    AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
+  };
+
   const value = useMemo<Ctx>(() => {
     const dict = dictFor(locale);
     const t = (key: string) => dict[key] ?? key;
