@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { LanguageButton } from "@/components/LanguageButton";
+import { SunlightCard } from "@/components/SunlightCard";
 import { fetchReport, type Report } from "@/src/api";
 import { useI18n } from "@/src/i18n";
 import { scoreColor, theme } from "@/src/theme";
@@ -131,6 +132,12 @@ export default function ReportScreen() {
                 <View key={c.category}>{row}</View>
               );
             })}
+
+          <SunlightCard
+            name={report.locality.name}
+            lat={report.locality.lat}
+            lon={report.locality.lon}
+          />
 
           {report.sources_used.length > 0 && (
             <View style={styles.sources}>

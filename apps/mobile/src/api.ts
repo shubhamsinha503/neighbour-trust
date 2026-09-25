@@ -42,6 +42,8 @@ export interface Report {
     city: string;
     state: string;
     pincode: string | null;
+    lat: number;
+    lon: number;
   };
   trust_score: {
     score: number | null;
