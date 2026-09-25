@@ -14,6 +14,12 @@ import { fetchReport, type Report } from "@/src/api";
 import { useI18n } from "@/src/i18n";
 import { scoreColor, theme } from "@/src/theme";
 
+const DETAIL_ROUTE: Record<string, string> = {
+  air_quality: "air-quality",
+  schools: "schools",
+  infrastructure: "connectivity",
+};
+
 export default function ReportScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { t, categoryLabel } = useI18n();
@@ -90,20 +96,37 @@ export default function ReportScreen() {
 
           {report.categories
             .filter((c) => c.available)
-            .map((c) => (
-              <View key={c.category} style={styles.catRow}>
-                <Text style={styles.catLabel}>
-                  {categoryLabel(c.category, c.label)}
-                </Text>
-                {c.score !== null ? (
-                  <Text style={[styles.catScore, { color: scoreColor(c.score) }]}>
-                    {c.score}
+            .map((c) => {
+              const route = DETAIL_ROUTE[c.category];
+              const row = (
+                <View style={styles.catRow}>
+                  <Text style={styles.catLabel}>
+                    {categoryLabel(c.category, c.label)}
                   </Text>
-                ) : (
-                  <Text style={styles.catNone}>{t("common.noDataYet")}</Text>
-                )}
-              </View>
-            ))}
+                  {c.score !== null ? (
+                    <Text
+                      style={[styles.catScore, { color: scoreColor(c.score) }]}
+                    >
+                      {c.score}
+                    </Text>
+                  ) : (
+                    <Text style={styles.catNone}>{t("common.noDataYet")}</Text>
+                  )}
+                  {route ? <Text style={styles.chevron}>›</Text> : null}
+                </View>
+              );
+              return route ? (
+                <Link
+                  key={c.category}
+                  href={`/${report.locality.slug}/${route}`}
+                  asChild
+                >
+                  <Pressable>{row}</Pressable>
+                </Link>
+              ) : (
+                <View key={c.category}>{row}</View>
+              );
+            })}
 
           {report.sources_used.length > 0 && (
             <View style={styles.sources}>
@@ -159,6 +182,7 @@ const styles = StyleSheet.create({
   catLabel: { fontSize: 14, fontWeight: "600", color: theme.ink },
   catScore: { fontSize: 18, fontWeight: "800" },
   catNone: { fontSize: 12, color: theme.inkMuted },
+  chevron: { fontSize: 20, color: theme.inkMuted, marginLeft: 8 },
   sources: { marginTop: 16 },
   sourcesLabel: { fontSize: 10, color: theme.inkMuted },
   sourcesText: { fontSize: 12, color: theme.inkSecondary, marginTop: 4 },

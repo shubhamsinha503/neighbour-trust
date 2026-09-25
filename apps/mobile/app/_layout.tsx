@@ -15,10 +15,7 @@ export default function RootLayout() {
             headerShown: false,
             contentStyle: { backgroundColor: theme.page },
           }}
-        >
-          <Stack.Screen name="index" />
-          <Stack.Screen name="[slug]" />
-        </Stack>
+        />
       </LanguageProvider>
     </SafeAreaProvider>
   );
