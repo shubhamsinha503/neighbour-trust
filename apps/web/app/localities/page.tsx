@@ -4,6 +4,7 @@ import Link from "next/link";
 import { LocalitySearch } from "@/components/LocalitySearch";
 import { fetchLocalitySummaries } from "@/lib/api";
 import { getServerT } from "@/lib/i18n-server";
+import { readSavedCity } from "@/lib/serverPrefs";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,15 @@ export default async function LocalitiesPage({
     localities = null;
   }
 
+  // An explicit ?city= in the URL wins (a shared or bookmarked link means
+  // exactly that city); otherwise open on the city the visitor last chose, so
+  // the list they scan is the one they care about. Only ever a city we carry.
+  let initialCity: string | null = null;
+  if (localities) {
+    const known = new Set(localities.map((l) => l.city));
+    initialCity = city && known.has(city) ? city : await readSavedCity(known);
+  }
+
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
       <Link
@@ -50,11 +60,7 @@ export default async function LocalitiesPage({
 
       <div className="mt-5">
         {localities ? (
-          <LocalitySearch
-            localities={localities}
-            // Only a city that exists in the list; anything else opens on "All".
-            initialCity={city && localities.some((l) => l.city === city) ? city : null}
-          />
+          <LocalitySearch localities={localities} initialCity={initialCity} />
         ) : (
           <div className="rounded-2xl border border-hairline bg-surface-1 p-4 text-[12.5px] text-ink-secondary">
             {t("home.loadError")}

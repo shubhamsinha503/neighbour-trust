@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { CityTile } from "@/components/CityTile";
 import { LocalitySearch } from "@/components/LocalitySearch";
 import { NearMe } from "@/components/NearMe";
 import { ShortlistShortcut } from "@/components/ShortlistShortcut";
@@ -10,13 +11,13 @@ import { LogoMark } from "@/components/Logo";
 import { authConfigured } from "@/lib/auth";
 import {
   fetchLocalitySummaries,
-  fetchVisitorPrefCity,
   fetchVisitorViews,
   type LocalitySummary,
   type RecentView,
 } from "@/lib/api";
-import { PREF_CITY_COOKIE, VISITOR_COOKIE } from "@/lib/preferences";
+import { VISITOR_COOKIE } from "@/lib/preferences";
 import { getServerT } from "@/lib/i18n-server";
+import { readSavedCity } from "@/lib/serverPrefs";
 
 export const dynamic = "force-dynamic";
 
@@ -86,19 +87,17 @@ async function SearchSection() {
     );
   }
 
-  // The city filter the visitor last chose, painted on the first frame so there
-  // is no flash from empty to filtered. A consented visitor's server-side
-  // profile wins (it follows them across devices); otherwise the local
-  // functional cookie. A stale value (a city we no longer carry) is ignored
-  // rather than shown as an empty list.
-  const store = await cookies();
-  const visitorId = store.get(VISITOR_COOKIE)?.value ?? null;
-  const [prefCity, recent] = visitorId
-    ? await Promise.all([fetchVisitorPrefCity(visitorId), fetchVisitorViews(visitorId)])
-    : [null, [] as RecentView[]];
-  const savedCity = prefCity ?? store.get(PREF_CITY_COOKIE)?.value ?? null;
+  // The city the visitor last chose, painted on the first frame so there is no
+  // flash from empty to filtered. Resolved by the shared helper so this and the
+  // localities list agree on what "your city" is. The recently-viewed strip is
+  // per consented visitor, so it needs the visitor id the helper hides — read it
+  // here and fetch the two in parallel.
   const knownCities = new Set(localities.map((l) => l.city));
-  const initialCity = savedCity && knownCities.has(savedCity) ? savedCity : null;
+  const visitorId = (await cookies()).get(VISITOR_COOKIE)?.value ?? null;
+  const [initialCity, recent] = await Promise.all([
+    readSavedCity(knownCities),
+    visitorId ? fetchVisitorViews(visitorId) : Promise.resolve([] as RecentView[]),
+  ]);
 
   return (
     <>
@@ -168,14 +167,12 @@ async function Coverage({ localities }: { localities: LocalitySummary[] }) {
     <div className="mt-6 rounded-2xl border border-hairline bg-surface-1 p-4">
       <div className="grid grid-cols-2 gap-3">
         {cities.map(([city, count]) => (
-          <Link
+          <CityTile
             key={city}
+            city={city}
+            count={count}
             href={`/localities?city=${encodeURIComponent(city)}`}
-            className="rounded-xl bg-page-plane px-3.5 py-3 transition-colors hover:bg-brand-soft"
-          >
-            <div className="text-[14px] font-semibold text-ink-primary">{city}</div>
-            <div className="mt-0.5 text-[12px] text-ink-secondary">{count} {t("common.localities")}</div>
-          </Link>
+          />
         ))}
       </div>
       <div className="mt-3 flex items-center justify-end px-0.5">
