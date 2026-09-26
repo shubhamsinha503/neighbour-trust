@@ -25,7 +25,7 @@ export function NearbyList({ payload }: { payload: ConnectivityDetail["payload"]
     { icon: "hospital", label: t("conn.hospitals"), count: payload.hospitals, km: payload.nearest_hospital_km },
     { icon: "tree", label: t("conn.parks"), count: payload.parks, km: payload.nearest_park_km },
     { icon: "cart", label: t("conn.markets"), count: payload.markets },
-    { icon: "drop", label: t("conn.clinics"), count: payload.clinics },
+    { icon: "plus", label: t("conn.clinics"), count: payload.clinics },
     { icon: "train", label: t("conn.metro"), count: payload.metro_rail_stations, km: payload.nearest_station_km },
   ];
   const rows = all.filter((r) => r.count != null);

@@ -28,7 +28,8 @@ export type IconName =
   | "hospital"
   | "tree"
   | "cart"
-  | "train";
+  | "train"
+  | "plus";
 
 interface Props {
   name: IconName;
@@ -163,6 +164,12 @@ export function Icon({ name, size = 24, color = theme.inkMuted, filled = false }
       {name === "hospital" && (
         <>
           <Rect x={4} y={4} width={16} height={16} rx={2} {...common} />
+          <Path d="M12 8v8M8 12h8" {...common} />
+        </>
+      )}
+      {name === "plus" && (
+        <>
+          <Circle cx={12} cy={12} r={9} {...common} />
           <Path d="M12 8v8M8 12h8" {...common} />
         </>
       )}

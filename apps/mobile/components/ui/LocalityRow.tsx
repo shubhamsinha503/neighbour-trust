@@ -21,31 +21,33 @@ export function LocalityRow({ item }: { item: LocalitySummary }) {
 
   return (
     <Link href={`/${item.slug}`} asChild>
-      <Pressable style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-        <ScoreBadge score={item.score} size="sm" />
-        <View style={styles.text}>
-          <Txt weight="bold" style={styles.name} numberOfLines={1}>
-            {item.name}
-          </Txt>
-          <Txt style={styles.city} numberOfLines={1}>
-            {item.city}
-          </Txt>
-          {flag ? (
-            <View style={styles.flagLine}>
-              <View style={[styles.dot, { backgroundColor: flagColor }]} />
-              <Txt weight="medium" style={styles.flagText} numberOfLines={1}>
-                {flag.headline}
-              </Txt>
-            </View>
-          ) : (
-            <Txt weight="medium" style={styles.meta}>
-              {item.categories_with_data > 0
-                ? `${item.categories_with_data} ${t("home.documented")}`
-                : t("common.noDataYet")}
+      <Pressable>
+        <View style={styles.row}>
+          <ScoreBadge score={item.score} size="sm" />
+          <View style={styles.text}>
+            <Txt weight="bold" style={styles.name} numberOfLines={1}>
+              {item.name}
             </Txt>
-          )}
+            <Txt style={styles.city} numberOfLines={1}>
+              {item.city}
+            </Txt>
+            {flag ? (
+              <View style={styles.flagLine}>
+                <View style={[styles.dot, { backgroundColor: flagColor }]} />
+                <Txt weight="medium" style={styles.flagText} numberOfLines={1}>
+                  {flag.headline}
+                </Txt>
+              </View>
+            ) : (
+              <Txt weight="medium" style={styles.meta}>
+                {item.categories_with_data > 0
+                  ? `${item.categories_with_data} ${t("home.documented")}`
+                  : t("common.noDataYet")}
+              </Txt>
+            )}
+          </View>
+          <Icon name="chevron" size={18} color={theme.inkMuted} />
         </View>
-        <Icon name="chevron" size={18} color={theme.inkMuted} />
       </Pressable>
     </Link>
   );
