@@ -77,19 +77,21 @@ export default function MapScreen() {
           contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}
           renderItem={({ item }) => (
             <Link href={`/${item.slug}/sunlight`} asChild>
-              <Pressable style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-                <View style={styles.mapIcon}>
-                  <Icon name="map" size={18} color={theme.brand} />
+              <Pressable>
+                <View style={styles.row}>
+                  <View style={styles.mapIcon}>
+                    <Icon name="map" size={18} color={theme.brand} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Txt weight="bold" style={styles.name} numberOfLines={1}>
+                      {item.name}
+                    </Txt>
+                    <Txt style={styles.city} numberOfLines={1}>
+                      {item.city}
+                    </Txt>
+                  </View>
+                  <Icon name="chevron" size={18} color={theme.inkMuted} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Txt weight="bold" style={styles.name} numberOfLines={1}>
-                    {item.name}
-                  </Txt>
-                  <Txt style={styles.city} numberOfLines={1}>
-                    {item.city}
-                  </Txt>
-                </View>
-                <Icon name="chevron" size={18} color={theme.inkMuted} />
               </Pressable>
             </Link>
           )}

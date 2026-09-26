@@ -81,7 +81,7 @@ export default function SearchScreen() {
           showsHorizontalScrollIndicator={false}
           keyExtractor={(c) => c}
           style={styles.chipsRow}
-          contentContainerStyle={{ gap: 8, paddingRight: 16 }}
+          contentContainerStyle={{ gap: 8, paddingRight: 16, alignItems: "center" }}
           renderItem={({ item }) => {
             const isAll = item === "__all__";
             return (
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   input: { flex: 1, fontSize: 15, color: theme.ink, paddingVertical: 2 },
-  chipsRow: { marginTop: 12, flexGrow: 0 },
+  chipsRow: { marginTop: 12, marginBottom: 4, height: 40, flexGrow: 0, flexShrink: 0 },
   count: { fontSize: 12, color: theme.inkMuted, marginBottom: 10 },
   empty: { fontSize: 14, color: theme.inkMuted, marginTop: 32, textAlign: "center" },
   errorBox: {

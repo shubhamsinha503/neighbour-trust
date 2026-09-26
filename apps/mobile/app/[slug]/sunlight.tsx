@@ -1,9 +1,10 @@
 import { Link, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ShadowMapView } from "@/components/ShadowMapView";
+import { SunlightCard } from "@/components/SunlightCard";
 import { Icon } from "@/components/ui/Icon";
 import { Txt } from "@/components/ui/Txt";
 import { fetchReport } from "@/src/api";
@@ -79,7 +80,16 @@ export default function SunlightScreen() {
       )}
 
       {!error && coords && (
-        <ShadowMapView lat={coords.lat} lon={coords.lon} />
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24, paddingHorizontal: 16 }}
+        >
+          <View style={styles.mapBox}>
+            <ShadowMapView lat={coords.lat} lon={coords.lon} />
+          </View>
+          {/* The sun-path breakdown below the interactive map — same card as the
+              report, minus its "open map" button since we're already here. */}
+          <SunlightCard name={name || "this locality"} lat={coords.lat} lon={coords.lon} />
+        </ScrollView>
       )}
     </View>
   );
@@ -100,4 +110,12 @@ const styles = StyleSheet.create({
   spacer: { width: 88 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   errorText: { fontSize: 14, color: theme.inkMuted },
+  mapBox: {
+    height: 380,
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: theme.hairline,
+    marginTop: 4,
+  },
 });

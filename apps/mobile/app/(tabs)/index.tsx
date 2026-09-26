@@ -17,7 +17,7 @@ import { useI18n } from "@/src/i18n";
 import { cityCounts, useLocalities } from "@/src/useLocalities";
 import { theme } from "@/src/theme";
 
-const EXAMPLES = ["Koramangala", "DLF Phase 5", "Whitefield", "Bandra"];
+const EXAMPLES = ["Koramangala", "560092", "Cyber Hub"];
 
 export default function HomeScreen() {
   const { t } = useI18n();
@@ -109,9 +109,17 @@ export default function HomeScreen() {
         {locError && <Txt style={styles.locError}>{locError}</Txt>}
       </View>
 
-      <Txt weight="bold" style={styles.sectionTitle}>
-        {t("home.popularCities")}
-      </Txt>
+      <View style={styles.sectionHead}>
+        <Txt weight="bold" style={styles.sectionTitle}>
+          {t("home.popularCities")}
+        </Txt>
+        <Pressable onPress={() => goSearch()} style={styles.browseAll} hitSlop={8}>
+          <Txt weight="semibold" style={styles.browseAllText}>
+            {t("home.browseAll")}
+          </Txt>
+          <Icon name="arrowRight" size={14} color={theme.brand} />
+        </Pressable>
+      </View>
       <View style={styles.grid}>
         {cities.map((c) => (
           <Pressable
@@ -119,12 +127,17 @@ export default function HomeScreen() {
             style={({ pressed }) => [styles.cityTile, pressed && styles.tilePressed]}
             onPress={() => goSearch(c.city)}
           >
-            <Txt weight="bold" style={styles.cityName} numberOfLines={1}>
-              {c.city}
-            </Txt>
-            <Txt weight="medium" style={styles.cityCount}>
-              {c.count} {t("common.localities")}
-            </Txt>
+            <View style={styles.cityIcon}>
+              <Icon name="building" size={20} color={theme.brand} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Txt weight="bold" style={styles.cityName} numberOfLines={1}>
+                {c.city}
+              </Txt>
+              <Txt weight="medium" style={styles.cityCount}>
+                {c.count} {t("common.localities")}
+              </Txt>
+            </View>
           </Pressable>
         ))}
       </View>
@@ -174,18 +187,38 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   locError: { fontSize: 12, color: theme.bad, marginTop: 8 },
-  sectionTitle: { fontSize: 18, color: theme.ink, marginTop: 28, marginBottom: 12 },
+  sectionHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 28,
+    marginBottom: 12,
+  },
+  sectionTitle: { fontSize: 18, color: theme.ink },
+  browseAll: { flexDirection: "row", alignItems: "center", gap: 3 },
+  browseAllText: { fontSize: 13, color: theme.brand },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   cityTile: {
     width: "47.5%",
     flexGrow: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.hairline,
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
+  },
+  cityIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: theme.brandSoft,
+    alignItems: "center",
+    justifyContent: "center",
   },
   tilePressed: { backgroundColor: theme.plane },
-  cityName: { fontSize: 16, color: theme.ink },
-  cityCount: { fontSize: 12, color: theme.inkMuted, marginTop: 4 },
+  cityName: { fontSize: 15, color: theme.ink },
+  cityCount: { fontSize: 12, color: theme.inkMuted, marginTop: 2 },
 });

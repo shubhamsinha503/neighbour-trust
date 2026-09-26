@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   View,
 } from "react-native";
@@ -12,10 +13,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LanguageButton } from "@/components/LanguageButton";
 import { SunlightCard } from "@/components/SunlightCard";
 import { Card } from "@/components/ui/Card";
+import { categoryIcon } from "@/components/ui/categoryIcon";
 import { ConfidenceTag } from "@/components/ui/ConfidenceTag";
 import { FlagRow } from "@/components/ui/FlagRow";
 import { Icon } from "@/components/ui/Icon";
-import { NearbyGrid } from "@/components/ui/NearbyGrid";
+import { NearbyList } from "@/components/ui/NearbyList";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
 import { Txt } from "@/components/ui/Txt";
 import {
@@ -68,6 +70,20 @@ export default function ReportScreen() {
 
   const ts = report?.trust_score;
 
+  async function onShare() {
+    if (!report) return;
+    const s = report.trust_score.score;
+    try {
+      await Share.share({
+        message: `${report.locality.name}, ${report.locality.city} — Trust Score ${
+          s ?? "—"
+        }/100 on Neighbour Trust.`,
+      });
+    } catch {
+      // User dismissed the share sheet — nothing to do.
+    }
+  }
+
   return (
     <ScrollView
       style={styles.screen}
@@ -90,12 +106,17 @@ export default function ReportScreen() {
             accessibilityLabel={t("saved.title")}
           >
             <Icon
-              name="bookmark"
+              name="heart"
               size={22}
               color={saved ? theme.brand : theme.inkMuted}
               filled={saved}
             />
           </Pressable>
+          {report && (
+            <Pressable onPress={onShare} hitSlop={10} accessibilityLabel="Share">
+              <Icon name="share" size={20} color={theme.inkMuted} />
+            </Pressable>
+          )}
           <LanguageButton />
         </View>
       </View>
@@ -122,7 +143,7 @@ export default function ReportScreen() {
 
           {/* Score card — the headline verdict, with a ring for the number. */}
           <Card style={styles.scoreCard}>
-            <ScoreBadge score={ts.score} size="lg" />
+            <ScoreBadge score={ts.score} size="lg" showOutOf />
             <View style={{ flex: 1 }}>
               <Txt weight="bold" style={styles.eyebrow}>
                 {t("report.basedOn")} {ts.categories_counted} {t("report.of")}{" "}
@@ -158,6 +179,9 @@ export default function ReportScreen() {
                 const inner = (
                   <Card style={styles.catCard}>
                     <View style={styles.catTop}>
+                      <View style={styles.catIcon}>
+                        <Icon name={categoryIcon(c.category)} size={18} color={theme.brand} />
+                      </View>
                       <Txt weight="bold" style={styles.catLabel}>
                         {categoryLabel(c.category, c.label)}
                       </Txt>
@@ -186,7 +210,11 @@ export default function ReportScreen() {
                   </Card>
                 );
                 return route ? (
-                  <Link key={c.category} href={`/${report.locality.slug}/${route}`} asChild>
+                  <Link
+                    key={c.category}
+                    href={`/${report.locality.slug}/${route}?score=${c.score ?? ""}`}
+                    asChild
+                  >
                     <Pressable>{inner}</Pressable>
                   </Link>
                 ) : (
@@ -201,7 +229,7 @@ export default function ReportScreen() {
               <Txt weight="bold" style={styles.sectionTitle}>
                 {t("overview.nearby")}
               </Txt>
-              <NearbyGrid payload={nearby} />
+              <NearbyList payload={nearby} />
             </View>
           )}
 
@@ -255,9 +283,17 @@ const styles = StyleSheet.create({
   catTop: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 10,
   },
-  catLabel: { fontSize: 15, color: theme.ink },
+  catIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: theme.brandSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  catLabel: { flex: 1, fontSize: 15, color: theme.ink },
   catScore: { fontSize: 22 },
   catNone: { fontSize: 12, color: theme.inkMuted },
   catBottom: {
