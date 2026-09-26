@@ -19,7 +19,9 @@
     },
     "plugins": [
       "expo-router",
-      "expo-asset"
+      "expo-asset",
+      "expo-font",
+      "expo-splash-screen"
     ],
     "extra": {
       "router": {}

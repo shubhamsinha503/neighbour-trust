@@ -12,8 +12,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { LanguageButton } from "@/components/LanguageButton";
 import { SunlightCard } from "@/components/SunlightCard";
+import { Icon } from "@/components/ui/Icon";
 import { fetchReport, type Report } from "@/src/api";
 import { useI18n } from "@/src/i18n";
+import { useSaved } from "@/src/saved";
 import { scoreColor, theme } from "@/src/theme";
 
 const DETAIL_ROUTE: Record<string, string> = {
@@ -25,7 +27,9 @@ const DETAIL_ROUTE: Record<string, string> = {
 export default function ReportScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { t, categoryLabel } = useI18n();
+  const { isSaved, toggle } = useSaved();
   const insets = useSafeAreaInsets();
+  const saved = isSaved(String(slug));
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState(false);
 
@@ -57,7 +61,21 @@ export default function ReportScreen() {
             <Text style={styles.back}>← {t("report.back")}</Text>
           </Pressable>
         </Link>
-        <LanguageButton />
+        <View style={styles.topRight}>
+          <Pressable
+            onPress={() => toggle(String(slug))}
+            hitSlop={10}
+            accessibilityLabel={t("saved.title")}
+          >
+            <Icon
+              name="bookmark"
+              size={22}
+              color={saved ? theme.brand : theme.inkMuted}
+              filled={saved}
+            />
+          </Pressable>
+          <LanguageButton />
+        </View>
       </View>
 
       {!report && !error && (
@@ -157,6 +175,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.page },
   back: { fontSize: 12, color: theme.inkMuted },
   topbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  topRight: { flexDirection: "row", alignItems: "center", gap: 14 },
   name: { fontSize: 24, fontWeight: "800", color: theme.ink, marginTop: 4 },
   place: { fontSize: 13, color: theme.inkSecondary, marginTop: 2 },
   scoreCard: {
