@@ -2,8 +2,8 @@ import * as Haptics from "expo-haptics";
 import { Link, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
@@ -16,12 +16,14 @@ import { SunlightCard } from "@/components/SunlightCard";
 import { Card } from "@/components/ui/Card";
 import { categoryIcon } from "@/components/ui/categoryIcon";
 import { ConfidenceTag } from "@/components/ui/ConfidenceTag";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { FlagRow } from "@/components/ui/FlagRow";
 import { Icon } from "@/components/ui/Icon";
 import { NearbyList } from "@/components/ui/NearbyList";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
 import { Signal } from "@/components/ui/Signal";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Txt } from "@/components/ui/Txt";
 import {
   fetchConnectivity,
@@ -71,6 +73,13 @@ export default function ReportScreen() {
     void load();
   }, [slug]);
 
+  const [refreshing, setRefreshing] = useState(false);
+  async function onRefresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
+
   const ts = report?.trust_score;
 
   // Honest "at a glance" signals derived from real category scores: the highest
@@ -114,6 +123,9 @@ export default function ReportScreen() {
         paddingBottom: insets.bottom + 24,
         paddingHorizontal: 16,
       }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.brand} colors={[theme.brand]} />
+      }
     >
       <View style={styles.topbar}>
         <Link href="/" asChild>
@@ -147,13 +159,31 @@ export default function ReportScreen() {
       </View>
 
       {!report && !error && (
-        <ActivityIndicator style={{ marginTop: 40 }} color={theme.brand} />
+        <View style={{ marginTop: 8 }}>
+          <Skeleton style={{ width: "60%", height: 28, marginTop: 4 }} />
+          <Skeleton style={{ width: "35%", height: 14, marginTop: 10 }} />
+          <View style={styles.skelScoreCard}>
+            <Skeleton style={{ width: 96, height: 96, borderRadius: 999 }} />
+            <View style={{ flex: 1, gap: 8 }}>
+              <Skeleton style={{ width: "50%", height: 12 }} />
+              <Skeleton style={{ width: "100%", height: 14 }} />
+              <Skeleton style={{ width: "80%", height: 14 }} />
+            </View>
+          </View>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} style={{ width: "100%", height: 68, borderRadius: 18, marginTop: 12 }} />
+          ))}
+        </View>
       )}
 
       {error && (
-        <Pressable onPress={load} style={styles.errorCard}>
-          <Txt style={styles.errorText}>{t("report.loadError")}</Txt>
-        </Pressable>
+        <EmptyState
+          icon="warning"
+          title={t("load.errorTitle")}
+          message={t("report.loadError")}
+          actionLabel={t("common.retry")}
+          onAction={load}
+        />
       )}
 
       {report && ts && (
@@ -321,6 +351,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 18,
     marginTop: 16,
+  },
+  skelScoreCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 18,
+    marginTop: 20,
   },
   eyebrow: {
     fontSize: 11,

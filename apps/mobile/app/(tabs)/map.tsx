@@ -1,17 +1,18 @@
 import { Link } from "expo-router";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
-  Pressable,
+  RefreshControl,
   StyleSheet,
   TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
 import { PressableScale } from "@/components/ui/PressableScale";
+import { LocalityRowSkeleton } from "@/components/ui/Skeleton";
 import { Txt } from "@/components/ui/Txt";
 import { useI18n } from "@/src/i18n";
 import { useLocalities } from "@/src/useLocalities";
@@ -27,6 +28,15 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { data, error, loading, reload } = useLocalities();
   const [query, setQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    reload();
+  }, [reload]);
+  useEffect(() => {
+    if (!loading) setRefreshing(false);
+  }, [loading]);
 
   const results = useMemo(() => {
     if (!data) return [];
@@ -61,13 +71,21 @@ export default function MapScreen() {
       </View>
 
       {loading && !data && (
-        <ActivityIndicator style={{ marginTop: 40 }} color={theme.brand} />
+        <View style={{ paddingTop: 12 }}>
+          {Array.from({ length: 7 }).map((_, i) => (
+            <LocalityRowSkeleton key={i} />
+          ))}
+        </View>
       )}
 
-      {error && (
-        <Pressable onPress={reload} style={styles.errorBox}>
-          <Txt style={styles.errorText}>{t("home.loadError")}</Txt>
-        </Pressable>
+      {error && !data && (
+        <EmptyState
+          icon="warning"
+          title={t("load.errorTitle")}
+          message={t("load.errorMsg")}
+          actionLabel={t("common.retry")}
+          onAction={reload}
+        />
       )}
 
       {data && (
@@ -76,6 +94,9 @@ export default function MapScreen() {
           keyExtractor={(item) => item.slug}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.brand} colors={[theme.brand]} />
+          }
           renderItem={({ item }) => (
             <Link href={`/${item.slug}/sunlight`} asChild>
               <PressableScale>

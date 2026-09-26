@@ -1,15 +1,11 @@
 import { Link } from "expo-router";
 import type { ReactNode } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { LanguageButton } from "@/components/LanguageButton";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Txt } from "@/components/ui/Txt";
 import { useI18n } from "@/src/i18n";
 import { theme } from "@/src/theme";
@@ -55,20 +51,33 @@ export function DetailScaffold({
       </Txt>
 
       {state === "loading" && (
-        <ActivityIndicator style={{ marginTop: 40 }} color={theme.brand} />
-      )}
-      {state === "nodata" && (
-        <View style={styles.card}>
-          <Txt weight="bold" style={styles.cardTitle}>
-            {t("detail.noData")}
-          </Txt>
-          {reason ? <Txt style={styles.reason}>{reason}</Txt> : null}
+        <View style={{ marginTop: 8 }}>
+          <View style={styles.skelHero}>
+            <Skeleton style={{ width: 96, height: 96, borderRadius: 999 }} />
+            <View style={{ flex: 1, gap: 8 }}>
+              <Skeleton style={{ width: "40%", height: 12 }} />
+              <Skeleton style={{ width: "100%", height: 14 }} />
+              <Skeleton style={{ width: "75%", height: 14 }} />
+            </View>
+          </View>
+          <View style={styles.skelGrid}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} style={{ flexBasis: "47%", flexGrow: 1, height: 78, borderRadius: 16 }} />
+            ))}
+          </View>
         </View>
       )}
+      {state === "nodata" && (
+        <EmptyState icon="info" title={t("detail.noData")} message={reason ?? ""} />
+      )}
       {state === "error" && (
-        <Pressable onPress={onRetry} style={styles.card}>
-          <Txt style={styles.reason}>{t("report.loadError")}</Txt>
-        </Pressable>
+        <EmptyState
+          icon="warning"
+          title={t("detail.noData")}
+          message={t("report.loadError")}
+          actionLabel={t("common.retry")}
+          onAction={onRetry}
+        />
       )}
       {state === "ready" && children}
     </ScrollView>
@@ -154,6 +163,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 12,
   },
+  skelHero: { flexDirection: "row", alignItems: "center", gap: 18, marginTop: 8 },
+  skelGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 18 },
   card: {
     marginTop: 12,
     borderWidth: 1,
