@@ -83,7 +83,7 @@ export default function AirQualityScreen() {
                 label={t("aq.station")}
                 value={p.station_name}
                 sub={
-                  p.nearest_station_km != null
+                  p.nearest_station_km != null && p.nearest_station_km > 0
                     ? `${p.nearest_station_km.toFixed(1)} ${t("aq.km")}`
                     : undefined
                 }

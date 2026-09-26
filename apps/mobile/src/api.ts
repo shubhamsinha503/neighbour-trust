@@ -10,8 +10,11 @@
  * EXPO_PUBLIC_API_BASE_URL to your computer's LAN IP when running in Expo Go.
  */
 
+// Default to the hosted production API so the app works on any phone out of the
+// box (no env setup on device). Point EXPO_PUBLIC_API_BASE_URL at a LAN dev
+// server when working against a local backend.
 const API_BASE =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://neighbour-trust.onrender.com";
 
 export interface LocalitySummary {
   slug: string;
