@@ -10,29 +10,54 @@
 export const theme = {
   // Brand / accent
   brand: "#F72575",
-  brandDeep: "#C81C5E",
+  brandDeep: "#D91361",
   brandLight: "#FFB3CC",
-  brandSoft: "#FFE4EC",
+  brandSoft: "#FFF0F6",
 
   // Surfaces
-  page: "#F8FAFC",
+  page: "#F7F8FA",
   surface: "#FFFFFF",
-  plane: "#F1F5F9",
-  hairline: "#E2E8F0",
+  plane: "#EEF1F5",
+  hairline: "#E2E7ED",
 
-  // Text (slate scale)
-  ink: "#0F172A",
-  inkSecondary: "#475569",
-  inkMuted: "#64748B",
+  // Text (navy scale — matches the web prototype)
+  ink: "#10213A",
+  ink2: "#1D3452",
+  inkSecondary: "#536276",
+  inkMuted: "#7C8798",
 
   // Status / bands
-  good: "#16A34A",
-  warn: "#D97706",
+  good: "#1B9362",
+  goodSoft: "#E9F7F1",
+  warn: "#B86818",
+  warnSoft: "#FFF6E8",
   orange: "#EA580C",
   bad: "#DC2626",
+  badSoft: "#FEF2F2",
 
   // Extra series colour used for community-sourced confidence
   violet: "#7C3AED",
+} as const;
+
+/**
+ * Shadow presets matching the web prototype's soft, deep elevation. Spread into a
+ * style; on Android `elevation` approximates the same lift.
+ */
+export const shadow = {
+  card: {
+    shadowColor: "#10213A",
+    shadowOpacity: 0.07,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
+  },
+  raised: {
+    shadowColor: "#10213A",
+    shadowOpacity: 0.09,
+    shadowRadius: 34,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 4,
+  },
 } as const;
 
 /**
@@ -56,9 +81,9 @@ export const font = {
 } as const;
 
 export const radius = {
-  sm: 10,
-  md: 14,
-  lg: 18,
+  sm: 12,
+  md: 16,
+  lg: 20,
   xl: 24,
   pill: 999,
 } as const;

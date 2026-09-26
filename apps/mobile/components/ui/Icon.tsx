@@ -10,6 +10,7 @@ export type IconName =
   | "menu"
   | "location"
   | "chevron"
+  | "check"
   | "back"
   | "globe"
   | "heart"
@@ -113,6 +114,7 @@ export function Icon({ name, size = 24, color = theme.inkMuted, filled = false }
           <Circle cx={12} cy={10} r={2.5} {...common} />
         </>
       )}
+      {name === "check" && <Polyline points="20 6 9 17 4 12" {...common} />}
       {name === "chevron" && <Polyline points="9 6 15 12 9 18" {...common} />}
       {name === "back" && <Polyline points="15 6 9 12 15 18" {...common} />}
       {name === "arrowRight" && (

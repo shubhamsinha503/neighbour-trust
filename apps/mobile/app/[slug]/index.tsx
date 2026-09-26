@@ -1,8 +1,9 @@
+import * as Haptics from "expo-haptics";
 import { Link, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
@@ -15,10 +16,15 @@ import { SunlightCard } from "@/components/SunlightCard";
 import { Card } from "@/components/ui/Card";
 import { categoryIcon } from "@/components/ui/categoryIcon";
 import { ConfidenceTag } from "@/components/ui/ConfidenceTag";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { FlagRow } from "@/components/ui/FlagRow";
 import { Icon } from "@/components/ui/Icon";
+import { MetricBar } from "@/components/ui/MetricBar";
 import { NearbyList } from "@/components/ui/NearbyList";
+import { PressableScale } from "@/components/ui/PressableScale";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
+import { Signal } from "@/components/ui/Signal";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Txt } from "@/components/ui/Txt";
 import {
   fetchConnectivity,
@@ -68,7 +74,33 @@ export default function ReportScreen() {
     void load();
   }, [slug]);
 
+  const [refreshing, setRefreshing] = useState(false);
+  async function onRefresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
+
   const ts = report?.trust_score;
+
+  // Honest "at a glance" signals derived from real category scores: the highest
+  // scored area (only when genuinely strong) and the lowest (only when weak
+  // enough to flag), so a locality that's strong everywhere shows no false caution.
+  const scored = report?.categories.filter((c) => c.available && c.score !== null) ?? [];
+  const strongest = scored.reduce<(typeof scored)[number] | null>(
+    (best, c) => (best === null || (c.score ?? 0) > (best.score ?? 0) ? c : best),
+    null,
+  );
+  const weakest = scored.reduce<(typeof scored)[number] | null>(
+    (low, c) => (low === null || (c.score ?? 0) < (low.score ?? 0) ? c : low),
+    null,
+  );
+  const showStrong = strongest !== null && (strongest.score ?? 0) >= 70;
+  const showWeak =
+    weakest !== null &&
+    strongest !== null &&
+    weakest.category !== strongest.category &&
+    (weakest.score ?? 0) < 55;
 
   async function onShare() {
     if (!report) return;
@@ -92,6 +124,9 @@ export default function ReportScreen() {
         paddingBottom: insets.bottom + 24,
         paddingHorizontal: 16,
       }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.brand} colors={[theme.brand]} />
+      }
     >
       <View style={styles.topbar}>
         <Link href="/" asChild>
@@ -101,7 +136,10 @@ export default function ReportScreen() {
         </Link>
         <View style={styles.topRight}>
           <Pressable
-            onPress={() => toggle(String(slug))}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              toggle(String(slug));
+            }}
             hitSlop={10}
             accessibilityLabel={t("saved.title")}
           >
@@ -122,13 +160,31 @@ export default function ReportScreen() {
       </View>
 
       {!report && !error && (
-        <ActivityIndicator style={{ marginTop: 40 }} color={theme.brand} />
+        <View style={{ marginTop: 8 }}>
+          <Skeleton style={{ width: "60%", height: 28, marginTop: 4 }} />
+          <Skeleton style={{ width: "35%", height: 14, marginTop: 10 }} />
+          <View style={styles.skelScoreCard}>
+            <Skeleton style={{ width: 96, height: 96, borderRadius: 999 }} />
+            <View style={{ flex: 1, gap: 8 }}>
+              <Skeleton style={{ width: "50%", height: 12 }} />
+              <Skeleton style={{ width: "100%", height: 14 }} />
+              <Skeleton style={{ width: "80%", height: 14 }} />
+            </View>
+          </View>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} style={{ width: "100%", height: 68, borderRadius: 18, marginTop: 12 }} />
+          ))}
+        </View>
       )}
 
       {error && (
-        <Pressable onPress={load} style={styles.errorCard}>
-          <Txt style={styles.errorText}>{t("report.loadError")}</Txt>
-        </Pressable>
+        <EmptyState
+          icon="warning"
+          title={t("load.errorTitle")}
+          message={t("report.loadError")}
+          actionLabel={t("common.retry")}
+          onAction={load}
+        />
       )}
 
       {report && ts && (
@@ -143,7 +199,7 @@ export default function ReportScreen() {
 
           {/* Score card — the headline verdict, with a ring for the number. */}
           <Card style={styles.scoreCard}>
-            <ScoreBadge score={ts.score} size="lg" showOutOf />
+            <ScoreBadge score={ts.score} size="lg" showOutOf animate />
             <View style={{ flex: 1 }}>
               <Txt weight="bold" style={styles.eyebrow}>
                 {t("report.basedOn")} {ts.categories_counted} {t("report.of")}{" "}
@@ -154,6 +210,33 @@ export default function ReportScreen() {
               <Txt style={styles.verdict}>{report.verdict}</Txt>
             </View>
           </Card>
+
+          {/* At a glance — real strongest / weakest measured areas */}
+          {(showStrong || showWeak) && (
+            <View style={styles.section}>
+              <Txt weight="bold" style={styles.sectionTitle}>
+                {t("overview.atGlance")}
+              </Txt>
+              {showStrong && strongest && (
+                <Signal
+                  tone="positive"
+                  title={t("overview.strongest")}
+                  detail={t("overview.strongestDetail")
+                    .replace("{cat}", categoryLabel(strongest.category, strongest.label))
+                    .replace("{n}", String(strongest.score))}
+                />
+              )}
+              {showWeak && weakest && (
+                <Signal
+                  tone="caution"
+                  title={t("overview.weakest")}
+                  detail={t("overview.weakestDetail")
+                    .replace("{cat}", categoryLabel(weakest.category, weakest.label))
+                    .replace("{n}", String(weakest.score))}
+                />
+              )}
+            </View>
+          )}
 
           {/* Watch-outs */}
           {report.flags.length > 0 && (
@@ -196,6 +279,11 @@ export default function ReportScreen() {
                         <Txt style={styles.catNone}>{t("common.noDataYet")}</Txt>
                       )}
                     </View>
+                    {c.score !== null && (
+                      <View style={styles.catBar}>
+                        <MetricBar value={c.score} color={scoreColor(c.score)} />
+                      </View>
+                    )}
                     <View style={styles.catBottom}>
                       <ConfidenceTag confidence={c.confidence} />
                       {route ? (
@@ -215,7 +303,7 @@ export default function ReportScreen() {
                     href={`/${report.locality.slug}/${route}?score=${c.score ?? ""}`}
                     asChild
                   >
-                    <Pressable>{inner}</Pressable>
+                    <PressableScale>{inner}</PressableScale>
                   </Link>
                 ) : (
                   <View key={c.category}>{inner}</View>
@@ -270,6 +358,12 @@ const styles = StyleSheet.create({
     gap: 18,
     marginTop: 16,
   },
+  skelScoreCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 18,
+    marginTop: 20,
+  },
   eyebrow: {
     fontSize: 11,
     textTransform: "uppercase",
@@ -296,11 +390,12 @@ const styles = StyleSheet.create({
   catLabel: { flex: 1, fontSize: 15, color: theme.ink },
   catScore: { fontSize: 22 },
   catNone: { fontSize: 12, color: theme.inkMuted },
+  catBar: { marginTop: 12 },
   catBottom: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 10,
+    marginTop: 12,
   },
   detailsLink: { flexDirection: "row", alignItems: "center", gap: 2 },
   detailsText: { fontSize: 12, color: theme.brand },

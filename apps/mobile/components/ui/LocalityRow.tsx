@@ -1,7 +1,8 @@
 import { Link } from "expo-router";
-import { Pressable, View, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
 
 import { Icon } from "@/components/ui/Icon";
+import { PressableScale } from "@/components/ui/PressableScale";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
 import { Txt } from "@/components/ui/Txt";
 import { useI18n } from "@/src/i18n";
@@ -21,7 +22,7 @@ export function LocalityRow({ item }: { item: LocalitySummary }) {
 
   return (
     <Link href={`/${item.slug}`} asChild>
-      <Pressable>
+      <PressableScale>
         <View style={styles.row}>
           <ScoreBadge score={item.score} size="sm" />
           <View style={styles.text}>
@@ -48,7 +49,7 @@ export function LocalityRow({ item }: { item: LocalitySummary }) {
           </View>
           <Icon name="chevron" size={18} color={theme.inkMuted} />
         </View>
-      </Pressable>
+      </PressableScale>
     </Link>
   );
 }

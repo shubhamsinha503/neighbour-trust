@@ -1,31 +1,33 @@
-import { Pressable, type PressableProps, StyleSheet, View } from "react-native";
+import * as Haptics from "expo-haptics";
+import type { GestureResponderEvent, PressableProps } from "react-native";
+import { StyleSheet, View } from "react-native";
 
+import { PressableScale } from "@/components/ui/PressableScale";
 import { Txt } from "@/components/ui/Txt";
 import { radius, theme } from "@/src/theme";
 
 type Variant = "primary" | "secondary";
 
-interface Props extends Omit<PressableProps, "children"> {
+interface Props extends Omit<PressableProps, "children" | "style"> {
   label: string;
   variant?: Variant;
   icon?: string;
 }
 
 /**
- * Primary (filled pink) and secondary (outlined) buttons. One component so the
- * two calls-to-action across the app stay visually consistent.
+ * Primary (filled pink) and secondary (outlined) buttons. Press-scales for
+ * physical feedback and fires a light haptic on the commit — one per tap.
  */
-export function Button({ label, variant = "primary", icon, style, ...rest }: Props) {
+export function Button({ label, variant = "primary", icon, onPress, ...rest }: Props) {
   const primary = variant === "primary";
   return (
-    <Pressable
+    <PressableScale
       {...rest}
-      style={(state) => [
-        styles.base,
-        primary ? styles.primary : styles.secondary,
-        state.pressed && styles.pressed,
-        typeof style === "function" ? style(state) : style,
-      ]}
+      onPress={(e: GestureResponderEvent) => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress?.(e);
+      }}
+      style={[styles.base, primary ? styles.primary : styles.secondary]}
     >
       <View style={styles.inner}>
         {icon ? (
@@ -37,7 +39,7 @@ export function Button({ label, variant = "primary", icon, style, ...rest }: Pro
           {label}
         </Txt>
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -55,7 +57,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: theme.brand,
   },
-  pressed: { opacity: 0.85 },
   inner: { flexDirection: "row", alignItems: "center", gap: 8 },
   icon: { fontSize: 16 },
   label: { fontSize: 15 },

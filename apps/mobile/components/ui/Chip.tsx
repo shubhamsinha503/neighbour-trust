@@ -1,5 +1,7 @@
-import { Pressable, StyleSheet } from "react-native";
+import * as Haptics from "expo-haptics";
+import { StyleSheet } from "react-native";
 
+import { PressableScale } from "@/components/ui/PressableScale";
 import { Txt } from "@/components/ui/Txt";
 import { radius, theme } from "@/src/theme";
 
@@ -11,17 +13,17 @@ interface Props {
 
 /**
  * A pill used for example searches and city filters. Active chips fill with the
- * soft brand tint and a brand border; inactive ones are quiet outlines.
+ * soft brand tint and a brand border; inactive ones are quiet outlines. A
+ * selection haptic marks the choice.
  */
 export function Chip({ label, active = false, onPress }: Props) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        active ? styles.active : styles.inactive,
-        pressed && { opacity: 0.75 },
-      ]}
+    <PressableScale
+      onPress={() => {
+        void Haptics.selectionAsync();
+        onPress?.();
+      }}
+      style={[styles.chip, active ? styles.active : styles.inactive]}
     >
       <Txt
         weight={active ? "semibold" : "medium"}
@@ -29,7 +31,7 @@ export function Chip({ label, active = false, onPress }: Props) {
       >
         {label}
       </Txt>
-    </Pressable>
+    </PressableScale>
   );
 }
 

@@ -1,9 +1,8 @@
 import { useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
-  Pressable,
+  RefreshControl,
   StyleSheet,
   TextInput,
   View,
@@ -11,8 +10,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Chip } from "@/components/ui/Chip";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Icon } from "@/components/ui/Icon";
 import { LocalityRow } from "@/components/ui/LocalityRow";
+import { LocalityRowSkeleton } from "@/components/ui/Skeleton";
 import { Txt } from "@/components/ui/Txt";
 import { useI18n } from "@/src/i18n";
 import { cityCounts, useLocalities } from "@/src/useLocalities";
@@ -26,6 +27,17 @@ export default function SearchScreen() {
 
   const [query, setQuery] = useState("");
   const [city, setCity] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    reload();
+  }, [reload]);
+
+  // Clear the pull-to-refresh spinner once the reload settles.
+  useEffect(() => {
+    if (!loading) setRefreshing(false);
+  }, [loading]);
 
   // A tap from Home (a city tile or an example chip) arrives as ?q= — seed the
   // box with it. Runs whenever the param changes so repeat taps re-seed.
@@ -96,13 +108,21 @@ export default function SearchScreen() {
       )}
 
       {loading && !data && (
-        <ActivityIndicator style={{ marginTop: 40 }} color={theme.brand} />
+        <View style={{ paddingTop: 12 }}>
+          {Array.from({ length: 7 }).map((_, i) => (
+            <LocalityRowSkeleton key={i} />
+          ))}
+        </View>
       )}
 
-      {error && (
-        <Pressable onPress={reload} style={styles.errorBox}>
-          <Txt style={styles.errorText}>{t("home.loadError")}</Txt>
-        </Pressable>
+      {error && !data && (
+        <EmptyState
+          icon="warning"
+          title={t("load.errorTitle")}
+          message={t("load.errorMsg")}
+          actionLabel={t("common.retry")}
+          onAction={reload}
+        />
       )}
 
       {data && (
@@ -111,12 +131,17 @@ export default function SearchScreen() {
           keyExtractor={(item) => item.slug}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.brand} colors={[theme.brand]} />
+          }
           ListHeaderComponent={
             <Txt weight="medium" style={styles.count}>
               {results.length} {t("search.count")} · {t("search.sortNote")}
             </Txt>
           }
-          ListEmptyComponent={<Txt style={styles.empty}>{t("search.empty")}</Txt>}
+          ListEmptyComponent={
+            <EmptyState icon="search" title={t("search.emptyTitle")} message={t("search.empty")} />
+          }
           renderItem={({ item }) => <LocalityRow item={item} />}
         />
       )}
