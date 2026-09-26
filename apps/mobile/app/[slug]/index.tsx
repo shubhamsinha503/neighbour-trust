@@ -19,6 +19,7 @@ import { ConfidenceTag } from "@/components/ui/ConfidenceTag";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FlagRow } from "@/components/ui/FlagRow";
 import { Icon } from "@/components/ui/Icon";
+import { MetricBar } from "@/components/ui/MetricBar";
 import { NearbyList } from "@/components/ui/NearbyList";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
@@ -278,6 +279,11 @@ export default function ReportScreen() {
                         <Txt style={styles.catNone}>{t("common.noDataYet")}</Txt>
                       )}
                     </View>
+                    {c.score !== null && (
+                      <View style={styles.catBar}>
+                        <MetricBar value={c.score} color={scoreColor(c.score)} />
+                      </View>
+                    )}
                     <View style={styles.catBottom}>
                       <ConfidenceTag confidence={c.confidence} />
                       {route ? (
@@ -384,11 +390,12 @@ const styles = StyleSheet.create({
   catLabel: { flex: 1, fontSize: 15, color: theme.ink },
   catScore: { fontSize: 22 },
   catNone: { fontSize: 12, color: theme.inkMuted },
+  catBar: { marginTop: 12 },
   catBottom: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 10,
+    marginTop: 12,
   },
   detailsLink: { flexDirection: "row", alignItems: "center", gap: 2 },
   detailsText: { fontSize: 12, color: theme.brand },
