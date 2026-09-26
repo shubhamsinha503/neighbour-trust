@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icon } from "@/components/ui/Icon";
+import { PressableScale } from "@/components/ui/PressableScale";
 import { Txt } from "@/components/ui/Txt";
 import { useI18n } from "@/src/i18n";
 import { useLocalities } from "@/src/useLocalities";
@@ -77,7 +78,7 @@ export default function MapScreen() {
           contentContainerStyle={{ paddingTop: 12, paddingBottom: insets.bottom + 24 }}
           renderItem={({ item }) => (
             <Link href={`/${item.slug}/sunlight`} asChild>
-              <Pressable>
+              <PressableScale>
                 <View style={styles.row}>
                   <View style={styles.mapIcon}>
                     <Icon name="map" size={18} color={theme.brand} />
@@ -92,7 +93,7 @@ export default function MapScreen() {
                   </View>
                   <Icon name="chevron" size={18} color={theme.inkMuted} />
                 </View>
-              </Pressable>
+              </PressableScale>
             </Link>
           )}
         />

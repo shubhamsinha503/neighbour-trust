@@ -1,8 +1,8 @@
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { useMemo, useState } from "react";
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LanguageButton } from "@/components/LanguageButton";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
+import { PressableScale } from "@/components/ui/PressableScale";
 import { Txt } from "@/components/ui/Txt";
 import { useI18n } from "@/src/i18n";
 import { cityCounts, useLocalities } from "@/src/useLocalities";
@@ -80,21 +81,27 @@ export default function HomeScreen() {
       </Txt>
       <Txt style={styles.subtitle}>{t("home.subtitle")}</Txt>
 
-      <Pressable style={styles.searchBar} onPress={() => goSearch()}>
+      <PressableScale style={styles.searchBar} onPress={() => goSearch()}>
         <Icon name="search" size={20} color={theme.inkMuted} />
         <Txt style={styles.searchText}>{t("home.search")}</Txt>
-      </Pressable>
+      </PressableScale>
 
       <View style={styles.examples}>
         <Txt weight="semibold" style={styles.examplesLabel}>
           {t("home.examplesLabel")}
         </Txt>
         {EXAMPLES.map((ex) => (
-          <Pressable key={ex} onPress={() => goSearch(ex)}>
+          <PressableScale
+            key={ex}
+            onPress={() => {
+              void Haptics.selectionAsync();
+              goSearch(ex);
+            }}
+          >
             <Txt weight="medium" style={styles.exampleChip}>
               {ex}
             </Txt>
-          </Pressable>
+          </PressableScale>
         ))}
       </View>
 
@@ -113,19 +120,22 @@ export default function HomeScreen() {
         <Txt weight="bold" style={styles.sectionTitle}>
           {t("home.popularCities")}
         </Txt>
-        <Pressable onPress={() => goSearch()} style={styles.browseAll} hitSlop={8}>
+        <PressableScale onPress={() => goSearch()} style={styles.browseAll} hitSlop={8}>
           <Txt weight="semibold" style={styles.browseAllText}>
             {t("home.browseAll")}
           </Txt>
           <Icon name="arrowRight" size={14} color={theme.brand} />
-        </Pressable>
+        </PressableScale>
       </View>
       <View style={styles.grid}>
         {cities.map((c) => (
-          <Pressable
+          <PressableScale
             key={c.city}
-            style={({ pressed }) => [styles.cityTile, pressed && styles.tilePressed]}
-            onPress={() => goSearch(c.city)}
+            style={styles.cityTile}
+            onPress={() => {
+              void Haptics.selectionAsync();
+              goSearch(c.city);
+            }}
           >
             <View style={styles.cityIcon}>
               <Icon name="building" size={20} color={theme.brand} />
@@ -138,7 +148,7 @@ export default function HomeScreen() {
                 {c.count} {t("common.localities")}
               </Txt>
             </View>
-          </Pressable>
+          </PressableScale>
         ))}
       </View>
     </ScrollView>

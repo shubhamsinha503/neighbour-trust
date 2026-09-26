@@ -55,7 +55,7 @@ export default function AirQualityScreen() {
         <>
           {/* Score card — ring + our take */}
           <Card style={styles.takeCard}>
-            <ScoreBadge score={catScore} size="lg" showOutOf />
+            <ScoreBadge score={catScore} size="lg" showOutOf animate />
             <View style={{ flex: 1 }}>
               <Txt weight="bold" style={styles.eyebrow}>
                 {t("aq.ourTake")}

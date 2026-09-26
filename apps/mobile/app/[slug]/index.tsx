@@ -1,3 +1,4 @@
+import * as Haptics from "expo-haptics";
 import { Link, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -18,6 +19,7 @@ import { ConfidenceTag } from "@/components/ui/ConfidenceTag";
 import { FlagRow } from "@/components/ui/FlagRow";
 import { Icon } from "@/components/ui/Icon";
 import { NearbyList } from "@/components/ui/NearbyList";
+import { PressableScale } from "@/components/ui/PressableScale";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
 import { Signal } from "@/components/ui/Signal";
 import { Txt } from "@/components/ui/Txt";
@@ -121,7 +123,10 @@ export default function ReportScreen() {
         </Link>
         <View style={styles.topRight}>
           <Pressable
-            onPress={() => toggle(String(slug))}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              toggle(String(slug));
+            }}
             hitSlop={10}
             accessibilityLabel={t("saved.title")}
           >
@@ -163,7 +168,7 @@ export default function ReportScreen() {
 
           {/* Score card — the headline verdict, with a ring for the number. */}
           <Card style={styles.scoreCard}>
-            <ScoreBadge score={ts.score} size="lg" showOutOf />
+            <ScoreBadge score={ts.score} size="lg" showOutOf animate />
             <View style={{ flex: 1 }}>
               <Txt weight="bold" style={styles.eyebrow}>
                 {t("report.basedOn")} {ts.categories_counted} {t("report.of")}{" "}
@@ -262,7 +267,7 @@ export default function ReportScreen() {
                     href={`/${report.locality.slug}/${route}?score=${c.score ?? ""}`}
                     asChild
                   >
-                    <Pressable>{inner}</Pressable>
+                    <PressableScale>{inner}</PressableScale>
                   </Link>
                 ) : (
                   <View key={c.category}>{inner}</View>
