@@ -209,6 +209,7 @@ export default function ReportScreen() {
             name={report.locality.name}
             lat={report.locality.lat}
             lon={report.locality.lon}
+            slug={report.locality.slug}
           />
 
           {report.sources_used.length > 0 && (
