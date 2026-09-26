@@ -1,8 +1,9 @@
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { DetailScaffold, Stat, VerdictBlock } from "@/components/DetailScaffold";
+import { Txt } from "@/components/ui/Txt";
 import { fetchSchools, NoDataError, type SchoolsDetail } from "@/src/api";
 import { useI18n } from "@/src/i18n";
 import { theme } from "@/src/theme";
@@ -58,7 +59,7 @@ export default function SchoolsScreen() {
               label={t("schools.staffingKnown")}
               value={String(p.schools_with_staffing_data)}
             />
-            {p.median_pupil_teacher_ratio !== undefined && (
+            {p.median_pupil_teacher_ratio != null && (
               <Stat
                 label={t("schools.ptr")}
                 value={String(p.median_pupil_teacher_ratio)}
@@ -68,14 +69,18 @@ export default function SchoolsScreen() {
 
           {p.nearest_schools && p.nearest_schools.length > 0 && (
             <View style={{ marginTop: 16 }}>
-              <Text style={styles.sectionLabel}>{t("schools.nearest")}</Text>
+              <Txt weight="bold" style={styles.sectionLabel}>
+                {t("schools.nearest")}
+              </Txt>
               {p.nearest_schools.slice(0, 8).map((s, i) => (
                 <View key={`${s.name}-${i}`} style={styles.schoolRow}>
-                  <Text style={styles.schoolName}>{s.name}</Text>
-                  {s.distance_km !== undefined && (
-                    <Text style={styles.schoolDist}>
+                  <Txt weight="medium" style={styles.schoolName}>
+                    {s.name}
+                  </Txt>
+                  {s.distance_km != null && (
+                    <Txt weight="semibold" style={styles.schoolDist}>
                       {s.distance_km.toFixed(1)} {t("aq.km")}
-                    </Text>
+                    </Txt>
                   )}
                 </View>
               ))}

@@ -5,12 +5,12 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { LanguageButton } from "@/components/LanguageButton";
+import { Txt } from "@/components/ui/Txt";
 import { useI18n } from "@/src/i18n";
 import { theme } from "@/src/theme";
 
@@ -45,25 +45,29 @@ export function DetailScaffold({
       <View style={styles.topbar}>
         <Link href={`/${slug}`} asChild>
           <Pressable>
-            <Text style={styles.back}>← {t("report.back")}</Text>
+            <Txt style={styles.back}>← {t("report.back")}</Txt>
           </Pressable>
         </Link>
         <LanguageButton />
       </View>
-      <Text style={styles.title}>{title}</Text>
+      <Txt weight="extrabold" style={styles.title}>
+        {title}
+      </Txt>
 
       {state === "loading" && (
         <ActivityIndicator style={{ marginTop: 40 }} color={theme.brand} />
       )}
       {state === "nodata" && (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t("detail.noData")}</Text>
-          {reason ? <Text style={styles.reason}>{reason}</Text> : null}
+          <Txt weight="bold" style={styles.cardTitle}>
+            {t("detail.noData")}
+          </Txt>
+          {reason ? <Txt style={styles.reason}>{reason}</Txt> : null}
         </View>
       )}
       {state === "error" && (
         <Pressable onPress={onRetry} style={styles.card}>
-          <Text style={styles.reason}>{t("report.loadError")}</Text>
+          <Txt style={styles.reason}>{t("report.loadError")}</Txt>
         </Pressable>
       )}
       {state === "ready" && children}
@@ -83,9 +87,13 @@ export function Stat({
 }) {
   return (
     <View style={styles.stat}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
-      {sub ? <Text style={styles.statSub}>{sub}</Text> : null}
+      <Txt weight="semibold" style={styles.statLabel}>
+        {label}
+      </Txt>
+      <Txt weight="extrabold" style={styles.statValue}>
+        {value}
+      </Txt>
+      {sub ? <Txt style={styles.statSub}>{sub}</Txt> : null}
     </View>
   );
 }
@@ -109,23 +117,27 @@ export function VerdictBlock({
       : confidence;
   return (
     <View style={styles.card}>
-      {headline ? <Text style={styles.verdict}>{headline}</Text> : null}
+      {headline ? (
+        <Txt weight="semibold" style={styles.verdict}>
+          {headline}
+        </Txt>
+      ) : null}
       <View style={styles.metaRow}>
         {confLabel ? (
-          <Text style={styles.meta}>
+          <Txt style={styles.meta}>
             {t("detail.confidence")}: {confLabel}
-          </Text>
+          </Txt>
         ) : null}
         {source ? (
-          <Text style={styles.meta}>
+          <Txt style={styles.meta}>
             {t("detail.source")}: {source}
-          </Text>
+          </Txt>
         ) : null}
       </View>
       {vintage ? (
-        <Text style={styles.meta}>
+        <Txt style={styles.meta}>
           {t("detail.asOf")} {new Date(vintage).toLocaleDateString()}
-        </Text>
+        </Txt>
       ) : null}
     </View>
   );
