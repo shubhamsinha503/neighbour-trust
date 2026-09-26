@@ -17,11 +17,13 @@
  * conversion is applied here — matching the web component exactly.
  */
 
+import { Link } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
 import * as SunCalc from "suncalc";
 
+import { Icon } from "@/components/ui/Icon";
 import { useI18n } from "@/src/i18n";
 import { theme } from "@/src/theme";
 
@@ -68,10 +70,13 @@ export function SunlightCard({
   name,
   lat,
   lon,
+  slug,
 }: {
   name: string;
   lat: number;
   lon: number;
+  /** When set, the card offers a link to the full interactive shadow map. */
+  slug?: string;
 }) {
   const { t } = useI18n();
   const [facing, setFacing] = useState<Facing | null>(null);
@@ -201,6 +206,21 @@ export function SunlightCard({
         {facingText ? <Text style={styles.facingDesc}>{facingText}</Text> : null}
       </View>
 
+      {slug ? (
+        <Link
+          href={{
+            pathname: "/[slug]/sunlight",
+            params: { slug, lat: String(lat), lon: String(lon), name },
+          }}
+          asChild
+        >
+          <Pressable style={styles.mapBtn}>
+            <Icon name="map" size={18} color="#ffffff" />
+            <Text style={styles.mapBtnText}>{t("sun.openMap")}</Text>
+          </Pressable>
+        </Link>
+      ) : null}
+
       <Text style={styles.footer}>{t("sun.footer").replace("{name}", name)}</Text>
     </View>
   );
@@ -285,4 +305,15 @@ const styles = StyleSheet.create({
     color: theme.ink,
   },
   footer: { fontSize: 10.5, lineHeight: 16, color: theme.inkMuted, marginTop: 16 },
+  mapBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 16,
+    backgroundColor: theme.brand,
+    borderRadius: 999,
+    paddingVertical: 12,
+  },
+  mapBtnText: { fontSize: 14, fontWeight: "700", color: "#ffffff" },
 });
