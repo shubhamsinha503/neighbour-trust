@@ -5,15 +5,25 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { LanguageButton } from "@/components/LanguageButton";
 import { SunlightCard } from "@/components/SunlightCard";
+import { Card } from "@/components/ui/Card";
+import { ConfidenceTag } from "@/components/ui/ConfidenceTag";
+import { FlagRow } from "@/components/ui/FlagRow";
 import { Icon } from "@/components/ui/Icon";
-import { fetchReport, type Report } from "@/src/api";
+import { NearbyGrid } from "@/components/ui/NearbyGrid";
+import { ScoreBadge } from "@/components/ui/ScoreBadge";
+import { Txt } from "@/components/ui/Txt";
+import {
+  fetchConnectivity,
+  fetchReport,
+  type ConnectivityDetail,
+  type Report,
+} from "@/src/api";
 import { useI18n } from "@/src/i18n";
 import { useSaved } from "@/src/saved";
 import { scoreColor, theme } from "@/src/theme";
@@ -30,8 +40,12 @@ export default function ReportScreen() {
   const { isSaved, toggle } = useSaved();
   const insets = useSafeAreaInsets();
   const saved = isSaved(String(slug));
+
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState(false);
+  // Connectivity is a best-effort side fetch for "what's nearby": absent data is
+  // fine and simply hides the section, so it never blocks or fails the report.
+  const [nearby, setNearby] = useState<ConnectivityDetail["payload"] | null>(null);
 
   async function load() {
     setError(false);
@@ -40,11 +54,19 @@ export default function ReportScreen() {
     } catch {
       setError(true);
     }
+    try {
+      const conn = await fetchConnectivity(String(slug));
+      setNearby(conn.payload);
+    } catch {
+      setNearby(null);
+    }
   }
 
   useEffect(() => {
     void load();
   }, [slug]);
+
+  const ts = report?.trust_score;
 
   return (
     <ScrollView
@@ -58,7 +80,7 @@ export default function ReportScreen() {
       <View style={styles.topbar}>
         <Link href="/" asChild>
           <Pressable>
-            <Text style={styles.back}>← {t("report.back")}</Text>
+            <Txt style={styles.back}>← {t("report.back")}</Txt>
           </Pressable>
         </Link>
         <View style={styles.topRight}>
@@ -83,73 +105,105 @@ export default function ReportScreen() {
       )}
 
       {error && (
-        <Pressable onPress={load} style={styles.card}>
-          <Text style={styles.errorText}>{t("report.loadError")}</Text>
+        <Pressable onPress={load} style={styles.errorCard}>
+          <Txt style={styles.errorText}>{t("report.loadError")}</Txt>
         </Pressable>
       )}
 
-      {report && (
+      {report && ts && (
         <>
-          <Text style={styles.name}>{report.locality.name}</Text>
-          <Text style={styles.place}>
+          <Txt weight="extrabold" style={styles.name}>
+            {report.locality.name}
+          </Txt>
+          <Txt style={styles.place}>
             {report.locality.city}
             {report.locality.pincode ? ` · ${report.locality.pincode}` : ""}
-          </Text>
+          </Txt>
 
-          <View style={styles.scoreCard}>
-            <Text
-              style={[
-                styles.bigScore,
-                { color: scoreColor(report.trust_score.score) },
-              ]}
-            >
-              {report.trust_score.score ?? "—"}
-            </Text>
+          {/* Score card — the headline verdict, with a ring for the number. */}
+          <Card style={styles.scoreCard}>
+            <ScoreBadge score={ts.score} size="lg" />
             <View style={{ flex: 1 }}>
-              <Text style={styles.basedOn}>
-                {t("report.basedOn")} {report.trust_score.categories_counted}{" "}
-                {t("report.of")} {report.trust_score.categories_total}{" "}
-                {t("report.categories")}
-              </Text>
-              {/* Verdict comes from the API, in English for now — the same
-                  layer-2 boundary the website has. */}
-              <Text style={styles.verdict}>{report.verdict}</Text>
+              <Txt weight="bold" style={styles.eyebrow}>
+                {t("report.basedOn")} {ts.categories_counted} {t("report.of")}{" "}
+                {ts.categories_total} {t("report.categories")}
+              </Txt>
+              {/* Verdict from the API, English for now — the same layer-2
+                  boundary the website has. */}
+              <Txt style={styles.verdict}>{report.verdict}</Txt>
             </View>
+          </Card>
+
+          {/* Watch-outs */}
+          {report.flags.length > 0 && (
+            <View style={styles.section}>
+              <Txt weight="bold" style={styles.sectionTitle}>
+                {t("overview.watchOut")}
+              </Txt>
+              {report.flags.map((f, i) => (
+                <FlagRow key={`${f.category}-${i}`} flag={f} />
+              ))}
+            </View>
+          )}
+
+          {/* Insights — one card per category with its confidence and a link. */}
+          <View style={styles.section}>
+            <Txt weight="bold" style={styles.sectionTitle}>
+              {t("overview.insights")}
+            </Txt>
+            {report.categories
+              .filter((c) => c.available)
+              .map((c) => {
+                const route = DETAIL_ROUTE[c.category];
+                const inner = (
+                  <Card style={styles.catCard}>
+                    <View style={styles.catTop}>
+                      <Txt weight="bold" style={styles.catLabel}>
+                        {categoryLabel(c.category, c.label)}
+                      </Txt>
+                      {c.score !== null ? (
+                        <Txt
+                          weight="extrabold"
+                          style={[styles.catScore, { color: scoreColor(c.score) }]}
+                        >
+                          {c.score}
+                        </Txt>
+                      ) : (
+                        <Txt style={styles.catNone}>{t("common.noDataYet")}</Txt>
+                      )}
+                    </View>
+                    <View style={styles.catBottom}>
+                      <ConfidenceTag confidence={c.confidence} />
+                      {route ? (
+                        <View style={styles.detailsLink}>
+                          <Txt weight="semibold" style={styles.detailsText}>
+                            {t("report.details")}
+                          </Txt>
+                          <Icon name="chevron" size={14} color={theme.brand} />
+                        </View>
+                      ) : null}
+                    </View>
+                  </Card>
+                );
+                return route ? (
+                  <Link key={c.category} href={`/${report.locality.slug}/${route}`} asChild>
+                    <Pressable>{inner}</Pressable>
+                  </Link>
+                ) : (
+                  <View key={c.category}>{inner}</View>
+                );
+              })}
           </View>
 
-          {report.categories
-            .filter((c) => c.available)
-            .map((c) => {
-              const route = DETAIL_ROUTE[c.category];
-              const row = (
-                <View style={styles.catRow}>
-                  <Text style={styles.catLabel}>
-                    {categoryLabel(c.category, c.label)}
-                  </Text>
-                  {c.score !== null ? (
-                    <Text
-                      style={[styles.catScore, { color: scoreColor(c.score) }]}
-                    >
-                      {c.score}
-                    </Text>
-                  ) : (
-                    <Text style={styles.catNone}>{t("common.noDataYet")}</Text>
-                  )}
-                  {route ? <Text style={styles.chevron}>›</Text> : null}
-                </View>
-              );
-              return route ? (
-                <Link
-                  key={c.category}
-                  href={`/${report.locality.slug}/${route}`}
-                  asChild
-                >
-                  <Pressable>{row}</Pressable>
-                </Link>
-              ) : (
-                <View key={c.category}>{row}</View>
-              );
-            })}
+          {/* What's nearby */}
+          {nearby && (
+            <View style={styles.section}>
+              <Txt weight="bold" style={styles.sectionTitle}>
+                {t("overview.nearby")}
+              </Txt>
+              <NearbyGrid payload={nearby} />
+            </View>
+          )}
 
           <SunlightCard
             name={report.locality.name}
@@ -159,10 +213,8 @@ export default function ReportScreen() {
 
           {report.sources_used.length > 0 && (
             <View style={styles.sources}>
-              <Text style={styles.sourcesLabel}>{t("report.sources")}</Text>
-              <Text style={styles.sourcesText}>
-                {report.sources_used.join(" · ")}
-              </Text>
+              <Txt style={styles.sourcesLabel}>{t("report.sources")}</Txt>
+              <Txt style={styles.sourcesText}>{report.sources_used.join(" · ")}</Txt>
             </View>
           )}
         </>
@@ -173,51 +225,52 @@ export default function ReportScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.page },
-  back: { fontSize: 12, color: theme.inkMuted },
-  topbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  back: { fontSize: 13, color: theme.inkMuted },
+  topbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
   topRight: { flexDirection: "row", alignItems: "center", gap: 14 },
-  name: { fontSize: 24, fontWeight: "800", color: theme.ink, marginTop: 4 },
-  place: { fontSize: 13, color: theme.inkSecondary, marginTop: 2 },
+  name: { fontSize: 27, color: theme.ink, letterSpacing: -0.5, marginTop: 4 },
+  place: { fontSize: 14, color: theme.inkSecondary, marginTop: 2 },
   scoreCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 18,
     marginTop: 16,
-    borderWidth: 1,
-    borderColor: theme.hairline,
-    backgroundColor: theme.surface,
-    borderRadius: 20,
-    padding: 20,
   },
-  bigScore: { fontSize: 40, fontWeight: "800" },
-  basedOn: {
+  eyebrow: {
     fontSize: 11,
-    fontWeight: "700",
     textTransform: "uppercase",
     color: theme.brand,
     letterSpacing: 0.5,
   },
-  verdict: { fontSize: 14, fontWeight: "600", color: theme.ink, marginTop: 4 },
-  catRow: {
+  verdict: { fontSize: 14, color: theme.ink, marginTop: 6, lineHeight: 20 },
+  section: { marginTop: 24 },
+  sectionTitle: { fontSize: 18, color: theme.ink, marginBottom: 12 },
+  catCard: { marginBottom: 10, padding: 14 },
+  catTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  catLabel: { fontSize: 15, color: theme.ink },
+  catScore: { fontSize: 22 },
+  catNone: { fontSize: 12, color: theme.inkMuted },
+  catBottom: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginTop: 10,
-    borderWidth: 1,
-    borderColor: theme.hairline,
-    backgroundColor: theme.surface,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
   },
-  catLabel: { fontSize: 14, fontWeight: "600", color: theme.ink },
-  catScore: { fontSize: 18, fontWeight: "800" },
-  catNone: { fontSize: 12, color: theme.inkMuted },
-  chevron: { fontSize: 20, color: theme.inkMuted, marginLeft: 8 },
-  sources: { marginTop: 16 },
+  detailsLink: { flexDirection: "row", alignItems: "center", gap: 2 },
+  detailsText: { fontSize: 12, color: theme.brand },
+  sources: { marginTop: 24 },
   sourcesLabel: { fontSize: 10, color: theme.inkMuted },
   sourcesText: { fontSize: 12, color: theme.inkSecondary, marginTop: 4 },
-  card: {
+  errorCard: {
     marginTop: 20,
     borderWidth: 1,
     borderColor: theme.hairline,

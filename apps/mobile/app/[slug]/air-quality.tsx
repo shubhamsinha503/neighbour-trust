@@ -1,8 +1,9 @@
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { DetailScaffold, Stat, VerdictBlock } from "@/components/DetailScaffold";
+import { Txt } from "@/components/ui/Txt";
 import { fetchAirQuality, NoDataError, type AirQualityDetail } from "@/src/api";
 import { useI18n } from "@/src/i18n";
 import { scoreColor, theme } from "@/src/theme";
@@ -46,10 +47,15 @@ export default function AirQualityScreen() {
       {p && (
         <>
           <View style={styles.hero}>
-            <Text style={[styles.aqi, { color: scoreColor(100 - p.current_aqi) }]}>
+            <Txt
+              weight="extrabold"
+              style={[styles.aqi, { color: scoreColor(100 - p.current_aqi) }]}
+            >
               {Math.round(p.current_aqi)}
-            </Text>
-            <Text style={styles.band}>{data?.verdict?.band_label}</Text>
+            </Txt>
+            <Txt weight="semibold" style={styles.band}>
+              {data?.verdict?.band_label}
+            </Txt>
           </View>
           <VerdictBlock
             headline={data?.verdict?.headline}

@@ -35,6 +35,14 @@ export interface ReportCategory {
   summary: string;
 }
 
+export interface Flag {
+  category: string;
+  /** "serious" | "notable" — how much weight to give it, not a measurement. */
+  severity: string;
+  headline: string;
+  detail: string;
+}
+
 export interface Report {
   locality: {
     slug: string;
@@ -51,6 +59,7 @@ export interface Report {
     categories_total: number;
   };
   verdict: string;
+  flags: Flag[];
   categories: ReportCategory[];
   sources_used: string[];
 }
