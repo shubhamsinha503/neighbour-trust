@@ -41,12 +41,13 @@ export function Skeleton({ style }: { style?: ViewStyle | ViewStyle[] }) {
 export function LocalityRowSkeleton() {
   return (
     <View style={styles.row}>
-      <Skeleton style={{ width: 40, height: 40, borderRadius: 999 }} />
+      <Skeleton style={{ width: 56, height: 56, borderRadius: 14 }} />
       <View style={{ flex: 1, gap: 8 }}>
         <Skeleton style={{ width: "55%", height: 15 }} />
         <Skeleton style={{ width: "32%", height: 12 }} />
         <Skeleton style={{ width: "72%", height: 11 }} />
       </View>
+      <Skeleton style={{ width: 24, height: 20 }} />
     </View>
   );
 }
@@ -56,13 +57,12 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 12,
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.hairline,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    borderRadius: radius.lg,
+    padding: 10,
     marginBottom: 10,
   },
 });

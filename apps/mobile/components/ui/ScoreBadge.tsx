@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, TextInput } from "react-native";
 import Animated, {
   Easing,
   useAnimatedProps,
@@ -13,6 +13,7 @@ import { Txt } from "@/components/ui/Txt";
 import { font, scoreColor, theme } from "@/src/theme";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 type Size = "sm" | "md" | "lg";
@@ -59,6 +60,12 @@ export function ScoreBadge({ score, size = "md", showOutOf = false, animate = fa
     strokeDashoffset: c * (1 - progress.get()),
   }));
 
+  // Count the number up alongside the ring (reference: "score counts up").
+  const target = score ?? 0;
+  const numberProps = useAnimatedProps(
+    () => ({ text: String(Math.round(progress.get() * target)) }) as never,
+  );
+
   return (
     <View style={{ width: box, height: box }}>
       <Svg width={box} height={box}>
@@ -86,9 +93,27 @@ export function ScoreBadge({ score, size = "md", showOutOf = false, animate = fa
         )}
       </Svg>
       <View style={styles.center} pointerEvents="none">
-        <Txt style={{ fontFamily: font.extrabold, fontSize: num, color, lineHeight: num * 1.05 }}>
-          {score ?? "—"}
-        </Txt>
+        {shouldAnimate ? (
+          <AnimatedTextInput
+            editable={false}
+            defaultValue={String(score ?? 0)}
+            animatedProps={numberProps}
+            style={{
+              fontFamily: font.extrabold,
+              fontSize: num,
+              color,
+              padding: 0,
+              margin: 0,
+              includeFontPadding: false,
+              textAlign: "center",
+              minWidth: num * 2,
+            }}
+          />
+        ) : (
+          <Txt style={{ fontFamily: font.extrabold, fontSize: num, color, lineHeight: num * 1.05 }}>
+            {score ?? "—"}
+          </Txt>
+        )}
         {showOutOf && score !== null && (
           <Txt style={{ fontFamily: font.semibold, fontSize: num * 0.32, color: theme.inkMuted }}>
             /100
