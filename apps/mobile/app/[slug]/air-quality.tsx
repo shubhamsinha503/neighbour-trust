@@ -59,16 +59,16 @@ export default function AirQualityScreen() {
           />
           <View style={styles.grid}>
             <Stat label={t("aq.aqi")} value={String(Math.round(p.current_aqi))} />
-            {p.latest_hour_aqi !== undefined && (
+            {p.latest_hour_aqi != null && (
               <Stat
                 label={t("aq.latestHour")}
                 value={String(Math.round(p.latest_hour_aqi))}
               />
             )}
-            {p.pm2_5 !== undefined && <Stat label="PM2.5" value={String(p.pm2_5)} />}
-            {p.pm10 !== undefined && <Stat label="PM10" value={String(p.pm10)} />}
-            {p.no2 !== undefined && <Stat label="NO₂" value={String(p.no2)} />}
-            {p.o3 !== undefined && <Stat label="O₃" value={String(p.o3)} />}
+            {p.pm2_5 != null && <Stat label="PM2.5" value={String(p.pm2_5)} />}
+            {p.pm10 != null && <Stat label="PM10" value={String(p.pm10)} />}
+            {p.no2 != null && <Stat label="NO₂" value={String(p.no2)} />}
+            {p.o3 != null && <Stat label="O₃" value={String(p.o3)} />}
             {p.dominant_pollutant && (
               <Stat label={t("aq.dominant")} value={p.dominant_pollutant} />
             )}
@@ -77,7 +77,7 @@ export default function AirQualityScreen() {
                 label={t("aq.station")}
                 value={p.station_name}
                 sub={
-                  p.nearest_station_km !== undefined
+                  p.nearest_station_km != null
                     ? `${p.nearest_station_km.toFixed(1)} ${t("aq.km")}`
                     : undefined
                 }

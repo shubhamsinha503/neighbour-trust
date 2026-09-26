@@ -58,7 +58,7 @@ export default function SchoolsScreen() {
               label={t("schools.staffingKnown")}
               value={String(p.schools_with_staffing_data)}
             />
-            {p.median_pupil_teacher_ratio !== undefined && (
+            {p.median_pupil_teacher_ratio != null && (
               <Stat
                 label={t("schools.ptr")}
                 value={String(p.median_pupil_teacher_ratio)}
@@ -72,7 +72,7 @@ export default function SchoolsScreen() {
               {p.nearest_schools.slice(0, 8).map((s, i) => (
                 <View key={`${s.name}-${i}`} style={styles.schoolRow}>
                   <Text style={styles.schoolName}>{s.name}</Text>
-                  {s.distance_km !== undefined && (
+                  {s.distance_km != null && (
                     <Text style={styles.schoolDist}>
                       {s.distance_km.toFixed(1)} {t("aq.km")}
                     </Text>
