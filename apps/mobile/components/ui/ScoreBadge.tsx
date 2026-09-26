@@ -15,6 +15,8 @@ const DIMS: Record<Size, { box: number; stroke: number; num: number }> = {
 interface Props {
   score: number | null;
   size?: Size;
+  /** Show a small "/100" under the number (used on the overview hero ring). */
+  showOutOf?: boolean;
 }
 
 /**
@@ -22,7 +24,7 @@ interface Props {
  * the score, colour by band) around the number. Null scores render an empty grey
  * ring with an em dash, matching the report's "no data yet" state.
  */
-export function ScoreBadge({ score, size = "md" }: Props) {
+export function ScoreBadge({ score, size = "md", showOutOf = false }: Props) {
   const { box, stroke, num } = DIMS[size];
   const r = (box - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -55,11 +57,14 @@ export function ScoreBadge({ score, size = "md" }: Props) {
         )}
       </Svg>
       <View style={styles.center} pointerEvents="none">
-        <Txt
-          style={{ fontFamily: font.extrabold, fontSize: num, color }}
-        >
+        <Txt style={{ fontFamily: font.extrabold, fontSize: num, color, lineHeight: num * 1.05 }}>
           {score ?? "—"}
         </Txt>
+        {showOutOf && score !== null && (
+          <Txt style={{ fontFamily: font.semibold, fontSize: num * 0.32, color: theme.inkMuted }}>
+            /100
+          </Txt>
+        )}
       </View>
     </View>
   );

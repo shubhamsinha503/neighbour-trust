@@ -22,8 +22,12 @@ export interface LocalitySummary {
   city: string;
   state: string;
   pincode: string | null;
+  lat: number;
+  lon: number;
   score: number | null;
   categories_with_data: number;
+  /** The single most important flag for the list line, or null. */
+  top_flag: Flag | null;
 }
 
 export interface ReportCategory {
