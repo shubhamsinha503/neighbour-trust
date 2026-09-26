@@ -19,6 +19,7 @@ import { FlagRow } from "@/components/ui/FlagRow";
 import { Icon } from "@/components/ui/Icon";
 import { NearbyList } from "@/components/ui/NearbyList";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
+import { Signal } from "@/components/ui/Signal";
 import { Txt } from "@/components/ui/Txt";
 import {
   fetchConnectivity,
@@ -69,6 +70,25 @@ export default function ReportScreen() {
   }, [slug]);
 
   const ts = report?.trust_score;
+
+  // Honest "at a glance" signals derived from real category scores: the highest
+  // scored area (only when genuinely strong) and the lowest (only when weak
+  // enough to flag), so a locality that's strong everywhere shows no false caution.
+  const scored = report?.categories.filter((c) => c.available && c.score !== null) ?? [];
+  const strongest = scored.reduce<(typeof scored)[number] | null>(
+    (best, c) => (best === null || (c.score ?? 0) > (best.score ?? 0) ? c : best),
+    null,
+  );
+  const weakest = scored.reduce<(typeof scored)[number] | null>(
+    (low, c) => (low === null || (c.score ?? 0) < (low.score ?? 0) ? c : low),
+    null,
+  );
+  const showStrong = strongest !== null && (strongest.score ?? 0) >= 70;
+  const showWeak =
+    weakest !== null &&
+    strongest !== null &&
+    weakest.category !== strongest.category &&
+    (weakest.score ?? 0) < 55;
 
   async function onShare() {
     if (!report) return;
@@ -154,6 +174,33 @@ export default function ReportScreen() {
               <Txt style={styles.verdict}>{report.verdict}</Txt>
             </View>
           </Card>
+
+          {/* At a glance — real strongest / weakest measured areas */}
+          {(showStrong || showWeak) && (
+            <View style={styles.section}>
+              <Txt weight="bold" style={styles.sectionTitle}>
+                {t("overview.atGlance")}
+              </Txt>
+              {showStrong && strongest && (
+                <Signal
+                  tone="positive"
+                  title={t("overview.strongest")}
+                  detail={t("overview.strongestDetail")
+                    .replace("{cat}", categoryLabel(strongest.category, strongest.label))
+                    .replace("{n}", String(strongest.score))}
+                />
+              )}
+              {showWeak && weakest && (
+                <Signal
+                  tone="caution"
+                  title={t("overview.weakest")}
+                  detail={t("overview.weakestDetail")
+                    .replace("{cat}", categoryLabel(weakest.category, weakest.label))
+                    .replace("{n}", String(weakest.score))}
+                />
+              )}
+            </View>
+          )}
 
           {/* Watch-outs */}
           {report.flags.length > 0 && (
