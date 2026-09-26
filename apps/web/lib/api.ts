@@ -465,6 +465,42 @@ export async function fetchVisitorPrefCity(visitorId: string): Promise<string | 
   }
 }
 
+export interface RecentView {
+  slug: string;
+  name: string;
+  city: string;
+  viewedAt: string;
+}
+
+export async function fetchVisitorViews(
+  visitorId: string,
+  limit = 6,
+): Promise<RecentView[]> {
+  // A consented visitor's recently opened localities, newest first, for the
+  // home page. Same rules as fetchVisitorPrefCity: the id travels in a header,
+  // and any trouble just means "no history" rather than a failed render.
+  try {
+    const response = await fetch(`${API_BASE}/api/v1/prefs/views?limit=${limit}`, {
+      headers: { "x-visitor-id": visitorId },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return [];
+    const raw = (await response.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((r) => typeof r.slug === "string" && typeof r.name === "string")
+      .map((r) => ({
+        slug: r.slug as string,
+        name: r.name as string,
+        city: String(r.city ?? ""),
+        viewedAt: String(r.viewed_at ?? ""),
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchVisitTotal(): Promise<number> {
   // A single-row read, and the number people watch tick up — so it is fetched
   // fresh on every render rather than cached. The client bumps it live on load;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/components/LanguageProvider";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 
@@ -115,6 +116,7 @@ export function LocalitySearch({
    * already chosen their route, so whatever sits here steps out of the way. */
   belowInput?: React.ReactNode;
 }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   // Remembered across visits in a first-party preference cookie (see
   // lib/preferences.ts). `initialCity` is what the server read from that cookie,
@@ -250,7 +252,7 @@ export function LocalitySearch({
               void lookUp(query);
             }
           }}
-          placeholder="Locality, pincode, apartment, road or landmark"
+          placeholder={t("search.placeholder")}
           aria-label="Search by locality, pincode, apartment, road or landmark"
           enterKeyHint="search"
           className="w-full rounded-2xl border-[1.5px] border-hairline bg-surface-1 py-4 pl-12 pr-4 text-[15px] outline-none transition-colors placeholder:text-ink-muted focus:border-brand"
@@ -267,7 +269,7 @@ export function LocalitySearch({
         * a pincode, a place — are shown rather than described. */}
       {!searching && examples.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 px-1">
-          <span className="text-[11.5px] text-ink-muted">Try</span>
+          <span className="text-[11.5px] text-ink-muted">{t("search.try")}</span>
           {examples.map((example) => (
             <button
               key={example}

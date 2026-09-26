@@ -7,11 +7,13 @@
  *
  *   POST   { grant: boolean }  — the banner's answer. On grant we mint an opaque
  *                                visitor id and set it HttpOnly, plus a readable
- *                                nt_consent=granted so the banner never asks
- *                                again. On decline we set nt_consent=denied and
+ *                                nt_consent=granted-v2 so the banner never asks
+ *                                again (versioned — see lib/preferences.ts).
+ *                                The id also keys the view history. On decline we set nt_consent=denied and
  *                                make sure no id exists.
  *   DELETE                     — withdraw and forget: erase the server row for
- *                                this visitor, drop the id, record denial.
+ *                                this visitor (and, by cascade, their view
+ *                                history), drop the id, record denial.
  *
  * The id is set HttpOnly on purpose: the browser sends it to our server on every
  * request (so we can read a preference), but page scripts — and anything that
@@ -22,7 +24,7 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { CONSENT_COOKIE, VISITOR_COOKIE } from "@/lib/preferences";
+import { CONSENT_COOKIE, CONSENT_GRANTED, VISITOR_COOKIE } from "@/lib/preferences";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
       path: "/",
       maxAge: ONE_YEAR_SECONDS,
     });
-    res.cookies.set(CONSENT_COOKIE, "granted", {
+    res.cookies.set(CONSENT_COOKIE, CONSENT_GRANTED, {
       httpOnly: false,
       sameSite: "lax",
       secure: SECURE,

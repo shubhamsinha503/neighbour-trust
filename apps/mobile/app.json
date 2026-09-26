@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Neighbour Trust",
+    "slug": "neighbour-trust",
+    "scheme": "neighbourtrust",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#FBFBFA"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.neighbourtrust.app"
+    },
+    "android": {
+      "package": "com.neighbourtrust.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-asset"
+    ],
+    "extra": {
+      "router": {}
+    }
+  }
+}

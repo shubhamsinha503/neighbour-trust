@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -10,8 +11,12 @@ import { LogoMark } from "@/components/Logo";
 import { authConfigured } from "@/lib/auth";
 import {
   fetchLocalitySummaries,
+  fetchVisitorViews,
   type LocalitySummary,
+  type RecentView,
 } from "@/lib/api";
+import { VISITOR_COOKIE } from "@/lib/preferences";
+import { getServerT } from "@/lib/i18n-server";
 import { readSavedCity } from "@/lib/serverPrefs";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +43,8 @@ export const dynamic = "force-dynamic";
 // The pincode is one no locality stores, so tapping it shows the place lookup.
 const EXAMPLES = ["Koramangala", "560092", "Cyber Hub"];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { t } = await getServerT();
   return (
     <main className="mx-auto max-w-3xl px-4 pb-10 pt-8 sm:pt-12">
       <Masthead />
@@ -47,15 +53,13 @@ export default function HomePage() {
         {/* Coverage is stated by the city tiles further down rather than a badge
           * here, so the hero opens straight on the headline. */}
         <h1 className="text-[30px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[38px]">
-          Know the neighbourhood
+          {t("home.hero1")}
           <br />
-          before you commit to it.
+          {t("home.hero2")}
         </h1>
 
         <p className="mt-3 max-w-xl text-[14.5px] leading-[1.6] text-ink-secondary">
-          Search a locality, pincode, apartment or landmark. See its schools,
-          safety, air, water and connectivity — with the source and date behind
-          every number.
+          {t("home.heroSub")}
         </p>
 
         <div className="mt-6">
@@ -71,21 +75,29 @@ export default function HomePage() {
 }
 
 async function SearchSection() {
+  const { t } = await getServerT();
   let localities: LocalitySummary[];
   try {
     localities = await fetchLocalitySummaries();
   } catch {
     return (
       <div className="rounded-2xl border border-hairline bg-surface-1 p-4 text-[12.5px] text-ink-secondary">
-        Couldn&apos;t load the localities just now. Please refresh in a moment.
+        {t("home.loadError")}
       </div>
     );
   }
 
   // The city the visitor last chose, painted on the first frame so there is no
   // flash from empty to filtered. Resolved by the shared helper so this and the
-  // localities list agree on what "your city" is.
-  const initialCity = await readSavedCity(new Set(localities.map((l) => l.city)));
+  // localities list agree on what "your city" is. The recently-viewed strip is
+  // per consented visitor, so it needs the visitor id the helper hides — read it
+  // here and fetch the two in parallel.
+  const knownCities = new Set(localities.map((l) => l.city));
+  const visitorId = (await cookies()).get(VISITOR_COOKIE)?.value ?? null;
+  const [initialCity, recent] = await Promise.all([
+    readSavedCity(knownCities),
+    visitorId ? fetchVisitorViews(visitorId) : Promise.resolve([] as RecentView[]),
+  ]);
 
   return (
     <>
@@ -96,6 +108,7 @@ async function SearchSection() {
         initialCity={initialCity}
         belowInput={
           <div className="mt-5">
+            {recent.length > 0 && <RecentlyViewed views={recent} />}
             <NearMe key="near-me" localities={localities} />
             <Coverage localities={localities} />
           </div>
@@ -106,12 +119,44 @@ async function SearchSection() {
 }
 
 /**
+ * The localities this visitor opened lately — only ever present for someone who
+ * accepted the banner, since history is recorded for no one else. Their own
+ * record, shown back to them; "forget me" on the privacy page erases it.
+ */
+async function RecentlyViewed({ views }: { views: RecentView[] }) {
+  const { t } = await getServerT();
+  return (
+    <div className="mb-5">
+      <div className="mb-2 flex items-baseline justify-between px-0.5">
+        <div className="text-[12px] font-semibold text-ink-secondary">{t("home.recentlyViewed")}</div>
+        <Link href="/privacy" className="text-[11.5px] text-ink-muted hover:underline">
+          {t("home.manage")}
+        </Link>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {views.map((v) => (
+          <Link
+            key={v.slug}
+            href={`/${v.slug}`}
+            className="rounded-full border border-hairline bg-surface-1 px-3 py-1.5 text-[12.5px] font-semibold text-ink-primary transition-colors hover:bg-brand-soft"
+          >
+            {v.name}
+            <span className="ml-1 font-normal text-ink-muted">· {v.city}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * How much of each city is covered, with the way into the full list.
  *
  * Counts come from the same list the search runs over, so the number here and
  * the number of things you can find cannot disagree.
  */
-function Coverage({ localities }: { localities: LocalitySummary[] }) {
+async function Coverage({ localities }: { localities: LocalitySummary[] }) {
+  const { t } = await getServerT();
   const byCity = new Map<string, number>();
   for (const locality of localities) {
     byCity.set(locality.city, (byCity.get(locality.city) ?? 0) + 1);
@@ -132,7 +177,7 @@ function Coverage({ localities }: { localities: LocalitySummary[] }) {
       </div>
       <div className="mt-3 flex items-center justify-end px-0.5">
         <Link href="/localities" className="text-[12px] font-semibold text-brand hover:underline">
-          Browse all localities →
+          {t("common.browseAll")}
         </Link>
       </div>
     </div>

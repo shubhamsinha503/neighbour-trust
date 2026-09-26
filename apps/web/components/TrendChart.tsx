@@ -18,9 +18,11 @@
  *     wants the numbers.
  */
 
+import { useT } from "@/components/LanguageProvider";
 import { useMemo, useState } from "react";
 import type { TrendPoint } from "@schema/envelope";
 import { BAND_LABEL, bandForAqi } from "@/lib/aqi";
+import { bandLabel } from "@/lib/i18n";
 
 const WIDTH = 680;
 const HEIGHT = 220;
@@ -47,6 +49,7 @@ interface Props {
 }
 
 export function TrendChart({ points }: Props) {
+  const t = useT();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const model = useMemo(() => buildModel(points), [points]);
@@ -230,7 +233,7 @@ export function TrendChart({ points }: Props) {
             {longDate(hovered.day)}
           </div>
           <div className="text-[11px] text-ink-secondary">
-            AQI {Math.round(hovered.aqi)} · {BAND_LABEL[bandForAqi(hovered.aqi)]}
+            AQI {Math.round(hovered.aqi)} · {bandLabel(t, bandForAqi(hovered.aqi), BAND_LABEL[bandForAqi(hovered.aqi)])}
           </div>
           <div className="text-[9.5px] text-ink-muted">
             {hovered.observationCount} reading
@@ -246,10 +249,10 @@ export function TrendChart({ points }: Props) {
         <table className="mt-2 w-full text-left text-[10.5px] text-ink-secondary">
           <thead className="text-ink-muted">
             <tr>
-              <th className="py-1 font-medium">Date</th>
-              <th className="py-1 font-medium">AQI</th>
-              <th className="py-1 font-medium">Band</th>
-              <th className="py-1 font-medium">Readings</th>
+              <th className="py-1 font-medium">{t("trend.date")}</th>
+              <th className="py-1 font-medium">{t("trend.aqi")}</th>
+              <th className="py-1 font-medium">{t("trend.band")}</th>
+              <th className="py-1 font-medium">{t("trend.readings")}</th>
             </tr>
           </thead>
           <tbody>
@@ -257,7 +260,7 @@ export function TrendChart({ points }: Props) {
               <tr key={point.day} className="border-t border-gridline">
                 <td className="py-1">{longDate(point.day)}</td>
                 <td className="py-1">{Math.round(point.aqi)}</td>
-                <td className="py-1">{BAND_LABEL[bandForAqi(point.aqi)]}</td>
+                <td className="py-1">{bandLabel(t, bandForAqi(point.aqi), BAND_LABEL[bandForAqi(point.aqi)])}</td>
                 <td className="py-1">{point.observationCount}</td>
               </tr>
             ))}

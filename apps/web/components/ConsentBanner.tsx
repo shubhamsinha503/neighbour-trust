@@ -3,19 +3,22 @@
 /**
  * The one consent this site asks for.
  *
- * Personalising across visits and devices means keeping preferences against a
- * per-person id, and that is the thing the privacy page says we ask before
- * doing. This banner is the asking. It appears once, until answered; the answer
+ * Personalising across visits and devices means keeping preferences — and a
+ * history of which localities were opened — against a per-person id, and that
+ * is the thing the privacy page says we ask before doing. This banner is the asking. It appears once, until answered; the answer
  * is remembered in a readable cookie so it never nags again.
  *
  * Everything here is opt-in and reversible: "No thanks" stores a plain denial
  * and nothing else, and even after "Yes" the privacy page has a one-tap "forget
  * me". The functional city cookie the app already sets is a separate, local
  * thing that needs no consent — this is only about the server-side profile.
+ * Anyone who said yes to the older wording (preferences only) is asked again,
+ * because history is something that wording never mentioned.
  */
 
 import { useEffect, useState } from "react";
 
+import { useT } from "@/components/LanguageProvider";
 import { PREF_CITY_COOKIE, readConsent } from "@/lib/preferences";
 
 function readCity(): string | null {
@@ -29,11 +32,15 @@ function readCity(): string | null {
 export function ConsentBanner() {
   // `null` until mounted, so the server and the first client render agree on
   // "nothing", and the banner only appears once we have read the cookie.
+  const t = useT();
   const [show, setShow] = useState<boolean>(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setShow(readConsent() === null);
+    // "outdated" is a yes to an older banner that asked about preferences
+    // only; history is a new ask, so it is asked again.
+    const consent = readConsent();
+    setShow(consent === null || consent === "outdated");
   }, []);
 
   async function answer(grant: boolean) {
@@ -68,19 +75,17 @@ export function ConsentBanner() {
   return (
     <div
       role="dialog"
-      aria-label="Remember my preferences"
+      aria-label={t("consent.title")}
       className="fixed inset-x-0 bottom-0 z-50 px-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-2"
     >
       <div className="mx-auto max-w-3xl rounded-2xl border border-hairline bg-surface-1 p-4 shadow-[0_6px_24px_rgba(0,0,0,0.12)]">
         <p className="text-[13px] leading-[1.6] text-ink-secondary">
           <span className="font-semibold text-ink-primary">
-            Remember your preferences?
+            {t("consent.title")}
           </span>{" "}
-          We can keep the city you look at on our side, tied to a private id that
-          never shows who you are — so it&apos;s remembered for you, and carries
-          across your devices once you sign in. You can undo it anytime.{" "}
+          {t("consent.body")}{" "}
           <a href="/privacy" className="font-semibold text-brand hover:underline">
-            How this works
+            {t("consent.how")}
           </a>
           .
         </p>
@@ -91,7 +96,7 @@ export function ConsentBanner() {
             onClick={() => answer(true)}
             className="rounded-xl bg-brand px-4 py-2 text-[13px] font-semibold text-white transition-opacity disabled:opacity-50"
           >
-            Yes, remember
+            {t("consent.yes")}
           </button>
           <button
             type="button"
@@ -99,7 +104,7 @@ export function ConsentBanner() {
             onClick={() => answer(false)}
             className="rounded-xl bg-page-plane px-4 py-2 text-[13px] font-semibold text-ink-secondary transition-opacity disabled:opacity-50"
           >
-            No thanks
+            {t("consent.no")}
           </button>
         </div>
       </div>

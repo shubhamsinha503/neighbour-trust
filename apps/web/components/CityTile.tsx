@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { useT } from "@/components/LanguageProvider";
 import { saveCityPreference } from "@/lib/preferences";
 
 /**
@@ -21,6 +22,7 @@ export function CityTile({
   count: number;
   href: string;
 }) {
+  const t = useT();
   return (
     <Link
       href={href}
@@ -29,7 +31,7 @@ export function CityTile({
     >
       <div className="text-[14px] font-semibold text-ink-primary">{city}</div>
       <div className="mt-0.5 text-[12px] text-ink-secondary">
-        {count} localities
+        {count} {t("common.localities")}
       </div>
     </Link>
   );

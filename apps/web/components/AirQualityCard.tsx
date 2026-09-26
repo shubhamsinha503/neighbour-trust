@@ -14,6 +14,8 @@
  *      rather than a footer, per Prominence-Interpretation Theory)
  */
 
+import { useT } from "@/components/LanguageProvider";
+import { bandLabel } from "@/lib/i18n";
 import type { AirQualityPayload, Confidence } from "@schema/envelope";
 import {
   BAND_COLOR,
@@ -27,6 +29,7 @@ import {
 import type { AirQualityView } from "@/lib/api";
 
 export function AirQualityCard({ view }: { view: AirQualityView }) {
+  const t = useT();
   const { payload, verdict, locality } = view;
   const bandColor = BAND_COLOR[payload.aqiBand];
 
@@ -73,31 +76,31 @@ export function AirQualityCard({ view }: { view: AirQualityView }) {
       {/* 2 — stat tiles */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <StatTile
-          label="AQI (24-hr)"
+          label={t("aq.aqi24")}
           value={Math.round(payload.currentAqi).toString()}
-          sub={BAND_LABEL[payload.aqiBand]}
+          sub={bandLabel(t, payload.aqiBand, BAND_LABEL[payload.aqiBand])}
           accent={bandColor}
         />
         <StatTile
-          label="PM2.5"
+          label={t("aq.pm25")}
           value={payload.pm25 !== undefined ? payload.pm25.toFixed(1) : "—"}
           sub="µg/m³"
         />
         <StatTile
-          label="PM10"
+          label={t("aq.pm10")}
           value={payload.pm10 !== undefined ? payload.pm10.toFixed(1) : "—"}
           sub="µg/m³"
         />
         <StatTile
-          label={payload.aqiBasis === "cams_model" ? "Source" : "Nearest station"}
+          label={payload.aqiBasis === "cams_model" ? t("aq.source") : t("aq.nearestStation")}
           value={
             payload.aqiBasis === "cams_model"
-              ? "Model"
+              ? t("aq.model")
               : payload.nearestStationKm !== undefined
                 ? `${payload.nearestStationKm.toFixed(1)}`
                 : "—"
           }
-          sub={payload.aqiBasis === "cams_model" ? "no live station" : "km away"}
+          sub={payload.aqiBasis === "cams_model" ? t("aq.noLiveStation") : t("aq.kmAway")}
         />
       </div>
 
@@ -125,7 +128,7 @@ export function AirQualityCard({ view }: { view: AirQualityView }) {
       {payload.latestHourAqi !== undefined && (
         <p className="mt-1.5 text-[11px] text-ink-muted">
           Most recent hour alone: AQI {Math.round(payload.latestHourAqi)} (
-          {BAND_LABEL[bandForAqi(payload.latestHourAqi)]}). The headline figure
+          {bandLabel(t, bandForAqi(payload.latestHourAqi), BAND_LABEL[bandForAqi(payload.latestHourAqi)])}). The headline figure
           averages the last 24 hours, which is how CPCB defines the index.
         </p>
       )}
@@ -133,7 +136,7 @@ export function AirQualityCard({ view }: { view: AirQualityView }) {
 
       {/* 5 — sources and confidence, in the main flow */}
       <footer className="mt-4 border-t border-dashed border-gridline pt-3">
-        <div className="mb-2 text-[9.5px] text-ink-muted">Data pulled from</div>
+        <div className="mb-2 text-[9.5px] text-ink-muted">{t("report.dataPulledFrom")}</div>
         <div className="flex flex-wrap items-center gap-2">
           {payload.sourcesUsed.map((source) => (
             <span

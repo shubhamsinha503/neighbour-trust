@@ -11,6 +11,7 @@
  * person is sent (see app/privacy). One request per query per page view.
  */
 
+import { useT } from "@/components/LanguageProvider";
 import { useState } from "react";
 
 export type RequestContext = {
@@ -45,6 +46,7 @@ export function RequestLocality({
   /** "card" where the search found nothing; "link" beneath results that may not be it. */
   variant?: "card" | "link";
 }) {
+  const t = useT();
   const already = sentThisVisit.get(keyOf(context.query));
   const [state, setState] = useState<State>(
     already ? { status: "sent", times: already } : { status: "idle" },
@@ -59,7 +61,7 @@ export function RequestLocality({
     }).catch(() => null);
     const data = await response?.json().catch(() => null);
     if (!response || !response.ok) {
-      setState({ status: "failed", message: data?.detail ?? "Couldn't send that. Please try again." });
+      setState({ status: "failed", message: data?.detail ?? t("rl.failed") });
       return;
     }
     const times = typeof data?.times_requested === "number" ? data.times_requested : 1;
@@ -97,8 +99,8 @@ export function RequestLocality({
           className="text-left text-[11.5px] font-medium text-ink-secondary underline decoration-dotted underline-offset-2 hover:text-brand disabled:opacity-60"
         >
           {state.status === "sending"
-            ? "Sending…"
-            : `Not the locality you wanted? Ask us to add “${name}”`}
+            ? t("rl.sending")
+            : t("rl.notWanted").replace("{name}", name)}
         </button>
         {state.status === "failed" && (
           <p className="mt-1 text-[11px] text-[#c0442c]">{state.message}</p>
@@ -110,7 +112,7 @@ export function RequestLocality({
   return (
     <div className="mt-3 border-t border-dashed border-gridline pt-3">
       <p className="text-[12px] leading-[1.5] text-ink-secondary">
-        Want us to cover it? Tell us — the most-requested places are added first.
+        {t("rl.wantCover")}
       </p>
       <button
         type="button"
@@ -118,7 +120,7 @@ export function RequestLocality({
         disabled={state.status === "sending"}
         className="mt-2 rounded-xl border border-brand px-3.5 py-2 text-[12.5px] font-semibold text-brand hover:bg-brand-soft disabled:opacity-60"
       >
-        {state.status === "sending" ? "Sending…" : `Ask us to add “${name}”`}
+        {state.status === "sending" ? t("rl.sending") : t("rl.askAdd").replace("{name}", name)}
       </button>
       {state.status === "failed" && (
         <p className="mt-1.5 text-[11.5px] text-[#c0442c]">{state.message}</p>

@@ -17,6 +17,7 @@
  * second one.
  */
 
+import { useT } from "@/components/LanguageProvider";
 import { useState } from "react";
 
 export interface Origin {
@@ -63,6 +64,7 @@ export function MeasureFrom({
   origin: Origin | null;
   onChange: (origin: Origin | null) => void;
 }) {
+  const t = useT();
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export function MeasureFrom({
       });
       const body = await response.json();
       if (!response.ok) {
-        setError(body.error ?? "That address could not be found.");
+        setError(body.error ?? t("mf.notFound"));
         return;
       }
 
@@ -103,7 +105,7 @@ export function MeasureFrom({
       }
       onChange({ lat: body.lat, lon: body.lon, label: body.label });
     } catch {
-      setError("Could not reach the address lookup. Try again in a moment.");
+      setError(t("mf.lookupFail"));
     } finally {
       setBusy(false);
     }
@@ -124,15 +126,15 @@ export function MeasureFrom({
           className="w-full text-[11px] font-semibold text-ink-secondary"
         >
           {origin
-            ? "Measuring from your address"
-            : `Measuring from the centre of ${localityName}`}
+            ? t("mf.fromAddress")
+            : t("mf.fromCentre").replace("{name}", localityName)}
         </label>
         <input
           id="measure-from"
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Enter an address, road or landmark"
+          placeholder={t("mf.placeholder")}
           className="min-w-0 flex-1 rounded-xl border border-gridline bg-surface-1 px-3 py-2 text-[12.5px] text-ink-primary placeholder:text-ink-muted focus:border-brand focus:outline-none"
         />
         <button
@@ -140,7 +142,7 @@ export function MeasureFrom({
           disabled={busy || value.trim().length < 3}
           className="rounded-xl bg-brand px-3.5 py-2 text-[12px] font-semibold text-white disabled:opacity-40"
         >
-          {busy ? "Finding…" : "Measure"}
+          {busy ? t("mf.finding") : t("mf.measure")}
         </button>
         {origin && (
           <button

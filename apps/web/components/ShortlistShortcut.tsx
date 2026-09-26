@@ -9,11 +9,13 @@
  * count is known, so it never pushes the page down after it has painted.
  */
 
+import { useT } from "@/components/LanguageProvider";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
 export function ShortlistShortcut() {
+  const t = useT();
   const { data: session } = useSession();
   const [count, setCount] = useState<number | null>(null);
 
@@ -41,12 +43,12 @@ export function ShortlistShortcut() {
       className="mt-6 flex items-center justify-between gap-3 rounded-2xl border border-brand/30 bg-brand-soft px-4 py-3.5 transition-colors hover:border-brand"
     >
       <span className="text-[13.5px] text-brand-deep">
-        {firstName ? `Welcome back, ${firstName}. ` : ""}
+        {firstName ? t("sc.welcomeBack").replace("{name}", firstName) : ""}
         <span className="font-semibold">
-          ♥ Your shortlist · {count} {count === 1 ? "locality" : "localities"}
+          ♥ {t("sc.yourShortlist")} · {count} {count === 1 ? t("sc.locality") : t("sc.localities")}
         </span>
       </span>
-      <span className="text-[13px] font-semibold text-brand-deep">Open →</span>
+      <span className="text-[13px] font-semibold text-brand-deep">{t("sc.open")}</span>
     </Link>
   );
 }

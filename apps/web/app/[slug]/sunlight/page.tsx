@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getServerT } from "@/lib/i18n-server";
+import { categoryLabel } from "@/lib/i18n";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -27,6 +29,7 @@ export default async function SunlightMapPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const { t } = await getServerT();
 
   let report = null;
   try {
@@ -41,16 +44,16 @@ export default async function SunlightMapPage({
         href={`/${slug}`}
         className="text-[11px] text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink-secondary"
       >
-        ← {report?.locality.name ?? "Back"}
+        ← {report?.locality.name ?? t("back.report")}
       </Link>
 
       <h1 className="mt-3 text-[23px] font-bold tracking-[-0.01em]">
-        Sun &amp; shadow
+        {t("sun.pageTitle")}
       </h1>
       <p className="mt-1.5 mb-5 max-w-xl text-[13px] leading-[1.6] text-ink-secondary">
         {report
-          ? `Drag the time slider to see how shade moves across ${report.locality.name} through the day. Blue is shade, clear is sun.`
-          : "Couldn't load this locality just now. Please refresh in a moment."}
+          ? t("sun.pageIntro").replace("{name}", report.locality.name)
+          : t("sun.pageLoadError")}
       </p>
 
       {report && (

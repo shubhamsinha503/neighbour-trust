@@ -10,6 +10,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { categoryLabel } from "@/lib/i18n";
+import { getServerT } from "@/lib/i18n-server";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export const metadata: Metadata = { title: "Compare localities" };
@@ -44,6 +47,7 @@ export default async function ComparePage({
   searchParams: Promise<{ slugs?: string }>;
 }) {
   const { slugs = "" } = await searchParams;
+  const { t } = await getServerT();
   const clean = slugs
     .split(",")
     .map((s) => s.trim())
@@ -63,7 +67,7 @@ export default async function ComparePage({
       if (!r.ok) error = data?.detail ?? "Could not load the comparison.";
       else localities = data.localities;
     } catch {
-      error = "Could not reach the server. Try again.";
+      error = t("compare.unreachable");
     }
   }
 
@@ -77,9 +81,9 @@ export default async function ComparePage({
         href="/shortlist"
         className="text-[11px] text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink-secondary"
       >
-        ← My shortlist
+        ← {t("back.shortlist")}
       </Link>
-      <h1 className="mt-3 text-[23px] font-bold tracking-[-0.01em]">Compare localities</h1>
+      <h1 className="mt-3 text-[23px] font-bold tracking-[-0.01em]">{t("compare.title")}</h1>
 
       {error ? (
         <p className="mt-4 text-[13px] text-ink-secondary">{error}</p>
@@ -101,21 +105,21 @@ export default async function ComparePage({
             </thead>
             <tbody>
               <tr>
-                <th className={head}>Trust Score</th>
+                <th className={head}>{t("common.trustScore")}</th>
                 {localities.map((l) => (
                   <td key={l.slug} className={cell}>
                     <span className="text-[22px] font-bold tabular-nums" style={{ color: colour(l.score) }}>
                       {l.score ?? "—"}
                     </span>
                     <div className="text-[10.5px] text-ink-muted">
-                      from {l.categories_counted} of {l.categories_total} categories
+                      {t("compare.from")} {l.categories_counted} {t("compare.of")} {l.categories_total} {t("compare.categoriesWord")}
                     </div>
                   </td>
                 ))}
               </tr>
               {rows.map(({ key, label }) => (
                 <tr key={key}>
-                  <th className={head}>{label}</th>
+                  <th className={head}>{categoryLabel(t, key, label)}</th>
                   {localities.map((l) => {
                     const c = l.categories.find((x) => x.category === key);
                     return (
@@ -127,11 +131,11 @@ export default async function ComparePage({
                           >
                             {c.score}
                             {c.is_baseline && (
-                              <span className="ml-1 text-[9.5px] font-semibold uppercase">baseline</span>
+                              <span className="ml-1 text-[9.5px] font-semibold uppercase">{t("compare.baseline")}</span>
                             )}
                           </span>
                         ) : (
-                          <span className="text-ink-muted">No data yet</span>
+                          <span className="text-ink-muted">{t("common.noDataYet")}</span>
                         )}
                       </td>
                     );
@@ -139,7 +143,7 @@ export default async function ComparePage({
                 </tr>
               ))}
               <tr>
-                <th className={head}>Flags</th>
+                <th className={head}>{t("compare.flags")}</th>
                 {localities.map((l) => (
                   <td key={l.slug} className={`${cell} text-[11.5px] text-ink-secondary`}>
                     {l.flags.length ? (
@@ -149,13 +153,13 @@ export default async function ComparePage({
                         ))}
                       </ul>
                     ) : (
-                      <span className="text-ink-muted">Nothing flagged</span>
+                      <span className="text-ink-muted">{t("compare.nothingFlagged")}</span>
                     )}
                   </td>
                 ))}
               </tr>
               <tr>
-                <th className={head}>Reported as coming</th>
+                <th className={head}>{t("compare.reportedComing")}</th>
                 {localities.map((l) => (
                   <td key={l.slug} className={`${cell} text-[11.5px] text-ink-secondary`}>
                     {l.upcoming.length ? (
@@ -165,7 +169,7 @@ export default async function ComparePage({
                         ))}
                       </ul>
                     ) : (
-                      <span className="text-ink-muted">Nothing reported</span>
+                      <span className="text-ink-muted">{t("compare.nothingReported")}</span>
                     )}
                   </td>
                 ))}

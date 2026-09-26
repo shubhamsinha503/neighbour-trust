@@ -14,6 +14,7 @@
  * model reaches for an adjacent fact.
  */
 
+import { useT } from "@/components/LanguageProvider";
 import { useState } from "react";
 import { AnswerSkeleton, SkeletonRegion } from "@/components/Skeleton";
 import { splitCitations } from "@/lib/citations";
@@ -35,11 +36,7 @@ type AskResult = {
 
 // Starting points, not a menu. Each is a question a buyer actually asks and
 // that the data can at least honestly decline.
-const SUGGESTIONS = [
-  "Is there a metro nearby or coming?",
-  "Has flooding or waterlogging been reported?",
-  "What has been reported about safety?",
-];
+const SUGGESTION_KEYS = ["ask.s1", "ask.s2", "ask.s3"];
 
 const KIND_LABEL: Record<string, string> = {
   category: "Category data",
@@ -53,6 +50,12 @@ const KIND_LABEL: Record<string, string> = {
   locality: "Locality",
 };
 
+function kindLabel(t: (k: string) => string, kind: string): string {
+  const key = "kind." + kind;
+  const v = t(key);
+  return v === key ? (KIND_LABEL[kind] ?? kind) : v;
+}
+
 function formatDay(iso?: string | null): string | null {
   if (!iso) return null;
   const date = new Date(iso);
@@ -61,6 +64,7 @@ function formatDay(iso?: string | null): string | null {
 }
 
 export function AskBox({ slug, localityName }: { slug: string; localityName: string }) {
+  const t = useT();
   const [question, setQuestion] = useState("");
   const [asked, setAsked] = useState("");
   const [result, setResult] = useState<AskResult | null>(null);
@@ -102,7 +106,7 @@ export function AskBox({ slug, localityName }: { slug: string; localityName: str
   return (
     <section className="mt-6 rounded-[20px] border border-hairline bg-surface-1 p-5">
       <div className="mb-1 text-[10.5px] font-bold uppercase tracking-[0.05em] text-brand">
-        Ask about {localityName}
+        {t("ask.about")} {localityName}
       </div>
 
       <form
@@ -113,7 +117,7 @@ export function AskBox({ slug, localityName }: { slug: string; localityName: str
         }}
       >
         <label htmlFor="ask-question" className="sr-only">
-          Your question about {localityName}
+          {t("ask.yourQuestion")} {localityName}
         </label>
         <input
           id="ask-question"
@@ -121,7 +125,7 @@ export function AskBox({ slug, localityName }: { slug: string; localityName: str
           value={question}
           maxLength={400}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="e.g. Is there waterlogging in the monsoon?"
+          placeholder={t("ask.placeholder")}
           className="min-w-0 flex-1 rounded-xl border border-hairline bg-white px-3 py-2.5 text-[13.5px] text-ink-primary placeholder:text-ink-muted focus:border-brand focus:outline-none"
         />
         <button
@@ -129,13 +133,15 @@ export function AskBox({ slug, localityName }: { slug: string; localityName: str
           disabled={loading || question.trim().length < 3}
           className="shrink-0 rounded-xl bg-brand px-4 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
         >
-          {loading ? "Checking…" : "Ask"}
+          {loading ? t("ask.checking") : t("ask.ask")}
         </button>
       </form>
 
       {!result && !loading && !error && (
         <div className="mt-3 flex flex-wrap gap-2">
-          {SUGGESTIONS.map((suggestion) => (
+          {SUGGESTION_KEYS.map((sk) => {
+            const suggestion = t(sk);
+            return (
             <button
               key={suggestion}
               type="button"
@@ -147,7 +153,8 @@ export function AskBox({ slug, localityName }: { slug: string; localityName: str
             >
               {suggestion}
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -185,7 +192,7 @@ export function AskBox({ slug, localityName }: { slug: string; localityName: str
               <ol className="mt-3.5 space-y-2.5">
                 {result.citations.map((citation) => {
                   const meta = [
-                    KIND_LABEL[citation.kind] ?? citation.kind,
+                    kindLabel(t, citation.kind),
                     citation.label,
                     formatDay(citation.vintage),
                   ].filter(Boolean);
@@ -222,9 +229,7 @@ export function AskBox({ slug, localityName }: { slug: string; localityName: str
             )}
 
             <p className="mt-3.5 text-[10.5px] leading-[1.5] text-ink-muted">
-              Written by an AI model from the sources listed, and checked so it
-              can only cite sources that exist. It can still misread one — the
-              sources are the record. Questions are not stored.
+              {t("ask.disclaimer")}
             </p>
           </div>
         )}

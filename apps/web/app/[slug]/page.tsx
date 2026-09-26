@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AskBox } from "@/components/AskBox";
+import { RecordView } from "@/components/RecordView";
 import { SaveButton } from "@/components/SaveButton";
 import { authConfigured } from "@/lib/auth";
 import { TrustReport } from "@/components/TrustReport";
+import { getServerT } from "@/lib/i18n-server";
 import {
   fetchConnectivity,
   fetchReport,
@@ -77,6 +79,7 @@ export default async function LocalityPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const { t } = await getServerT();
 
   // No list of every locality first. This page used to fetch all 159, uncached,
   // only to check the slug existed — before the report, and in series with it.
@@ -117,7 +120,7 @@ export default async function LocalityPage({
         href="/"
         className="text-[11px] text-ink-muted underline decoration-dotted underline-offset-2 hover:text-ink-secondary"
       >
-        ← All localities
+        ← {t("back.allLocalities")}
       </Link>
 
       <header className="mb-5 mt-3 flex items-start justify-between gap-3">
@@ -135,6 +138,7 @@ export default async function LocalityPage({
 
       {report ? (
         <>
+          <RecordView slug={slug} />
           <TrustReport report={report} connectivity={connectivity} />
           {/* After the report, not before: a question is better asked once the
             * reader has seen what we hold, and the answer cites that record. */}
@@ -142,7 +146,7 @@ export default async function LocalityPage({
         </>
       ) : (
         <div className="rounded-[20px] border border-hairline bg-surface-1 p-5">
-          <b className="text-[13px]">Report unavailable</b>
+          <b className="text-[13px]">{t("report.unavailableTitle")}</b>
           <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-secondary">
             {error}
           </p>
