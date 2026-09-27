@@ -1,5 +1,4 @@
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -32,6 +31,7 @@ import {
   type ConnectivityDetail,
   type Report,
 } from "@/src/api";
+import { LocalityThumb } from "@/components/ui/LocalityThumb";
 import { useI18n } from "@/src/i18n";
 import { useSaved } from "@/src/saved";
 import { radius, scoreColor, theme } from "@/src/theme";
@@ -125,13 +125,17 @@ export default function ReportScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* Gradient header */}
-      <LinearGradient
-        colors={[theme.brand, "#B3175A"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + 8 }]}
-      >
+      {/* Photo hero header */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        {report && (
+          <LocalityThumb
+            seed={report.locality.slug}
+            style={StyleSheet.absoluteFill}
+            radius={0}
+            width={900}
+            scrim
+          />
+        )}
         <View style={styles.topbar}>
           <Link href="/" asChild>
             <Pressable hitSlop={8} style={styles.iconBtn}>
@@ -169,7 +173,7 @@ export default function ReportScreen() {
             </Txt>
           </View>
         )}
-      </LinearGradient>
+      </View>
 
       {/* Tabs */}
       {report && (
@@ -403,8 +407,9 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.page },
   header: {
     paddingHorizontal: 12,
-    paddingBottom: 22,
-    minHeight: 120,
+    paddingBottom: 20,
+    minHeight: 168,
+    backgroundColor: theme.brand,
     justifyContent: "space-between",
   },
   topbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

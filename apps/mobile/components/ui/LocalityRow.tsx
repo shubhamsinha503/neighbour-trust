@@ -24,7 +24,7 @@ export function LocalityRow({ item }: { item: LocalitySummary }) {
     <Link href={`/${item.slug}`} asChild>
       <PressableScale>
         <View style={styles.row}>
-          <LocalityThumb seed={item.slug} label={item.name} style={styles.thumb} radius={14} />
+          <LocalityThumb seed={item.slug} style={styles.thumb} radius={14} width={160} />
           <View style={styles.text}>
             <Txt weight="bold" style={styles.name} numberOfLines={1}>
               {item.name}

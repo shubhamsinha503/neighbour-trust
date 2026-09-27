@@ -82,13 +82,13 @@ export default function HomeScreen() {
       contentContainerStyle={{ paddingBottom: 28 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Hero */}
-      <LinearGradient
-        colors={["#FFE1EE", "#F7F8FA"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={[styles.hero, { paddingTop: insets.top + 14 }]}
-      >
+      {/* Photo hero */}
+      <View style={[styles.hero, { paddingTop: insets.top + 14 }]}>
+        <LocalityThumb seed="home-hero-neighbourhood" style={StyleSheet.absoluteFill} radius={0} width={900} scrim />
+        <LinearGradient
+          colors={["rgba(16,33,58,0.35)", "rgba(16,33,58,0.65)"]}
+          style={StyleSheet.absoluteFill}
+        />
         <View style={styles.header}>
           <View style={styles.brandRow}>
             <View style={styles.brandMark}>
@@ -136,7 +136,7 @@ export default function HomeScreen() {
           </PressableScale>
         </View>
         {locError && <Txt style={styles.locError}>{locError}</Txt>}
-      </LinearGradient>
+      </View>
 
       {/* Popular near you */}
       <View style={styles.sectionHead}>
@@ -199,9 +199,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.page },
   hero: {
     paddingHorizontal: 16,
-    paddingBottom: 22,
+    paddingBottom: 24,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
+    overflow: "hidden",
+    backgroundColor: theme.ink,
   },
   header: {
     flexDirection: "row",
@@ -218,9 +220,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  brand: { fontSize: 17, color: theme.ink },
-  title: { fontSize: 30, color: theme.ink, letterSpacing: -0.7, lineHeight: 35 },
-  subtitle: { fontSize: 14.5, color: theme.inkSecondary, marginTop: 8, lineHeight: 21 },
+  brand: { fontSize: 17, color: "#ffffff" },
+  title: { fontSize: 31, color: "#ffffff", letterSpacing: -0.7, lineHeight: 36 },
+  subtitle: { fontSize: 14.5, color: "rgba(255,255,255,0.88)", marginTop: 8, lineHeight: 21 },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -240,7 +242,7 @@ const styles = StyleSheet.create({
   },
   searchText: { fontSize: 15, color: theme.inkMuted },
   examples: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8, marginTop: 14 },
-  examplesLabel: { fontSize: 13, color: theme.inkMuted },
+  examplesLabel: { fontSize: 13, color: "rgba(255,255,255,0.9)" },
   exampleChip: {
     fontSize: 13,
     color: theme.brandDeep,
