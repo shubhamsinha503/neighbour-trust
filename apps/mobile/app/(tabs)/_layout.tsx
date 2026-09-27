@@ -57,7 +57,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="more"
-        options={{ title: t("nav.more"), tabBarIcon: tab("menu") }}
+        options={{ title: t("nav.profile"), tabBarIcon: tab("user") }}
       />
     </Tabs>
   );

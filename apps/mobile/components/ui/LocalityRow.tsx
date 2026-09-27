@@ -2,18 +2,17 @@ import { Link } from "expo-router";
 import { View, StyleSheet } from "react-native";
 
 import { Icon } from "@/components/ui/Icon";
-import { LocalityThumb } from "@/components/ui/LocalityThumb";
 import { PressableScale } from "@/components/ui/PressableScale";
+import { ScoreBadge } from "@/components/ui/ScoreBadge";
 import { Txt } from "@/components/ui/Txt";
 import { useI18n } from "@/src/i18n";
 import type { LocalitySummary } from "@/src/api";
-import { radius, scoreColor, theme } from "@/src/theme";
+import { radius, theme } from "@/src/theme";
 
 /**
- * One tappable locality in a list: a gradient cover thumb, the name and city, the
- * locality's top flag on a severity-coloured line (from the summary's top_flag),
- * and the score on the right. The flag is the honesty signal a buyer scans for;
- * it falls back to how much of the picture is documented.
+ * One tappable locality in a list: a score-ring badge on the left, the name and
+ * city, and — when present — the locality's top flag on a severity-coloured line
+ * (the honesty signal a buyer scans for), falling back to how much is documented.
  */
 export function LocalityRow({ item }: { item: LocalitySummary }) {
   const { t } = useI18n();
@@ -24,7 +23,7 @@ export function LocalityRow({ item }: { item: LocalitySummary }) {
     <Link href={`/${item.slug}`} asChild>
       <PressableScale>
         <View style={styles.row}>
-          <LocalityThumb seed={item.slug} style={styles.thumb} radius={14} width={160} />
+          <ScoreBadge score={item.score} size="sm" />
           <View style={styles.text}>
             <Txt weight="bold" style={styles.name} numberOfLines={1}>
               {item.name}
@@ -47,12 +46,7 @@ export function LocalityRow({ item }: { item: LocalitySummary }) {
               </Txt>
             )}
           </View>
-          <View style={styles.right}>
-            <Txt weight="extrabold" style={[styles.score, { color: scoreColor(item.score) }]}>
-              {item.score ?? "—"}
-            </Txt>
-            <Icon name="chevron" size={16} color={theme.inkMuted} />
-          </View>
+          <Icon name="chevron" size={18} color={theme.inkMuted} />
         </View>
       </PressableScale>
     </Link>
@@ -63,15 +57,15 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 14,
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.hairline,
     borderRadius: radius.lg,
-    padding: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     marginBottom: 10,
   },
-  thumb: { width: 56, height: 56 },
   text: { flex: 1, gap: 2 },
   name: { fontSize: 16, color: theme.ink },
   city: { fontSize: 13, color: theme.inkMuted },
@@ -79,6 +73,4 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 999 },
   flagText: { flex: 1, fontSize: 11.5, color: theme.inkSecondary },
   meta: { fontSize: 11, color: theme.brandDeep, marginTop: 2 },
-  right: { alignItems: "center", gap: 2, paddingLeft: 2 },
-  score: { fontSize: 20 },
 });
