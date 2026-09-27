@@ -83,6 +83,12 @@ export default function AirQualityScreen() {
               value={p.pm10 != null ? String(p.pm10) : "—"}
               sub={t("aq.unit")}
             />
+            {p.no2 != null ? (
+              <Stat label="NO₂" value={String(p.no2)} sub={t("aq.unit")} />
+            ) : null}
+            {p.o3 != null ? (
+              <Stat label="O₃" value={String(p.o3)} sub={t("aq.unit")} />
+            ) : null}
             {p.dominant_pollutant ? (
               <Stat label={t("aq.dominant")} value={p.dominant_pollutant} />
             ) : null}
