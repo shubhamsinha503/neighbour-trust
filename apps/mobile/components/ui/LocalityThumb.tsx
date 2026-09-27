@@ -1,19 +1,18 @@
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { StyleSheet, View, type ViewStyle } from "react-native";
 
-import { Txt } from "@/components/ui/Txt";
-import { font } from "@/src/theme";
+import { coverImage } from "@/src/coverImage";
 
-// On-brand gradient pairs; picked deterministically per locality so cards have
-// variety without fake photography. Purely decorative, never claimed as imagery
-// of the actual place.
+// Deterministic on-brand gradient placeholder shown under the photo while it
+// loads (and if it ever fails) — keeps cards looking intentional, never blank.
 const PAIRS: Array<[string, string]> = [
-  ["#F72575", "#FF7BAC"],
+  ["#F72575", "#B3175A"],
   ["#10213A", "#33507A"],
-  ["#7C3AED", "#B794F6"],
-  ["#2563EB", "#6BA3F7"],
-  ["#1B9362", "#54C79A"],
-  ["#EA580C", "#FBA46A"],
+  ["#7C3AED", "#4C1D95"],
+  ["#2563EB", "#1E3A8A"],
+  ["#1B9362", "#0F5C3E"],
+  ["#EA580C", "#9A3412"],
 ];
 
 function pick(seed: string): [string, string] {
@@ -23,37 +22,43 @@ function pick(seed: string): [string, string] {
 }
 
 /**
- * A decorative gradient tile standing in for locality imagery (we have no photos
- * of specific places, and inventing them would be dishonest). Deterministic by
- * slug, with the locality's initial watermarked in.
+ * A locality cover: representative photography (deterministic per slug) over a
+ * brand gradient placeholder, with a soft dark scrim at the bottom so any text
+ * overlaid on it stays legible. `width` sizes the fetched image.
  */
 export function LocalityThumb({
   seed,
-  label,
   style,
   radius = 16,
+  width = 600,
+  scrim = false,
 }: {
   seed: string;
-  label: string;
+  label?: string;
   style?: ViewStyle | ViewStyle[];
   radius?: number;
+  width?: number;
+  scrim?: boolean;
 }) {
   const [a, b] = pick(seed);
   return (
-    <LinearGradient
-      colors={[a, b]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[{ borderRadius: radius, overflow: "hidden" }, style]}
-    >
-      <View style={styles.fill}>
-        <Txt style={styles.letter}>{label.trim().charAt(0).toUpperCase()}</Txt>
-      </View>
-    </LinearGradient>
+    <View style={[{ borderRadius: radius, overflow: "hidden", backgroundColor: a }, style]}>
+      <LinearGradient colors={[a, b]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      <Image
+        source={{ uri: coverImage(seed, width) }}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        transition={280}
+        cachePolicy="memory-disk"
+      />
+      {scrim && (
+        <LinearGradient
+          colors={["transparent", "rgba(16,33,58,0.55)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  fill: { flex: 1, alignItems: "center", justifyContent: "center" },
-  letter: { fontFamily: font.extrabold, fontSize: 40, color: "rgba(255,255,255,0.28)" },
-});

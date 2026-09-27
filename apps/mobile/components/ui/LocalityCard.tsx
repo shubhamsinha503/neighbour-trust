@@ -16,7 +16,7 @@ export function LocalityCard({ item }: { item: LocalitySummary }) {
     <Link href={`/${item.slug}`} asChild>
       <PressableScale style={styles.card}>
         <View style={styles.coverWrap}>
-          <LocalityThumb seed={item.slug} label={item.name} style={styles.cover} radius={0} />
+          <LocalityThumb seed={item.slug} style={styles.cover} radius={0} width={420} />
           <View style={styles.pill}>
             <Txt weight="extrabold" style={[styles.pillText, { color: scoreColor(item.score) }]}>
               {item.score ?? "—"}

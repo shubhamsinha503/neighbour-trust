@@ -31,7 +31,9 @@ export type IconName =
   | "cart"
   | "train"
   | "plus"
-  | "sun";
+  | "sun"
+  | "user"
+  | "bell";
 
 interface Props {
   name: IconName;
@@ -183,6 +185,18 @@ export function Icon({ name, size = 24, color = theme.inkMuted, filled = false }
             d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"
             {...common}
           />
+        </>
+      )}
+      {name === "user" && (
+        <>
+          <Circle cx={12} cy={8} r={4} {...common} />
+          <Path d="M4.5 20a7.5 7.5 0 0 1 15 0" {...common} />
+        </>
+      )}
+      {name === "bell" && (
+        <>
+          <Path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" {...common} />
+          <Path d="M10 20a2 2 0 0 0 4 0" {...common} />
         </>
       )}
       {name === "tree" && (

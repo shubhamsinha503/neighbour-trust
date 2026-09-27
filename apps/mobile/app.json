@@ -21,7 +21,8 @@
       "expo-router",
       "expo-asset",
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-image"
     ],
     "extra": {
       "router": {}

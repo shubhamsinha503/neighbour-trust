@@ -19,14 +19,15 @@ export function NearbyList({ payload }: { payload: ConnectivityDetail["payload"]
   const all: Array<{
     icon: IconName;
     label: string;
+    color: string;
     count?: number;
     km?: number | null;
   }> = [
-    { icon: "hospital", label: t("conn.hospitals"), count: payload.hospitals, km: payload.nearest_hospital_km },
-    { icon: "tree", label: t("conn.parks"), count: payload.parks, km: payload.nearest_park_km },
-    { icon: "cart", label: t("conn.markets"), count: payload.markets },
-    { icon: "plus", label: t("conn.clinics"), count: payload.clinics },
-    { icon: "train", label: t("conn.metro"), count: payload.metro_rail_stations, km: payload.nearest_station_km },
+    { icon: "hospital", label: t("conn.hospitals"), color: "#F72575", count: payload.hospitals, km: payload.nearest_hospital_km },
+    { icon: "tree", label: t("conn.parks"), color: "#16A34A", count: payload.parks, km: payload.nearest_park_km },
+    { icon: "cart", label: t("conn.markets"), color: "#EA580C", count: payload.markets },
+    { icon: "plus", label: t("conn.clinics"), color: "#2563EB", count: payload.clinics },
+    { icon: "train", label: t("conn.metro"), color: "#7C3AED", count: payload.metro_rail_stations, km: payload.nearest_station_km },
   ];
   const rows = all.filter((r) => r.count != null);
 
@@ -36,8 +37,8 @@ export function NearbyList({ payload }: { payload: ConnectivityDetail["payload"]
     <View style={styles.list}>
       {rows.map((r, i) => (
         <View key={r.label} style={[styles.row, i === rows.length - 1 && styles.lastRow]}>
-          <View style={styles.iconWrap}>
-            <Icon name={r.icon} size={18} color={theme.brand} />
+          <View style={[styles.iconWrap, { backgroundColor: r.color + "1A" }]}>
+            <Icon name={r.icon} size={18} color={r.color} />
           </View>
           <View style={{ flex: 1 }}>
             <Txt weight="bold" style={styles.label}>
@@ -91,8 +92,7 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 38,
     height: 38,
-    borderRadius: 999,
-    backgroundColor: theme.brandSoft,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
