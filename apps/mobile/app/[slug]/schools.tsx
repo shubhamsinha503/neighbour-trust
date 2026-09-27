@@ -36,6 +36,14 @@ export default function SchoolsScreen() {
 
   const p = data?.payload;
 
+  // Real derived stats from the nearest-schools list — unique boards present and
+  // the mean distance. Both come straight from the payload, nothing invented.
+  const boards = p?.nearest_schools
+    ? [...new Set(p.nearest_schools.map((s) => s.board).filter((b): b is string => !!b))]
+    : [];
+  const dists = p?.nearest_schools?.map((s) => s.distance_km).filter((d): d is number => d != null) ?? [];
+  const avgDist = dists.length ? dists.reduce((a, b) => a + b, 0) / dists.length : null;
+
   return (
     <DetailScaffold
       slug={String(slug)}
@@ -64,6 +72,12 @@ export default function SchoolsScreen() {
                 label={t("schools.ptr")}
                 value={String(p.median_pupil_teacher_ratio)}
               />
+            )}
+            {avgDist != null && (
+              <Stat label={t("schools.avgDist")} value={`${avgDist.toFixed(1)} ${t("aq.km")}`} />
+            )}
+            {boards.length > 0 && (
+              <Stat label={t("schools.boards")} value={boards.join(", ")} />
             )}
           </View>
 

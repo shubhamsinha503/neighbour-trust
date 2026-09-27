@@ -187,6 +187,8 @@ const en: Dict = {
   "schools.staffingKnown": "Staffing known for",
   "schools.ptr": "Median pupils/teacher",
   "schools.nearest": "Nearest schools",
+  "schools.boards": "Boards nearby",
+  "schools.avgDist": "Avg. distance",
   "conn.summary": "What is nearby",
   "conn.metro": "Transit stations",
   "conn.hospitals": "Hospitals",

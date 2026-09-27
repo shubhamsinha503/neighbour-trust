@@ -232,11 +232,16 @@ export default function ReportScreen() {
             <Card style={styles.scoreCard}>
               <ScoreBadge score={ts.score} size="lg" showOutOf animate />
               <View style={{ flex: 1 }}>
-                <Txt weight="bold" style={styles.eyebrow}>
+                <View style={[styles.verdictPill, { backgroundColor: scoreColor(ts.score) + "1A" }]}>
+                  <Txt weight="bold" style={[styles.verdictPillText, { color: scoreColor(ts.score) }]}>
+                    {t(bandKey(ts.score))}
+                  </Txt>
+                </View>
+                <Txt style={styles.verdict}>{report.verdict}</Txt>
+                <Txt style={styles.basedOn}>
                   {t("report.basedOn")} {ts.categories_counted} {t("report.of")}{" "}
                   {ts.categories_total} {t("report.categories")}
                 </Txt>
-                <Txt style={styles.verdict}>{report.verdict}</Txt>
               </View>
             </Card>
 
@@ -414,8 +419,16 @@ const styles = StyleSheet.create({
   place: { fontSize: 13.5, color: theme.inkSecondary, marginTop: 2 },
   skelScore: { flexDirection: "row", alignItems: "center", gap: 18, marginTop: 8 },
   scoreCard: { flexDirection: "row", alignItems: "center", gap: 18, marginTop: 8 },
-  eyebrow: { fontSize: 11, textTransform: "uppercase", color: theme.brand, letterSpacing: 0.5 },
-  verdict: { fontSize: 14, color: theme.ink, marginTop: 6, lineHeight: 20 },
+  verdictPill: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 8,
+  },
+  verdictPillText: { fontSize: 13 },
+  verdict: { fontSize: 14, color: theme.ink, lineHeight: 20 },
+  basedOn: { fontSize: 11, color: theme.inkMuted, marginTop: 8 },
   section: { marginTop: 24 },
   sectionTitle: { fontSize: 18, color: theme.ink, marginBottom: 12 },
   strip: { gap: 10, paddingRight: 4, paddingBottom: 2 },
