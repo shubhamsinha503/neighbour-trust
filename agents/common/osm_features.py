@@ -43,6 +43,14 @@ from typing import Iterable, Optional
 import httpx
 import osmium
 
+# These extracts are hundreds of megabytes and Geofabrik throttles under load, so
+# a single socket read can stall well past a tight per-read timeout. Give the read
+# room and lean on retries for the genuinely transient failures rather than
+# failing the whole ingest on the first slow chunk.
+DOWNLOAD_TIMEOUT = httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0)
+DOWNLOAD_RETRIES = 4
+DOWNLOAD_BACKOFF_SECONDS = 5.0
+
 log = logging.getLogger(__name__)
 
 SOURCE_NAME = "OpenStreetMap"
@@ -132,19 +140,44 @@ def download_extract(
             )
             return dest
 
-    log.info("Downloading %s from Geofabrik", name)
     partial = dest.with_suffix(".partial")
     # Written to a temporary name and moved into place, so an interrupted
     # download cannot leave a truncated file that later reads as a valid but
     # half-empty map.
-    with httpx.stream("GET", url, follow_redirects=True, timeout=120.0) as response:
-        response.raise_for_status()
-        with partial.open("wb") as handle:
-            for chunk in response.iter_bytes(chunk_size=1024 * 1024):
-                handle.write(chunk)
-    partial.replace(dest)
-    log.info("Downloaded %s (%.0f MB)", name, dest.stat().st_size / 1e6)
-    return dest
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, DOWNLOAD_RETRIES + 1):
+        log.info(
+            "Downloading %s from Geofabrik (attempt %d/%d)",
+            name, attempt, DOWNLOAD_RETRIES,
+        )
+        try:
+            with httpx.stream(
+                "GET", url, follow_redirects=True, timeout=DOWNLOAD_TIMEOUT
+            ) as response:
+                response.raise_for_status()
+                with partial.open("wb") as handle:
+                    for chunk in response.iter_bytes(chunk_size=1024 * 1024):
+                        handle.write(chunk)
+            partial.replace(dest)
+            log.info("Downloaded %s (%.0f MB)", name, dest.stat().st_size / 1e6)
+            return dest
+        except (httpx.HTTPError, OSError) as exc:
+            # A slow read, a dropped connection or a 5xx from an overloaded
+            # mirror are all transient; a truncated .partial from this try must
+            # not be reused, so drop it before backing off and retrying.
+            last_exc = exc
+            partial.unlink(missing_ok=True)
+            if attempt < DOWNLOAD_RETRIES:
+                wait = DOWNLOAD_BACKOFF_SECONDS * attempt
+                log.warning(
+                    "Download of %s failed (%s); retrying in %.0fs", name, exc, wait
+                )
+                time.sleep(wait)
+
+    raise ExtractError(
+        f"could not download {name} from Geofabrik after "
+        f"{DOWNLOAD_RETRIES} attempts: {last_exc}"
+    ) from last_exc
 
 
 def snapshot_time(path: pathlib.Path) -> Optional[datetime]:

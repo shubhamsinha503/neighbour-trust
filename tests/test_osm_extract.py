@@ -20,8 +20,10 @@ rather than merely under-informing them.
 import pathlib
 import textwrap
 
+import httpx
 import pytest
 
+from agents.common import osm_features
 from agents.infrastructure.sources import osm_extract as osm
 
 # A base point and offsets in degrees. One degree of latitude is ~111 km, so
@@ -184,3 +186,55 @@ class TestConfiguration:
         path = write_osm(tmp_path, node(1))  # untagged, so nothing matches
         with pytest.raises(osm.ExtractError):
             client_for(path)
+
+
+class _FakeStream:
+    """Stands in for httpx.stream()'s context manager over a streamed body."""
+
+    def __init__(self, chunks):
+        self._chunks = chunks
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def raise_for_status(self):
+        return None
+
+    def iter_bytes(self, chunk_size=0):
+        return iter(self._chunks)
+
+
+class TestDownloadResilience:
+    """A slow or flaky Geofabrik download is retried, not fatal on the first
+    stall — the failure mode that took down a whole connectivity ingest."""
+
+    def test_a_transient_timeout_is_retried_then_succeeds(self, tmp_path, monkeypatch):
+        attempts = {"n": 0}
+
+        def flaky(method, url, **kwargs):
+            attempts["n"] += 1
+            if attempts["n"] < 3:
+                raise httpx.ReadTimeout("The read operation timed out")
+            return _FakeStream([b"PBF-BYTES"])
+
+        monkeypatch.setattr(osm_features.httpx, "stream", flaky)
+        monkeypatch.setattr(osm_features.time, "sleep", lambda _s: None)
+
+        dest = osm.download_extract("southern-zone", cache_dir=tmp_path)
+        assert dest.exists() and dest.read_bytes() == b"PBF-BYTES"
+        assert attempts["n"] == 3
+
+    def test_it_gives_up_with_a_clear_error_and_leaves_no_partial(self, tmp_path, monkeypatch):
+        def always_timeout(method, url, **kwargs):
+            raise httpx.ReadTimeout("The read operation timed out")
+
+        monkeypatch.setattr(osm_features.httpx, "stream", always_timeout)
+        monkeypatch.setattr(osm_features.time, "sleep", lambda _s: None)
+
+        with pytest.raises(osm.ExtractError) as exc:
+            osm.download_extract("southern-zone", cache_dir=tmp_path)
+        assert "Geofabrik" in str(exc.value)
+        assert not (tmp_path / "southern-zone.osm.partial").exists()
