@@ -292,6 +292,46 @@ export default function ReportScreen() {
               </View>
             )}
 
+            {/* More nearby — amenity coverage (counts, not scores) */}
+            {nearby && ((nearby.hospitals ?? 0) > 0 || (nearby.parks ?? 0) > 0) && (
+              <View style={styles.section}>
+                <Txt weight="bold" style={styles.sectionTitle}>
+                  {t("overview.amenities")}
+                </Txt>
+                <View style={styles.amenityRow}>
+                  <Link href={`/${report.locality.slug}/healthcare`} asChild>
+                    <PressableScale style={styles.amenityCard}>
+                      <View style={[styles.amenityIcon, { backgroundColor: "#DC262618" }]}>
+                        <Icon name="plus" size={18} color="#DC2626" />
+                      </View>
+                      <Txt weight="bold" style={styles.amenityLabel}>
+                        {categoryLabel("healthcare", "Healthcare")}
+                      </Txt>
+                      <Txt style={styles.amenitySub}>
+                        {t("health.nearbyCount").replace(
+                          "{n}",
+                          String((nearby.hospitals ?? 0) + (nearby.clinics ?? 0)),
+                        )}
+                      </Txt>
+                    </PressableScale>
+                  </Link>
+                  <Link href={`/${report.locality.slug}/green-spaces`} asChild>
+                    <PressableScale style={styles.amenityCard}>
+                      <View style={[styles.amenityIcon, { backgroundColor: "#16A34A18" }]}>
+                        <Icon name="tree" size={18} color="#16A34A" />
+                      </View>
+                      <Txt weight="bold" style={styles.amenityLabel}>
+                        {categoryLabel("green_spaces", "Green spaces")}
+                      </Txt>
+                      <Txt style={styles.amenitySub}>
+                        {t("green.nearbyCount").replace("{n}", String(nearby.parks ?? 0))}
+                      </Txt>
+                    </PressableScale>
+                  </Link>
+                </View>
+              </View>
+            )}
+
             {/* Watch out for */}
             {report.flags.length > 0 && (
               <View style={styles.section}>
@@ -454,6 +494,26 @@ const styles = StyleSheet.create({
   stripLabel: { fontSize: 11.5, color: theme.inkSecondary, textAlign: "center" },
   stripScore: { fontSize: 22 },
   stripBand: { fontSize: 9.5, color: theme.inkMuted },
+  amenityRow: { flexDirection: "row", gap: 12 },
+  amenityCard: {
+    flex: 1,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.hairline,
+    borderRadius: 16,
+    padding: 14,
+    gap: 4,
+  },
+  amenityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  amenityLabel: { fontSize: 14, color: theme.ink },
+  amenitySub: { fontSize: 11.5, color: theme.inkMuted, lineHeight: 16 },
   noteCard: { padding: 16, gap: 10 },
   noteTitle: { fontSize: 16, color: theme.ink, marginBottom: 2 },
   noteRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
