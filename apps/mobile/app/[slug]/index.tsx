@@ -11,16 +11,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { LanguageButton } from "@/components/LanguageButton";
 import { SunlightCard } from "@/components/SunlightCard";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { categoryIcon } from "@/components/ui/categoryIcon";
-import { ConfidenceTag } from "@/components/ui/ConfidenceTag";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FlagRow } from "@/components/ui/FlagRow";
 import { Icon } from "@/components/ui/Icon";
-import { MetricBar } from "@/components/ui/MetricBar";
 import { NearbyList } from "@/components/ui/NearbyList";
 import { PressableScale } from "@/components/ui/PressableScale";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
@@ -41,6 +38,24 @@ const DETAIL_ROUTE: Record<string, string> = {
   schools: "schools",
   infrastructure: "connectivity",
 };
+
+/** Accent colour per category, matching the Home "What matters" grid. */
+const CAT_COLOR: Record<string, string> = {
+  schools: "#2563EB",
+  crime: "#F72575",
+  air_quality: "#1B9362",
+  water: "#06B6D4",
+  infrastructure: "#7C3AED",
+};
+
+/** A score-band word — a plain restatement of the score, never a new claim. */
+function bandKey(score: number | null): string {
+  if (score === null) return "band.unscored";
+  if (score >= 80) return "band.high";
+  if (score >= 70) return "band.good";
+  if (score >= 60) return "band.fair";
+  return "band.mixed";
+}
 
 export default function ReportScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -96,16 +111,55 @@ export default function ReportScreen() {
   const ts = report?.trust_score;
   const available = report?.categories.filter((c) => c.available) ?? [];
 
+  // Highlights and considerations are DERIVED from real scores, flags and nearby
+  // counts — never hardcoded. A category only appears as a strength/weakness by
+  // its own score; nearby facts come from the connectivity payload.
+  const highlights: string[] = [];
+  const considerations: string[] = [];
+  for (const c of available) {
+    if (c.score !== null && c.score >= 75) {
+      highlights.push(
+        t("hl.strong")
+          .replace("{cat}", categoryLabel(c.category, c.label))
+          .replace("{n}", String(c.score)),
+      );
+    } else if (c.score !== null && c.score < 55) {
+      considerations.push(
+        t("con.weak")
+          .replace("{cat}", categoryLabel(c.category, c.label))
+          .replace("{n}", String(c.score)),
+      );
+    }
+  }
+  if (nearby) {
+    if ((nearby.hospitals ?? 0) > 0) highlights.push(t("hl.hospitals"));
+    if ((nearby.parks ?? 0) > 0) highlights.push(t("hl.parks"));
+    if ((nearby.metro_rail_stations ?? 0) > 0) highlights.push(t("hl.metro"));
+  }
+  if (ts && ts.categories_counted < ts.categories_total) {
+    considerations.push(t("con.limited").replace("{n}", String(ts.categories_counted)));
+  }
+  const highlightsTop = highlights.slice(0, 5);
+  const considerationsTop = considerations.slice(0, 5);
+
   return (
     <View style={styles.screen}>
       {/* Clean header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.topbar}>
-          <Link href="/" asChild>
-            <Pressable hitSlop={8} style={styles.iconBtn}>
-              <Icon name="back" size={20} color={theme.ink} />
-            </Pressable>
-          </Link>
+          <View style={styles.topLeft}>
+            <Link href="/" asChild>
+              <Pressable hitSlop={8} style={styles.iconBtn}>
+                <Icon name="back" size={20} color={theme.ink} />
+              </Pressable>
+            </Link>
+            <View style={styles.brandMark}>
+              <Icon name="heart" size={14} color="#ffffff" filled />
+            </View>
+            <Txt weight="extrabold" style={styles.brand}>
+              {t("brand")}
+            </Txt>
+          </View>
           <View style={styles.topRight}>
             <Pressable
               onPress={() => {
@@ -123,7 +177,6 @@ export default function ReportScreen() {
                 <Icon name="share" size={18} color={theme.ink} />
               </Pressable>
             )}
-            <LanguageButton />
           </View>
         </View>
         {report && (
@@ -187,6 +240,53 @@ export default function ReportScreen() {
               </View>
             </Card>
 
+            {/* Category score strip */}
+            {available.length > 0 && (
+              <View style={styles.section}>
+                <Txt weight="bold" style={styles.sectionTitle}>
+                  {t("overview.categoryScores")}
+                </Txt>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.strip}
+                >
+                  {available.map((c) => {
+                    const color = CAT_COLOR[c.category] ?? theme.brand;
+                    const route = DETAIL_ROUTE[c.category];
+                    const card = (
+                      <View style={styles.stripCard}>
+                        <View style={[styles.stripIcon, { backgroundColor: color + "1A" }]}>
+                          <Icon name={categoryIcon(c.category)} size={18} color={color} />
+                        </View>
+                        <Txt weight="semibold" style={styles.stripLabel} numberOfLines={1}>
+                          {categoryLabel(c.category, c.label)}
+                        </Txt>
+                        <Txt
+                          weight="extrabold"
+                          style={[styles.stripScore, { color: c.score !== null ? scoreColor(c.score) : theme.inkMuted }]}
+                        >
+                          {c.score ?? "—"}
+                        </Txt>
+                        <Txt style={styles.stripBand}>{t(bandKey(c.score))}</Txt>
+                      </View>
+                    );
+                    return route ? (
+                      <Link
+                        key={c.category}
+                        href={`/${report.locality.slug}/${route}?score=${c.score ?? ""}`}
+                        asChild
+                      >
+                        <PressableScale>{card}</PressableScale>
+                      </Link>
+                    ) : (
+                      <View key={c.category}>{card}</View>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
             {/* Watch out for */}
             {report.flags.length > 0 && (
               <View style={styles.section}>
@@ -199,6 +299,44 @@ export default function ReportScreen() {
               </View>
             )}
 
+            {/* Highlights */}
+            {highlightsTop.length > 0 && (
+              <View style={styles.section}>
+                <Card style={[styles.noteCard, { backgroundColor: theme.goodSoft }]}>
+                  <Txt weight="bold" style={styles.noteTitle}>
+                    {t("overview.highlights")}
+                  </Txt>
+                  {highlightsTop.map((h, i) => (
+                    <View key={i} style={styles.noteRow}>
+                      <View style={styles.noteIcon}>
+                        <Icon name="check" size={13} color={theme.good} />
+                      </View>
+                      <Txt style={styles.noteText}>{h}</Txt>
+                    </View>
+                  ))}
+                </Card>
+              </View>
+            )}
+
+            {/* Considerations */}
+            {considerationsTop.length > 0 && (
+              <View style={styles.section}>
+                <Card style={[styles.noteCard, { backgroundColor: theme.warnSoft }]}>
+                  <Txt weight="bold" style={styles.noteTitle}>
+                    {t("overview.consider")}
+                  </Txt>
+                  {considerationsTop.map((h, i) => (
+                    <View key={i} style={styles.noteRow}>
+                      <View style={styles.noteIcon}>
+                        <Icon name="warning" size={13} color={theme.warn} />
+                      </View>
+                      <Txt style={styles.noteText}>{h}</Txt>
+                    </View>
+                  ))}
+                </Card>
+              </View>
+            )}
+
             {/* What's nearby */}
             {nearby && (
               <View style={styles.section}>
@@ -208,58 +346,6 @@ export default function ReportScreen() {
                 <NearbyList payload={nearby} />
               </View>
             )}
-
-            {/* Insights — category cards */}
-            <View style={styles.section}>
-              <Txt weight="bold" style={styles.sectionTitle}>
-                {t("overview.insights")}
-              </Txt>
-              {available.map((c) => {
-                const route = DETAIL_ROUTE[c.category];
-                const inner = (
-                  <Card style={styles.catCard}>
-                    <View style={styles.catTop}>
-                      <View style={styles.catIcon}>
-                        <Icon name={categoryIcon(c.category)} size={18} color={theme.brand} />
-                      </View>
-                      <Txt weight="bold" style={styles.catLabel}>
-                        {categoryLabel(c.category, c.label)}
-                      </Txt>
-                      {c.score !== null ? (
-                        <Txt weight="extrabold" style={[styles.catScore, { color: scoreColor(c.score) }]}>
-                          {c.score}
-                        </Txt>
-                      ) : (
-                        <Txt style={styles.catNone}>{t("common.noDataYet")}</Txt>
-                      )}
-                    </View>
-                    {c.score !== null && (
-                      <View style={{ marginTop: 12 }}>
-                        <MetricBar value={c.score} color={scoreColor(c.score)} />
-                      </View>
-                    )}
-                    <View style={styles.catBottom}>
-                      <ConfidenceTag confidence={c.confidence} />
-                      {route ? (
-                        <View style={styles.detailsLink}>
-                          <Txt weight="semibold" style={styles.detailsText}>
-                            {t("report.details")}
-                          </Txt>
-                          <Icon name="chevron" size={14} color={theme.brand} />
-                        </View>
-                      ) : null}
-                    </View>
-                  </Card>
-                );
-                return route ? (
-                  <Link key={c.category} href={`/${report.locality.slug}/${route}?score=${c.score ?? ""}`} asChild>
-                    <PressableScale>{inner}</PressableScale>
-                  </Link>
-                ) : (
-                  <View key={c.category}>{inner}</View>
-                );
-              })}
-            </View>
 
             {/* Sunlight */}
             <View style={styles.section}>
@@ -283,9 +369,12 @@ export default function ReportScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Button
-                  label={t("overview.viewMap")}
-                  icon="◎"
-                  onPress={() => router.push(`/${report.locality.slug}/sunlight`)}
+                  label={saved ? t("overview.saved") : t("overview.save")}
+                  icon={saved ? "♥" : "♡"}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    toggle(String(slug));
+                  }}
                 />
               </View>
             </View>
@@ -307,7 +396,18 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.page },
   header: { paddingHorizontal: 12, paddingBottom: 8 },
   topbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  topRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  topLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
+  brandMark: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: theme.brand,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 2,
+  },
+  brand: { fontSize: 15, color: theme.ink },
+  topRight: { flexDirection: "row", alignItems: "center", gap: 4 },
   iconBtn: { width: 38, height: 38, borderRadius: 999, alignItems: "center", justifyContent: "center" },
   headerText: { marginTop: 8, paddingHorizontal: 4 },
   name: { fontSize: 26, color: theme.ink, letterSpacing: -0.5 },
@@ -318,27 +418,34 @@ const styles = StyleSheet.create({
   verdict: { fontSize: 14, color: theme.ink, marginTop: 6, lineHeight: 20 },
   section: { marginTop: 24 },
   sectionTitle: { fontSize: 18, color: theme.ink, marginBottom: 12 },
-  catCard: { marginBottom: 10, padding: 14 },
-  catTop: { flexDirection: "row", alignItems: "center", gap: 10 },
-  catIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: theme.brandSoft,
+  strip: { gap: 10, paddingRight: 4, paddingBottom: 2 },
+  stripCard: {
+    width: 96,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.hairline,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    gap: 3,
+  },
+  stripIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 4,
   },
-  catLabel: { flex: 1, fontSize: 15, color: theme.ink },
-  catScore: { fontSize: 22 },
-  catNone: { fontSize: 12, color: theme.inkMuted },
-  catBottom: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 12,
-  },
-  detailsLink: { flexDirection: "row", alignItems: "center", gap: 2 },
-  detailsText: { fontSize: 12, color: theme.brand },
+  stripLabel: { fontSize: 11.5, color: theme.inkSecondary, textAlign: "center" },
+  stripScore: { fontSize: 22 },
+  stripBand: { fontSize: 9.5, color: theme.inkMuted },
+  noteCard: { padding: 16, gap: 10 },
+  noteTitle: { fontSize: 16, color: theme.ink, marginBottom: 2 },
+  noteRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  noteIcon: { marginTop: 1 },
+  noteText: { flex: 1, fontSize: 13.5, color: theme.ink, lineHeight: 19 },
   actions: { flexDirection: "row", gap: 12, marginTop: 24 },
   sources: { marginTop: 24 },
   sourcesLabel: { fontSize: 10, color: theme.inkMuted },
