@@ -228,6 +228,7 @@ const en: Dict = {
   "facing.SW": "Harsh afternoon sun; the hottest exposure in summer.",
   "facing.W": "Strong late-afternoon and evening sun; hot through the summer.",
   "facing.NW": "Indirect for most of the day, with some evening sun in summer.",
+  "search.clear": "Clear search",
 };
 
 const hi: Dict = {
@@ -426,6 +427,7 @@ const hi: Dict = {
   "con.limited": "अब तक 5 में से केवल {n} श्रेणियाँ प्रलेखित हैं",
   "schools.boards": "आसपास के बोर्ड",
   "schools.avgDist": "औसत दूरी",
+  "search.clear": "खोज साफ़ करें",
 };
 
 const kn: Dict = {
@@ -624,6 +626,7 @@ const kn: Dict = {
   "con.limited": "ಇದುವರೆಗೆ 5 ರಲ್ಲಿ {n} ವರ್ಗಗಳು ಮಾತ್ರ ದಾಖಲಾಗಿವೆ",
   "schools.boards": "ಸಮೀಪದ ಬೋರ್ಡ್‌ಗಳು",
   "schools.avgDist": "ಸರಾಸರಿ ದೂರ",
+  "search.clear": "ಹುಡುಕಾಟ ತೆರವುಗೊಳಿಸಿ",
 };
 
 const te: Dict = {
@@ -822,6 +825,7 @@ const te: Dict = {
   "con.limited": "ఇప్పటివరకు 5 లో {n} వర్గాలు మాత్రమే నమోదయ్యాయి",
   "schools.boards": "సమీప బోర్డులు",
   "schools.avgDist": "సగటు దూరం",
+  "search.clear": "శోధనను క్లియర్ చేయి",
 };
 
 const mr: Dict = {
@@ -1020,6 +1024,7 @@ const mr: Dict = {
   "con.limited": "आतापर्यंत 5 पैकी फक्त {n} श्रेणी नोंदवल्या आहेत",
   "schools.boards": "जवळचे बोर्ड",
   "schools.avgDist": "सरासरी अंतर",
+  "search.clear": "शोध साफ करा",
 };
 
 const DICTS: Record<Locale, Dict> = { en, hi, kn, te, mr };

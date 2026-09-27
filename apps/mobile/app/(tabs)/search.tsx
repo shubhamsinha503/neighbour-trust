@@ -32,7 +32,7 @@ export default function SearchScreen() {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const { data, error, loading, reload } = useLocalities();
-  const params = useLocalSearchParams<{ q?: string }>();
+  const params = useLocalSearchParams<{ q?: string; city?: string }>();
 
   const [query, setQuery] = useState("");
   const [city, setCity] = useState<string | null>(null);
@@ -51,9 +51,22 @@ export default function SearchScreen() {
     if (!loading) setRefreshing(false);
   }, [loading]);
 
+  // A locality/pincode example from Home seeds the text box; a city tile seeds
+  // the city chip (which the "All cities" chip can clear) rather than locking a
+  // word into the search box with no obvious way back to every city.
   useEffect(() => {
-    if (typeof params.q === "string") setQuery(params.q);
+    if (typeof params.q === "string") {
+      setQuery(params.q);
+      setCity(null);
+    }
   }, [params.q]);
+
+  useEffect(() => {
+    if (typeof params.city === "string") {
+      setCity(params.city);
+      setQuery("");
+    }
+  }, [params.city]);
 
   const cities = useMemo(
     () => (data ? cityCounts(data).map((c) => c.city) : []),
@@ -124,6 +137,11 @@ export default function SearchScreen() {
           autoCorrect={false}
           returnKeyType="search"
         />
+        {query.length > 0 && (
+          <Pressable onPress={() => setQuery("")} hitSlop={10} accessibilityLabel={t("search.clear")}>
+            <Icon name="close" size={18} color={theme.inkMuted} />
+          </Pressable>
+        )}
       </View>
 
       {cities.length > 0 && (

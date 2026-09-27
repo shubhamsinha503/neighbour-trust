@@ -11,6 +11,7 @@ export type IconName =
   | "location"
   | "chevron"
   | "check"
+  | "close"
   | "back"
   | "globe"
   | "heart"
@@ -118,6 +119,7 @@ export function Icon({ name, size = 24, color = theme.inkMuted, filled = false }
         </>
       )}
       {name === "check" && <Polyline points="20 6 9 17 4 12" {...common} />}
+      {name === "close" && <Path d="M6 6l12 12M18 6L6 18" {...common} />}
       {name === "chevron" && <Polyline points="9 6 15 12 9 18" {...common} />}
       {name === "back" && <Polyline points="15 6 9 12 15 18" {...common} />}
       {name === "arrowRight" && (

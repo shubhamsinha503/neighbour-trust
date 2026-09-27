@@ -46,6 +46,12 @@ export default function HomeScreen() {
     router.push({ pathname: "/search", params: q ? { q } : {} });
   }
 
+  // A known city from the rail filters Explore by the city chip (clearable via
+  // "All cities"), rather than seeding free text the user must delete by hand.
+  function goCity(city: string) {
+    router.push({ pathname: "/search", params: { city } });
+  }
+
   async function showNeighbourhood() {
     setLocError(null);
     setLocating(true);
@@ -165,7 +171,7 @@ export default function HomeScreen() {
             style={styles.cityCard}
             onPress={() => {
               void Haptics.selectionAsync();
-              goSearch(c.city);
+              goCity(c.city);
             }}
           >
             <View style={styles.cityBadgeWrap}>
