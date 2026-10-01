@@ -70,15 +70,15 @@ export default function ReportScreen() {
   const [nearby, setNearby] = useState<ConnectivityDetail["payload"] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  async function load() {
+  async function load(force = false) {
     setError(false);
     try {
-      setReport(await fetchReport(String(slug)));
+      setReport(await fetchReport(String(slug), force));
     } catch {
       setError(true);
     }
     try {
-      const conn = await fetchConnectivity(String(slug));
+      const conn = await fetchConnectivity(String(slug), force);
       setNearby(conn.payload);
     } catch {
       setNearby(null);
@@ -91,7 +91,7 @@ export default function ReportScreen() {
 
   async function onRefresh() {
     setRefreshing(true);
-    await load();
+    await load(true);
     setRefreshing(false);
   }
 

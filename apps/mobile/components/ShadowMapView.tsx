@@ -58,6 +58,7 @@ export function ShadowMapView({ lat, lon }: { lat: number; lon: number }) {
       {loading && (
         <View style={styles.loading} pointerEvents="none">
           <ActivityIndicator color={theme.brand} />
+          <Txt style={styles.loadingText}>{t("shadow.loading")}</Txt>
         </View>
       )}
     </View>
@@ -75,7 +76,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
   },
+  loadingText: { fontSize: 12.5, color: theme.inkMuted },
   fallback: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   fallbackText: { fontSize: 14, color: theme.inkMuted, textAlign: "center", lineHeight: 20 },
 });

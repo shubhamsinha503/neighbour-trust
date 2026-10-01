@@ -1,5 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { Link } from "expo-router";
+import { memo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { CityBadge } from "@/components/ui/CityBadge";
@@ -35,7 +36,7 @@ function band(score: number | null): { key: string; color: string } {
  * or how much of it is documented. A heart toggles saved without navigating.
  * All imagery is SVG illustration; no invented scores or fabricated photos.
  */
-export function LocalityRow({ item }: { item: LocalitySummary }) {
+function LocalityRowBase({ item }: { item: LocalitySummary }) {
   const { t } = useI18n();
   const { isSaved, toggle } = useSaved();
   const saved = isSaved(item.slug);
@@ -111,6 +112,14 @@ export function LocalityRow({ item }: { item: LocalitySummary }) {
     </Link>
   );
 }
+
+/**
+ * Memoised: the list re-renders when the search text or filters change, but each
+ * row's `item` is stable, so memo keeps every off-screen row from re-rendering
+ * on each keystroke. Save state comes from the SavedContext inside the row, so a
+ * bookmark toggle still updates the heart.
+ */
+export const LocalityRow = memo(LocalityRowBase);
 
 const styles = StyleSheet.create({
   card: {

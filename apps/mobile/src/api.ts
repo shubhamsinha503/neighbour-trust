@@ -81,8 +81,31 @@ export function fetchSummaries(): Promise<LocalitySummary[]> {
   return getJson<LocalitySummary[]>("/api/v1/localities/summary");
 }
 
-export function fetchReport(slug: string): Promise<Report> {
-  return getJson<Report>(`/api/v1/localities/${slug}/report`);
+// A short-lived in-memory cache keyed by request. Moving between a locality's
+// Overview and its category screens reads the same report and connectivity
+// payload, so without this every navigation refetched them. Caching the promise
+// also dedupes concurrent in-flight calls (Overview fetches connectivity for
+// "What's nearby" at the same time a tapped category screen would). A rejected
+// request is evicted so a retry still hits the network; pass `force` (used by
+// pull-to-refresh) to bypass a cached hit.
+const detailCache = new Map<string, Promise<unknown>>();
+function cached<T>(key: string, force: boolean, run: () => Promise<T>): Promise<T> {
+  if (!force) {
+    const hit = detailCache.get(key) as Promise<T> | undefined;
+    if (hit) return hit;
+  }
+  const p = run().catch((err) => {
+    detailCache.delete(key);
+    throw err;
+  });
+  detailCache.set(key, p);
+  return p;
+}
+
+export function fetchReport(slug: string, force = false): Promise<Report> {
+  return cached(`report:${slug}`, force, () =>
+    getJson<Report>(`/api/v1/localities/${slug}/report`),
+  );
 }
 
 export { API_BASE };
@@ -173,9 +196,15 @@ export interface ConnectivityDetail {
   };
 }
 
-export const fetchAirQuality = (slug: string) =>
-  getDetail<AirQualityDetail>(`/api/v1/localities/${slug}/air-quality`);
-export const fetchSchools = (slug: string) =>
-  getDetail<SchoolsDetail>(`/api/v1/localities/${slug}/schools`);
-export const fetchConnectivity = (slug: string) =>
-  getDetail<ConnectivityDetail>(`/api/v1/localities/${slug}/connectivity`);
+export const fetchAirQuality = (slug: string, force = false) =>
+  cached(`aq:${slug}`, force, () =>
+    getDetail<AirQualityDetail>(`/api/v1/localities/${slug}/air-quality`),
+  );
+export const fetchSchools = (slug: string, force = false) =>
+  cached(`schools:${slug}`, force, () =>
+    getDetail<SchoolsDetail>(`/api/v1/localities/${slug}/schools`),
+  );
+export const fetchConnectivity = (slug: string, force = false) =>
+  cached(`conn:${slug}`, force, () =>
+    getDetail<ConnectivityDetail>(`/api/v1/localities/${slug}/connectivity`),
+  );
