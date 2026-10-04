@@ -94,6 +94,28 @@ def list_localities(conn: psycopg.Connection) -> list[dict[str, Any]]:
     ).fetchall()
 
 
+def ambiguous_locality_names(conn: psycopg.Connection) -> set[str]:
+    """Locality names that exist in more than one city (lower-cased).
+
+    A locality name is not unique across India: "Anna Nagar" is a large Chennai
+    neighbourhood and also one in Hyderabad. The news agent searches press by
+    name, so for these names a query for our Hyderabad "Anna Nagar" pulls in
+    Chennai's coverage. The disambiguation the news pipeline applies (city in the
+    query, and a stricter post-filter) is only needed for exactly these names, so
+    the set is computed from the data rather than hard-coded — it self-corrects as
+    localities are added or removed.
+    """
+    rows = conn.execute(
+        """
+        SELECT lower(name) AS name
+        FROM locality
+        GROUP BY lower(name)
+        HAVING COUNT(DISTINCT lower(city)) > 1
+        """
+    ).fetchall()
+    return {row["name"] for row in rows if row.get("name")}
+
+
 # ---------------------------------------------------------------------------
 # Air quality stations and observations
 # ---------------------------------------------------------------------------

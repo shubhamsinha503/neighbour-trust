@@ -141,8 +141,55 @@ def city_mismatch_reason(url: str, city: str) -> Optional[str]:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Positive-evidence guard for ambiguous names
+# ---------------------------------------------------------------------------
+#
+# The cross-city guard above only fires when a URL *proves* the article is
+# foreign. For a name shared across cities ("Anna Nagar" in both Chennai and
+# Hyderabad) that is not enough: the common case is an article whose URL names no
+# city at all, which the guard keeps by default — so Chennai's Anna Nagar
+# coverage lands on Hyderabad's card.
+#
+# For those names, and only those, the default is flipped: an article is kept
+# only when there is positive evidence it belongs to the locality's own city —
+# the URL is filed under that city's section, or the headline names the city or
+# its state. Unique names (Koramangala, Indiranagar) never reach this and keep
+# their high-recall behaviour untouched.
+
+
+def _city_text_tokens(city: str, state: str = "") -> set[str]:
+    """Spellings of the locality's own city and state to look for in a headline."""
+    tokens: set[str] = set()
+    for token in _own_city_tokens(city):
+        tokens.add(token)
+        tokens.add(token.replace("-", " "))
+    st = (state or "").strip().lower()
+    if st:
+        tokens.add(st)
+    return {t for t in tokens if t}
+
+
+def has_local_evidence(url: str, title: str, city: str, state: str = "") -> bool:
+    """True if anything in the URL or headline ties the article to our city.
+
+    Evidence is either the URL filed under our city's own news section, or the
+    city or state named in the headline text itself.
+    """
+    own = _own_city_tokens(city)
+    if url and any(_url_names_city(url, t) for t in own):
+        return True
+    text = (title or "").lower()
+    return any(token in text for token in _city_text_tokens(city, state))
+
+
 def filter_incidents(
-    incidents: list[dict[str, Any]], *, locality: str, city: str = ""
+    incidents: list[dict[str, Any]],
+    *,
+    locality: str,
+    city: str = "",
+    state: str = "",
+    strict: bool = False,
 ) -> tuple[list[dict[str, Any]], list[tuple[str, str]]]:
     """Split confirmed incidents into those about the locality and those not.
 
@@ -150,17 +197,31 @@ def filter_incidents(
     than discarded so a run can report what it dropped and why — a silent filter
     is how you end up unable to explain your own numbers.
 
-    Two checks: the hand-verified title exclusions, and — when `city` is given —
-    the cross-city URL guard that drops same-named coverage from another city.
+    Checks applied in order:
+      1. the hand-verified title exclusions;
+      2. the cross-city URL guard that drops coverage filed under another city;
+      3. only when `strict` (the locality's name is shared across cities): a
+         positive-evidence requirement — keep an article only if the URL or
+         headline ties it to this locality's own city or state.
+
+    `strict` is set by the caller for ambiguous names alone, so unique names keep
+    their high-recall behaviour and never need to prove their own city.
     """
     kept: list[dict[str, Any]] = []
     dropped: list[tuple[str, str]] = []
 
     for incident in incidents:
         title = incident.get("title") or ""
-        reason = exclusion_reason(title, locality) or city_mismatch_reason(
-            incident.get("url") or "", city
-        )
+        url = incident.get("url") or ""
+        reason = exclusion_reason(title, locality) or city_mismatch_reason(url, city)
+        if reason is None and strict and city and not has_local_evidence(
+            url, title, city, state
+        ):
+            reason = (
+                f"'{locality}' exists in more than one city and nothing here ties "
+                f"this story to {city} — no city/state in the headline and the URL "
+                f"is not filed under {city}"
+            )
         if reason:
             dropped.append((title, reason))
         else:

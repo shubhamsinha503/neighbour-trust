@@ -10,8 +10,10 @@ one, so the filter is deliberately narrow and these tests hold it there.
 
 from agents.news_monitor.exclusions import (
     VERIFIED_EXCLUSIONS,
+    city_mismatch_reason,
     exclusion_reason,
     filter_incidents,
+    has_local_evidence,
 )
 
 
@@ -106,3 +108,106 @@ class TestFilter:
         for locality, phrase, why in VERIFIED_EXCLUSIONS:
             assert locality and phrase and why
             assert phrase == phrase.lower(), "phrases are matched lowercased"
+
+
+class TestCrossCityUrlGuard:
+    """The original guard: drop coverage whose URL is filed under another city."""
+
+    def test_foreign_city_section_is_dropped(self):
+        assert city_mismatch_reason(
+            "https://www.thehindu.com/news/cities/chennai/anna-nagar-swd/", "Hyderabad"
+        )
+
+    def test_own_city_section_is_kept(self):
+        assert (
+            city_mismatch_reason(
+                "https://timesofindia.com/city/hyderabad/anna-nagar-story", "Hyderabad"
+            )
+            is None
+        )
+
+    def test_no_city_in_url_is_not_judged_here(self):
+        """A bare slug tells this guard nothing — the strict filter handles it."""
+        assert city_mismatch_reason("https://example.com/anna-nagar-swd", "Hyderabad") is None
+
+
+class TestPositiveEvidence:
+    def test_url_in_own_city_section_counts(self):
+        assert has_local_evidence(
+            "https://timesofindia.com/city/hyderabad/x", "", "Hyderabad", "Telangana"
+        )
+
+    def test_city_named_in_headline_counts(self):
+        assert has_local_evidence(
+            "", "Anna Nagar in Hyderabad floods after rain", "Hyderabad", "Telangana"
+        )
+
+    def test_state_named_in_headline_counts(self):
+        assert has_local_evidence(
+            "", "Telangana rains hit Anna Nagar", "Hyderabad", "Telangana"
+        )
+
+    def test_nothing_tying_it_to_our_city_is_no_evidence(self):
+        assert not has_local_evidence(
+            "https://example.com/anna-nagar-swd-works",
+            "Anna Nagar Second Avenue SWD works drag on for nine months",
+            "Hyderabad",
+            "Telangana",
+        )
+
+
+class TestStrictFilterForAmbiguousNames:
+    """The Anna Nagar case: the Hyderabad locality must not inherit Chennai news."""
+
+    chennai_story = {
+        "title": "Anna Nagar Second Avenue SWD works drag on for nine months",
+        "url": "https://example.com/anna-nagar-swd-works",
+    }
+    hyderabad_story = {
+        "title": "Theft reported in Hyderabad's Anna Nagar, two held",
+        "url": "https://example.com/story",
+    }
+
+    def test_strict_drops_story_with_no_local_evidence(self):
+        kept, dropped = filter_incidents(
+            [self.chennai_story],
+            locality="Anna Nagar",
+            city="Hyderabad",
+            state="Telangana",
+            strict=True,
+        )
+        assert kept == []
+        assert len(dropped) == 1 and "more than one city" in dropped[0][1]
+
+    def test_strict_keeps_story_that_names_our_city(self):
+        kept, dropped = filter_incidents(
+            [self.hyderabad_story],
+            locality="Anna Nagar",
+            city="Hyderabad",
+            state="Telangana",
+            strict=True,
+        )
+        assert len(kept) == 1 and dropped == []
+
+    def test_non_strict_keeps_everything_for_unique_names(self):
+        """A unique name (Koramangala) never pays the recall cost of strictness."""
+        kept, dropped = filter_incidents(
+            [self.chennai_story],
+            locality="Koramangala",
+            city="Bengaluru",
+            state="Karnataka",
+            strict=False,
+        )
+        assert len(kept) == 1 and dropped == []
+
+    def test_strict_still_defers_to_the_url_city_guard(self):
+        """A URL filed under a foreign city is dropped by the existing guard."""
+        story = {
+            "title": "Anna Nagar news",
+            "url": "https://www.thehindu.com/news/cities/chennai/anna-nagar",
+        }
+        kept, dropped = filter_incidents(
+            [story], locality="Anna Nagar", city="Hyderabad", state="Telangana", strict=True
+        )
+        assert kept == []
+        assert "chennai" in dropped[0][1].lower()

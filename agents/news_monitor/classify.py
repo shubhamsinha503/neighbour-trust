@@ -54,9 +54,14 @@ class Classifier(Protocol):
     name: str
 
     def classify(
-        self, *, title: str, locality: str, city: str, category: str
+        self, *, title: str, locality: str, city: str, category: str, url: str = ""
     ) -> Optional[Judgement]:
-        """Judge one mention, or return None if this classifier cannot decide."""
+        """Judge one mention, or return None if this classifier cannot decide.
+
+        `url` is optional context: Indian outlets file city news under a
+        city-section path (`/city/chennai/`), which is often the only thing that
+        says which of two same-named localities a headline is about.
+        """
         ...
 
 
@@ -159,8 +164,11 @@ class HeuristicClassifier:
     name = "heuristic"
 
     def classify(
-        self, *, title: str, locality: str, city: str, category: str
+        self, *, title: str, locality: str, city: str, category: str, url: str = ""
     ) -> Optional[Judgement]:
+        # The heuristic reads the headline only; `url` is accepted so it satisfies
+        # the Classifier protocol, and the cross-city URL guard runs separately at
+        # envelope-build time (see exclusions.py).
         text = title.lower()
         locality_l = locality.lower()
 
@@ -235,6 +243,12 @@ Answer false when the headline is:
 Answer true only when a real event occurred in that locality: a theft, an \
 assault, a water shortage, a burst pipeline, flooding, and so on.
 
+When a URL is given, use it as evidence of which city the story belongs to: \
+Indian outlets file city news under a city-section path such as /city/chennai/ \
+or /chennai-news/. A locality name is not unique across India — there is an Anna \
+Nagar in Chennai and another in Hyderabad — so if the URL places the story in a \
+different city than the one named above, answer false.
+
 Be conservative, and weigh the two errors differently. Missing a real incident \
 costs one data point among many. A false positive becomes a number on a safety \
 card telling someone a neighbourhood is dangerous, and these compound: a single \
@@ -280,12 +294,13 @@ class ClaudeClassifier:
         self.name = f"claude:{self._model}"
 
     def classify(
-        self, *, title: str, locality: str, city: str, category: str
+        self, *, title: str, locality: str, city: str, category: str, url: str = ""
     ) -> Optional[Judgement]:
         prompt = (
             f"Locality: {locality}, {city}\n"
             f"Category: {category}\n"
             f"Headline: {title}"
+            + (f"\nURL: {url}" if url else "")
         )
 
         try:
@@ -558,12 +573,13 @@ class OpenAICompatibleClassifier:
 
 
     def classify(
-        self, *, title: str, locality: str, city: str, category: str
+        self, *, title: str, locality: str, city: str, category: str, url: str = ""
     ) -> Optional[Judgement]:
         prompt = (
             f"Locality: {locality}, {city}\n"
             f"Category: {category}\n"
             f"Headline: {title}"
+            + (f"\nURL: {url}" if url else "")
         )
 
         self._wait_turn()

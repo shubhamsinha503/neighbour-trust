@@ -98,6 +98,13 @@ def run_once(
                         "No localities seeded. Run: python -m agents.common.seed_localities"
                     )
 
+                # Names shared across cities ("Anna Nagar" in both Chennai and
+                # Hyderabad). Computed over the whole table, not just the
+                # localities being processed, so a single-locality run still
+                # knows its name collides elsewhere. Drives the city-anchored
+                # search and the stricter envelope filter below.
+                ambiguous_names = db.ambiguous_locality_names(conn)
+
                 if not skip_fetch:
                     # Longest-unfetched first, within a time limit. Re-reading
                     # all 159 localities took 70 of the run's 70 minutes on
@@ -129,6 +136,7 @@ def run_once(
                             locality,
                             gnews_client=gnews_client,
                             gdelt_client=gdelt_client,
+                            ambiguous_names=ambiguous_names,
                         )
                         fetched_localities += 1
                         # Per locality, so a run killed mid-fetch keeps what it
@@ -174,7 +182,8 @@ def run_once(
                 for locality in localities:
                     for category in news_agent.CATEGORIES:
                         result = news_agent.build_envelope(
-                            conn, locality, category=category
+                            conn, locality, category=category,
+                            ambiguous_names=ambiguous_names,
                         )
                         outcome.results.append(result)
                         if result.ok:

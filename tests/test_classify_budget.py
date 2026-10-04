@@ -29,7 +29,7 @@ class CountingClassifier:
         self.tick = tick
         self.decline_every = decline_every
 
-    def classify(self, *, title, locality, city, category):
+    def classify(self, *, title, locality, city, category, url=""):
         self.calls += 1
         if self.clock is not None:
             self.clock.advance(self.tick)
@@ -119,7 +119,7 @@ def test_fetch_writes_each_search_as_one_batch(monkeypatch):
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("row-at-a-time write")))
 
     class FakeNews:
-        def search_locality(self, *, locality, city, category, months):
+        def search_locality(self, *, locality, city, category, months, disambiguate=False):
             return [{"url": f"https://x/{category}/{i}", "title": "t"} for i in range(7)]
 
     stored = agent.fetch_for_locality(
