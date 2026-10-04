@@ -218,6 +218,10 @@ export default function SearchScreen() {
             <EmptyState icon="search" title={t("search.emptyTitle")} message={t("search.empty")} />
           }
           renderItem={({ item }) => <LocalityRow item={item} />}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          removeClippedSubviews
         />
       )}
 

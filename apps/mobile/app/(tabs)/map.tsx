@@ -117,6 +117,10 @@ export default function MapScreen() {
               </PressableScale>
             </Link>
           )}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          removeClippedSubviews
         />
       )}
     </View>

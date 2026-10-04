@@ -45,6 +45,10 @@ export default function SavedScreen() {
           keyExtractor={(item) => item.slug}
           contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 24 }}
           renderItem={({ item }) => <LocalityRow item={item} />}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          removeClippedSubviews
         />
       )}
     </View>

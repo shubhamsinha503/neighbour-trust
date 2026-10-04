@@ -1,4 +1,4 @@
-# Neighbour Trust — mobile (Expo)
+# Nestra — mobile (Expo)
 
 A real native app (not the TWA wrapper), built with Expo + React Native +
 expo-router. It talks to the **same FastAPI backend** the website uses, so there

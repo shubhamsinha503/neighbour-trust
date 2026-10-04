@@ -94,9 +94,12 @@ export default function HomeScreen() {
             <View style={styles.brandMark}>
               <Icon name="heart" size={16} color="#ffffff" filled />
             </View>
-            <Txt weight="extrabold" style={styles.brand}>
-              {t("brand")}
-            </Txt>
+            <View>
+              <Txt weight="extrabold" style={styles.brand}>
+                {t("brand")}
+              </Txt>
+              <Txt style={styles.brandTagline}>{t("brand.tagline")}</Txt>
+            </View>
           </View>
           <LanguageButton />
         </View>
@@ -243,6 +246,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   brand: { fontSize: 17, color: theme.ink },
+  brandTagline: { fontSize: 10.5, color: theme.inkMuted, letterSpacing: 0.2, marginTop: 1 },
   eyebrow: {
     alignSelf: "flex-start",
     backgroundColor: theme.brandSoft,
