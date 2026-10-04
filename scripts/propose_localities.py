@@ -156,7 +156,10 @@ CITIES: dict[str, dict[str, Any]] = {
     },
     "Noida": {
         "state": "Uttar Pradesh",
-        "extract": "northern-zone",
+        # UP sits in Geofabrik's central-zone, not northern-zone (which is
+        # Delhi/Haryana/Punjab). Reading northern-zone here found no Noida
+        # settlement node, so every candidate mis-attributed to New Delhi.
+        "extract": "central-zone",
         "centre": (28.5355, 77.3910),
         "radius_km": 13.0,
         # Greater Noida is a separate municipality (below); kept out of Noida so
@@ -165,14 +168,14 @@ CITIES: dict[str, dict[str, Any]] = {
     },
     "Greater Noida": {
         "state": "Uttar Pradesh",
-        "extract": "northern-zone",
+        "extract": "central-zone",
         "centre": (28.4744, 77.5040),
         "radius_km": 16.0,
         "aliases": ["Greater Noida West", "Noida Extension"],
     },
     "Ghaziabad": {
         "state": "Uttar Pradesh",
-        "extract": "northern-zone",
+        "extract": "central-zone",
         "centre": (28.6692, 77.4538),
         "radius_km": 14.0,
         "aliases": ["Indirapuram", "Vaishali", "Vasundhara"],
