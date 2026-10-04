@@ -9,7 +9,7 @@ catch. The list is hand-maintained and grows, so the checks run on every commit.
 import pytest
 
 from agents.common.geo import cell_for
-from agents.common.seed_localities import LOCALITIES
+from agents.common.seed_localities import LOCALITIES, RETIRED_SLUGS
 
 # Generous boxes around each city. Not precision checks — those are
 # scripts/geocode_localities.py's job. This only catches a coordinate that has
@@ -37,6 +37,14 @@ def test_no_two_localities_share_an_h3_cell():
         cell = cell_for(lat, lon)
         assert cell not in seen, f"{slug} collides with {seen[cell]} in cell {cell}"
         seen[cell] = slug
+
+
+def test_retired_slugs_are_not_also_active():
+    """A slug cannot be both seeded and retired — the seeder would add it and then
+    immediately delete it, serving nothing while looking fine."""
+    active = {row[0] for row in LOCALITIES}
+    clash = active & set(RETIRED_SLUGS)
+    assert not clash, f"slugs both active and retired: {clash}"
 
 
 @pytest.mark.parametrize("row", LOCALITIES, ids=[r[0] for r in LOCALITIES])

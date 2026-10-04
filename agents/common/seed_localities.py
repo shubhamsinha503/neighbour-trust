@@ -223,7 +223,11 @@ LOCALITIES: list[tuple[str, str, str, str, str, float, float]] = [
     ("satavahana-nagar", "Satavahana Nagar", "Hyderabad", "Telangana", None, 17.5000, 78.4003),
     ("ramnaresh-colony", "Ramnaresh Colony", "Hyderabad", "Telangana", None, 17.5023, 78.3791),
     ("sreenivasa-nagar", "Sreenivasa Nagar", "Hyderabad", "Telangana", None, 17.5063, 78.3912),
-    ("venkata-reddy-nagar", "Venkata Reddy Nagar", "Hyderabad", "Telangana", None, 17.4852, 78.3176),
+    # Venkata Reddy Nagar removed: OpenStreetMap places it inside Lingampally
+    # (its own area record reads "Venkata Reddy Nagar, Chandanagar, Lingampally"),
+    # 35 m from the Lingampally centroid below — the same res-9 H3 cell. Two
+    # localities in one cell silently overwrite each other's envelopes, so the
+    # nested sub-area is dropped and Lingampally (which carries a pincode) stands.
     ("bhagyanagar-colony", "Bhagyanagar Colony", "Hyderabad", "Telangana", None, 17.4975, 78.4033),
     ("taranagar", "Taranagar", "Hyderabad", "Telangana", None, 17.4926, 78.3185),
     ("uskabavi", "Uskabavi", "Hyderabad", "Telangana", None, 17.5249, 78.2921),
@@ -1087,7 +1091,13 @@ LOCALITIES: list[tuple[str, str, str, str, str, float, float]] = [
     ("agripada", "Agripada", "Mumbai", "Maharashtra", None, 18.9750, 72.8251),
     ("kalanagar", "Kalanagar", "Mumbai", "Maharashtra", None, 19.0547, 72.8485),
     ("antop-hill", "Antop Hill", "Mumbai", "Maharashtra", None, 19.0239, 72.8685),
-    ("ashok-nagar", "Ashok Nagar", "Mumbai", "Maharashtra", None, 19.1067, 72.8291),
+    # Re-pointed from (19.1067, 72.8291) — that point is "Ashok Nagar, Juhu",
+    # a sub-area nested inside Juhu 171 m from its centroid, sharing one res-9
+    # H3 cell (and so overwriting Juhu's envelopes). OpenStreetMap also holds a
+    # distinct, standalone "Ashok Nagar, Kurla East" ~6 km away; using that keeps
+    # a real searchable locality instead of dropping coverage, and it collides
+    # with nothing.
+    ("ashok-nagar", "Ashok Nagar", "Mumbai", "Maharashtra", None, 19.0530, 72.8798),
     ("gufa-tekdi", "Gufa Tekdi", "Mumbai", "Maharashtra", None, 19.1393, 72.8573),
     ("cgs-colony", "CGS Colony", "Mumbai", "Maharashtra", None, 19.0295, 72.8694),
     ("dadar-west", "Dadar West", "Mumbai", "Maharashtra", None, 19.0239, 72.8382),
@@ -1402,6 +1412,16 @@ LOCALITIES: list[tuple[str, str, str, str, str, float, float]] = [
 ]
 
 
+# Slugs removed from the list above that must also be deleted from the database.
+# Seeding is upsert-only, so without this a dropped locality would linger and keep
+# being served. Each entry is a locality retired because it shared an H3 cell with
+# another (and so could only overwrite its envelopes); the note at its old place
+# in the list says which locality it collided with.
+RETIRED_SLUGS: tuple[str, ...] = (
+    "venkata-reddy-nagar",  # nested in Lingampally; see the note above
+)
+
+
 def main() -> None:
     with db.connect() as conn:
         for slug, name, city, state, pincode, lat, lon in LOCALITIES:
@@ -1416,8 +1436,13 @@ def main() -> None:
                 lon=lon,
                 h3_cell=cell_for(lat, lon),
             )
+        removed = sum(db.delete_locality(conn, slug) for slug in RETIRED_SLUGS)
         conn.commit()
-    print(f"Seeded {len(LOCALITIES)} localities across Bengaluru, Gurugram, Hyderabad and Mumbai.")
+    print(
+        f"Seeded {len(LOCALITIES)} localities across Bengaluru, Gurugram, "
+        f"Hyderabad and Mumbai."
+        + (f" Retired {removed}." if removed else "")
+    )
 
 
 if __name__ == "__main__":

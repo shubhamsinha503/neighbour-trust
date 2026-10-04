@@ -63,6 +63,22 @@ def upsert_locality(
     return row["id"]
 
 
+def delete_locality(conn: psycopg.Connection, slug: str) -> bool:
+    """Remove a locality by slug. Returns True if a row was deleted.
+
+    Seeding is otherwise upsert-only, so a locality dropped from the seed list
+    would linger in the database and keep being served. This lets the seeder
+    retire one explicitly. Its data_envelope rows are keyed by h3_cell rather
+    than by locality, so they are not removed here — a retired locality that
+    shared its cell with another (the reason for most retirements) leaves the
+    cell's envelopes correctly owned by the locality that remains.
+    """
+    row = conn.execute(
+        "DELETE FROM locality WHERE slug = %s RETURNING id", (slug,)
+    ).fetchone()
+    return row is not None
+
+
 def get_locality(conn: psycopg.Connection, slug: str) -> Optional[dict[str, Any]]:
     return conn.execute(
         """
