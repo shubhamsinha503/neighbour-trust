@@ -1684,6 +1684,12 @@ LOCALITIES: list[tuple[str, str, str, str, str, float, float]] = [
     ("malcha", "Malcha", "Delhi", "Delhi", None, 28.6039, 77.1834),
     ("tigri", "Tigri", "Delhi", "Delhi", None, 28.5117, 77.2409),
     ("sangam-vihar", "Sangam Vihar", "Delhi", "Delhi", None, 28.5057, 77.2485),
+    # --- Geocoded sectors, Noida (scripts/geocode_sectors) ---
+    ("noida-sector-10", "Sector 10", "Noida", "Uttar Pradesh", None, 28.5906, 77.3325),
+    ("noida-sector-18", "Sector 18", "Noida", "Uttar Pradesh", None, 28.5705, 77.3229),
+    ("noida-sector-59", "Sector 59", "Noida", "Uttar Pradesh", None, 28.6080, 77.3676),
+    ("noida-sector-62", "Sector 62", "Noida", "Uttar Pradesh", None, 28.6211, 77.3643),
+    ("noida-sector-83", "Sector 83", "Noida", "Uttar Pradesh", None, 28.5245, 77.3980),
 ]
 
 
