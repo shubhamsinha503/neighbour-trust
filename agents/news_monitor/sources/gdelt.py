@@ -109,21 +109,26 @@ class GdeltClient:
         category: str,
         months: int = 12,
         max_records: int = 60,
+        disambiguate: bool = False,
     ) -> Iterator[dict[str, Any]]:
         """Articles mentioning a locality alongside that category's vocabulary.
 
         The locality name is quoted so GDELT matches the phrase rather than its
         words separately — without quotes "Golf Course Road" matches any article
-        containing "golf". The city name is deliberately *not* required in the
-        query: Indian local reporting frequently names only the locality, and
-        requiring both cost more recall than it bought precision in testing.
-        The city is passed to the classifier instead, which can weigh it.
+        containing "golf". The city name is normally *not* required in the query:
+        Indian local reporting frequently names only the locality, and requiring
+        both cost more recall than it bought precision in testing. The city is
+        passed to the classifier instead, which can weigh it.
+
+        `disambiguate` is the exception: for a name shared across cities it adds
+        the city to the query so another city's same-named locality is kept out.
         """
         terms = CATEGORY_TERMS.get(category)
         if not terms:
             raise GdeltError(f"No search terms defined for category {category!r}")
 
-        query = f'"{locality}" ({" OR ".join(terms)})'
+        anchor = f'"{locality}" "{city}"' if disambiguate and city else f'"{locality}"'
+        query = f'{anchor} ({" OR ".join(terms)})'
         payload = self._get(
             {
                 "query": query,

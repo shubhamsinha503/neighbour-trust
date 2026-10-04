@@ -128,12 +128,19 @@ class GoogleNewsClient:
         category: str,
         months: int = 12,
         now: Optional[datetime] = None,
+        disambiguate: bool = False,
     ) -> Iterator[dict[str, Any]]:
         """Articles naming a locality alongside a category's vocabulary.
 
         Searched once per edition configured for the city, so a Gurugram query
         covers Hindi as well as English. Results are deduplicated on URL, since
         a story carried by several outlets appears once per edition.
+
+        `disambiguate` adds the city to the query. It is off by default because
+        Indian local reporting frequently names only the locality, so requiring
+        the city costs recall; the caller turns it on only for names shared
+        across cities ("Anna Nagar"), where that recall cost is worth paying to
+        keep another city's coverage out.
         """
         terms = CATEGORY_TERMS.get(category)
         if not terms:
@@ -143,8 +150,10 @@ class GoogleNewsClient:
         cutoff = now - timedelta(days=months * 31)
 
         # The locality is quoted so Google matches the phrase; without quotes
-        # "Golf Course Road" matches any article containing "golf".
-        query = f'"{locality}" ({" OR ".join(terms)})'
+        # "Golf Course Road" matches any article containing "golf". For an
+        # ambiguous name the city is quoted and required alongside it.
+        anchor = f'"{locality}" "{city}"' if disambiguate and city else f'"{locality}"'
+        query = f'{anchor} ({" OR ".join(terms)})'
         editions = CITY_EDITIONS.get(city, DEFAULT_EDITIONS)
 
         seen: set[str] = set()

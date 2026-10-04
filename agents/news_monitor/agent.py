@@ -128,6 +128,7 @@ def fetch_for_locality(
     *,
     gnews_client: Optional[gnews_src.GoogleNewsClient] = None,
     gdelt_client: Optional[gdelt_src.GdeltClient] = None,
+    ambiguous_names: Optional[set[str]] = None,
 ) -> int:
     """Search every available source for this locality and store the hits.
 
@@ -136,8 +137,15 @@ def fetch_for_locality(
     separate networks on 2026-09-01 while Google News answered in five seconds —
     and because they index different press. Duplicates across sources are
     absorbed by the (locality, category, url) unique constraint.
+
+    `ambiguous_names` is the set of locality names shared across cities. When this
+    locality's name is one of them, the city is added to each search query so a
+    same-named locality in another city is kept out at the source.
     """
     stored = 0
+    disambiguate = (locality.get("name") or "").strip().lower() in (
+        ambiguous_names or set()
+    )
 
     for category in CATEGORIES:
         found = 0
@@ -155,6 +163,7 @@ def fetch_for_locality(
                         city=locality["city"],
                         category=category,
                         months=LOOKBACK_MONTHS,
+                        disambiguate=disambiguate,
                     )
                 )
             except Exception as exc:
@@ -291,6 +300,7 @@ def classify_pending(
             locality=mention["locality"],
             city=mention["city"],
             category=mention["category"],
+            url=mention.get("url") or "",
         )
 
     since_commit = 0
@@ -372,7 +382,12 @@ def attribution(contributing: list[str]) -> tuple[str, Optional[str]]:
 
 
 def build_envelope(
-    conn, locality: dict[str, Any], *, category: str, now: Optional[datetime] = None
+    conn,
+    locality: dict[str, Any],
+    *,
+    category: str,
+    now: Optional[datetime] = None,
+    ambiguous_names: Optional[set[str]] = None,
 ) -> LocalityResult:
     now = now or datetime.now(timezone.utc)
     h3_cell, slug = locality["h3_cell"], locality["slug"]
@@ -388,8 +403,18 @@ def build_envelope(
     # being about it. Applied here rather than at classification so a correction
     # takes effect on the next ordinary run instead of requiring — and paying
     # for — a full re-judgement of the corpus.
+    #
+    # `strict` is on only for names shared across cities, where an article must
+    # show positive evidence of this locality's own city to count. It is derived
+    # here so a name that becomes (or stops being) ambiguous as localities change
+    # is handled on the next ordinary run, not at the next code change.
+    strict = (locality.get("name") or "").strip().lower() in (ambiguous_names or set())
     incidents, excluded = exclusions_mod.filter_incidents(
-        incidents, locality=locality["name"], city=locality["city"]
+        incidents,
+        locality=locality["name"],
+        city=locality["city"],
+        state=locality.get("state") or "",
+        strict=strict,
     )
     for title, reason in excluded:
         log.info("[%s/%s] excluded: %s (%s)", slug, category, title[:70], reason)
