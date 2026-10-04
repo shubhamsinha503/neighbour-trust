@@ -586,16 +586,22 @@ def main(argv: Optional[list[str]] = None) -> int:
             return 1
         seed = pathlib.Path("agents/common/seed_localities.py")
         source = seed.read_text(encoding="utf-8")
-        marker = "]\n\n\ndef main() -> None:"
-        if marker not in source:
+        # Insert before the standalone "]" that closes the LOCALITIES list.
+        # Anchoring on the list's own closing bracket — rather than on whatever
+        # follows it (a RETIRED_SLUGS block, then main()) — keeps this working as
+        # the file grows; an earlier marker that assumed "]" sat right before
+        # def main() silently stopped matching once RETIRED_SLUGS was added.
+        try:
+            close_idx = source.index("\n]\n", source.index("LOCALITIES:"))
+        except ValueError:
             print("\nCould not find the end of LOCALITIES; not writing.", file=sys.stderr)
             return 1
         block = (
             f"\n    # --- Proposed from OpenStreetMap place nodes, "
             f"{args.city} ---\n"
-            f"{as_seed_rows(result, args.limit)}\n"
+            f"{as_seed_rows(result, args.limit)}"
         )
-        seed.write_text(source.replace(marker, block + marker), encoding="utf-8")
+        seed.write_text(source[:close_idx] + block + source[close_idx:], encoding="utf-8")
         print(f"\nAppended {len(shown)} rows to {seed}. Review the diff before seeding.")
 
     return 0
