@@ -144,6 +144,26 @@ class TestSlugs:
         assert not slug.startswith("-") and not slug.endswith("-")
 
 
+class TestCityNamespacedSlugs:
+    """Generic names ("Sector 50") exist in several NCR cities and must be
+    namespaced, or the second city's copy collides on the unique slug."""
+
+    def test_sector_is_prefixed_with_city(self):
+        assert prop.slug_for("Sector 50", "Noida") == "noida-sector-50"
+        assert prop.slug_for("Sector 50", "Gurugram") == "gurugram-sector-50"
+
+    def test_two_cities_do_not_collide(self):
+        assert prop.slug_for("Sector 50", "Noida") != prop.slug_for("Sector 50", "Greater Noida")
+
+    def test_phase_and_block_are_also_namespaced(self):
+        assert prop.slug_for("Phase 2", "Greater Noida") == "greater-noida-phase-2"
+        assert prop.slug_for("Block C", "Delhi") == "delhi-block-c"
+
+    def test_distinctive_names_stay_bare(self):
+        assert prop.slug_for("Koramangala", "Bengaluru") == "koramangala"
+        assert prop.slug_for("Dwarka", "Delhi") == "dwarka"
+
+
 class TestAdmissionThresholds:
     def test_a_candidate_must_have_something_to_show(self):
         """A locality that renders an empty report is worse than one that does

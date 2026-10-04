@@ -31,6 +31,12 @@ DELAY = 1.1
 CITY_BOX = {
     "Bengaluru": (77.35, 12.75, 77.85, 13.20),
     "Gurugram": (76.85, 28.30, 77.15, 28.55),
+    # Delhi NCR (min_lon, min_lat, max_lon, max_lat).
+    "Delhi": (76.84, 28.40, 77.35, 28.88),
+    "Noida": (77.30, 28.48, 77.60, 28.64),
+    "Greater Noida": (77.42, 28.40, 77.65, 28.52),
+    "Ghaziabad": (77.38, 28.60, 77.60, 28.78),
+    "Faridabad": (77.25, 28.33, 77.45, 28.52),
 }
 
 # How far apart my estimate and the geocoder may be before a human must look.
