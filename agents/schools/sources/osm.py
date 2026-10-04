@@ -37,7 +37,7 @@ from __future__ import annotations
 import logging
 import pathlib
 import time
-from typing import Any, Iterator, Optional
+from typing import Any, Iterable, Iterator, Optional
 
 from agents.common import osm_features
 
@@ -56,15 +56,30 @@ CITY_BBOX: dict[str, tuple[float, float, float, float]] = {
     "Gurugram": (28.25, 76.75, 28.65, 77.25),
     "Hyderabad": (17.10, 78.15, 17.70, 78.80),
     "Mumbai": (18.85, 72.60, 19.35, 73.15),
+    # Delhi NCR. Without these the NCR localities get no OSM school presence and
+    # their Schools card is empty — UDISE does not cover them either (see
+    # udise.CITY_DISTRICTS), so OSM is the only school source for NCR for now.
+    "Delhi": (28.40, 76.84, 28.88, 77.35),
+    "Noida": (28.48, 77.30, 28.64, 77.60),
+    "Greater Noida": (28.38, 77.40, 28.54, 77.68),
+    "Ghaziabad": (28.58, 77.36, 28.80, 77.62),
+    "Faridabad": (28.30, 77.22, 28.54, 77.48),
 }
 
 # Which regional extract covers each city. Hyderabad rides in southern-zone
-# (already downloaded for Bengaluru); Mumbai needs western-zone.
+# (already downloaded for Bengaluru); Mumbai needs western-zone. Delhi and
+# Faridabad (Haryana) are in northern-zone; Noida/Greater Noida/Ghaziabad are in
+# Uttar Pradesh, which Geofabrik files under central-zone.
 CITY_EXTRACT: dict[str, str] = {
     "Bengaluru": "southern-zone",
     "Gurugram": "northern-zone",
     "Hyderabad": "southern-zone",
     "Mumbai": "western-zone",
+    "Delhi": "northern-zone",
+    "Noida": "central-zone",
+    "Greater Noida": "central-zone",
+    "Ghaziabad": "central-zone",
+    "Faridabad": "northern-zone",
 }
 
 log = logging.getLogger(__name__)
@@ -117,6 +132,27 @@ class OsmSchoolsClient:
         if name in self._paths:
             return self._paths[name]
         return osm_features.download_extract(name, cache_dir=self._cache_dir)
+
+    def warm(self, cities: Iterable[str]) -> None:
+        """Parse each city's extract into the cache, before any DB work.
+
+        The parse takes minutes. The schools job used to trigger it lazily from
+        inside the database transaction (between the UDISE writes and the
+        commit), which left the connection idle long enough for the managed
+        database's idle-in-transaction timeout to drop it mid-run — seen as
+        "server conn crashed? / the connection is lost". Warming the cache here,
+        with no connection open, keeps the heavy read out of the transaction, the
+        way the connectivity agent already reads its extracts before connecting.
+
+        Non-fatal per extract: a missing or unreadable one already degrades to
+        UDISE-only in schools_for_city, so it must not break the run before the
+        database is even opened.
+        """
+        for extract_name in sorted({CITY_EXTRACT[c] for c in cities if c in CITY_EXTRACT}):
+            try:
+                self._schools_in(extract_name)
+            except Exception as exc:
+                log.warning("could not pre-warm %s: %s", extract_name, exc)
 
     def _schools_in(self, extract_name: str) -> list[dict[str, Any]]:
         if extract_name not in self._by_extract:

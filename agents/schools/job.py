@@ -46,6 +46,14 @@ def run_once(
     client = udise_src.UdiseClient()
     osm_client = osm_src.OsmSchoolsClient()
 
+    # Parse the OSM extracts before opening the database connection. The parse
+    # takes minutes, and doing it inside the transaction (between the UDISE writes
+    # and the commit) left the connection idle long enough for the managed
+    # database's idle-in-transaction timeout to drop it mid-run. The connectivity
+    # agent already reads its extracts before connecting for this reason.
+    if not skip_ingest:
+        osm_client.warm(osm_src.CITY_BBOX)
+
     try:
         with db.connect() as conn:
             run_id = (
