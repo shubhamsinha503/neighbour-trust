@@ -110,11 +110,6 @@ export default function HomeScreen() {
           </Txt>
         </View>
 
-        <Txt weight="extrabold" style={styles.title}>
-          {t("home.title")}
-        </Txt>
-        <Txt style={styles.subtitle}>{t("home.subtitle")}</Txt>
-
         <PressableScale style={styles.searchBar} onPress={() => goSearch()}>
           <Icon name="search" size={20} color={theme.inkMuted} />
           <Txt style={styles.searchText}>{t("home.search")}</Txt>
@@ -256,13 +251,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   eyebrowText: { fontSize: 11, letterSpacing: 0.6, color: theme.brandDeep },
-  title: { fontSize: 33, color: theme.ink, letterSpacing: -0.8, lineHeight: 38 },
-  subtitle: { fontSize: 14.5, color: theme.inkSecondary, marginTop: 10, lineHeight: 21 },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginTop: 18,
+    marginTop: 6,
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.hairline,
