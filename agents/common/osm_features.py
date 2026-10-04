@@ -64,6 +64,12 @@ EXTRACTS: dict[str, str] = {
     # Maharashtra (Mumbai) and Gujarat. Added for the Hyderabad/Mumbai launch —
     # Hyderabad rides in southern-zone, Mumbai needs this one.
     "western-zone": "https://download.geofabrik.de/asia/india/western-zone-latest.osm.pbf",
+    # Uttar Pradesh (and MP, Chhattisgarh). Added for the Delhi NCR expansion:
+    # Delhi and Gurugram/Faridabad (Haryana) are in northern-zone, but Noida,
+    # Greater Noida and Ghaziabad are in UP — Geofabrik files UP under central-
+    # zone, not northern — so their place nodes are absent from northern-zone and
+    # every candidate there mis-attributes to a Delhi/Haryana settlement.
+    "central-zone": "https://download.geofabrik.de/asia/india/central-zone-latest.osm.pbf",
 }
 
 DEFAULT_CACHE = pathlib.Path(".cache/osm")
