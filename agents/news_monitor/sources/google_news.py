@@ -49,6 +49,12 @@ CITY_EDITIONS: dict[str, list[tuple[str, str]]] = {
     # (hl, ceid) — interface language and edition
     "Bengaluru": [("en-IN", "IN:en"), ("kn", "IN:kn")],
     "Gurugram": [("en-IN", "IN:en"), ("hi", "IN:hi")],
+    # Delhi NCR reporting runs heavily in Hindi alongside English.
+    "Delhi": [("en-IN", "IN:en"), ("hi", "IN:hi")],
+    "Noida": [("en-IN", "IN:en"), ("hi", "IN:hi")],
+    "Greater Noida": [("en-IN", "IN:en"), ("hi", "IN:hi")],
+    "Ghaziabad": [("en-IN", "IN:en"), ("hi", "IN:hi")],
+    "Faridabad": [("en-IN", "IN:en"), ("hi", "IN:hi")],
 }
 DEFAULT_EDITIONS = [("en-IN", "IN:en")]
 

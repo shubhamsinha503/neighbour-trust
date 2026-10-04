@@ -141,6 +141,49 @@ CITIES: dict[str, dict[str, Any]] = {
         # now — a deliberate first-pass boundary, widened later if wanted.
         "aliases": ["Bombay"],
     },
+    # --- Delhi NCR ---
+    # Each NCR city is its own `city`, not folded into one "Delhi NCR": they are
+    # separate municipalities a buyer names distinctly, and their "Sector N" names
+    # collide, which is why sector slugs are namespaced by city (see slug_for).
+    # All ride the northern-zone extract already downloaded.
+    "Delhi": {
+        "state": "Delhi",
+        "extract": "northern-zone",
+        # Central Delhi; the built-up NCT runs ~20 km out (Dwarka, Rohini, Saket).
+        "centre": (28.6139, 77.2090),
+        "radius_km": 22.0,
+        "aliases": ["New Delhi"],
+    },
+    "Noida": {
+        "state": "Uttar Pradesh",
+        "extract": "northern-zone",
+        "centre": (28.5355, 77.3910),
+        "radius_km": 13.0,
+        # Greater Noida is a separate municipality (below); kept out of Noida so
+        # their sectors are not merged.
+        "aliases": [],
+    },
+    "Greater Noida": {
+        "state": "Uttar Pradesh",
+        "extract": "northern-zone",
+        "centre": (28.4744, 77.5040),
+        "radius_km": 16.0,
+        "aliases": ["Greater Noida West", "Noida Extension"],
+    },
+    "Ghaziabad": {
+        "state": "Uttar Pradesh",
+        "extract": "northern-zone",
+        "centre": (28.6692, 77.4538),
+        "radius_km": 14.0,
+        "aliases": ["Indirapuram", "Vaishali", "Vasundhara"],
+    },
+    "Faridabad": {
+        "state": "Haryana",
+        "extract": "northern-zone",
+        "centre": (28.4089, 77.3178),
+        "radius_km": 13.0,
+        "aliases": [],
+    },
 }
 
 # Two candidates closer than this with the same name are the same place mapped
@@ -204,6 +247,21 @@ def slugify(name: str) -> str:
     text = name.lower().replace("&", "and")
     text = re.sub(r"[^a-z0-9]+", "-", text)
     return text.strip("-")
+
+
+# Names that are not unique without their city: "Sector 50" and "Phase 2" exist
+# in most NCR cities. Left bare, the second city's copy collides on the UNIQUE
+# slug and is silently rejected. These get a "<city>-" prefix; distinctive names
+# (Koramangala, Juhu) stay bare.
+_GENERIC_NAME = re.compile(r"^(sector|phase|block)\b", re.IGNORECASE)
+
+
+def slug_for(name: str, city: str) -> str:
+    """A slug for a locality, namespaced by city when the name is generic."""
+    base = slugify(name)
+    if _GENERIC_NAME.match(name.strip()):
+        return f"{slugify(city)}-{base}"
+    return base
 
 
 def existing_localities() -> list[tuple[str, str, str, float, float]]:
@@ -432,7 +490,7 @@ def propose(city: str, kinds: list[str], *, cache_dir: pathlib.Path) -> dict[str
             thin.append(place)
             continue
 
-        slug = slugify(place["name"])
+        slug = slug_for(place["name"], city)
         if slug in seen_slugs:
             rejected["slug collides with an existing locality"] += 1
             continue

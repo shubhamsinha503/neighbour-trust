@@ -82,7 +82,9 @@ def exclusion_reason(title: str, locality: str) -> Optional[str]:
 _KNOWN_CITIES: tuple[str, ...] = (
     "chennai", "mumbai", "delhi", "new-delhi", "kolkata", "pune", "ahmedabad",
     "bengaluru", "bangalore", "hyderabad", "gurugram", "gurgaon", "noida",
-    "jaipur", "chandigarh", "lucknow", "kochi", "coimbatore", "nagpur", "thane",
+    "greater-noida", "ghaziabad", "faridabad",
+    "jaipur", "chandigarh", "mohali", "ludhiana", "amritsar", "jalandhar",
+    "lucknow", "kochi", "coimbatore", "nagpur", "thane",
     "bhopal", "indore", "patna", "surat", "vadodara", "visakhapatnam", "bhubaneswar",
 )
 
@@ -96,6 +98,12 @@ _CITY_ALIASES: dict[str, tuple[str, ...]] = {
     "gurgaon": ("gurugram", "gurgaon"),
     "mumbai": ("mumbai", "navi-mumbai"),
     "delhi": ("delhi", "new-delhi"),
+    # NCR: outlets file these under their own sections, but a story about one is
+    # routinely tagged "noida" vs "greater-noida" loosely, so greater-noida counts
+    # its own and bare "noida" as own-city evidence (not the reverse — a Noida
+    # story is not evidence for Greater Noida).
+    "greater noida": ("greater-noida", "noida"),
+    "mohali": ("mohali", "chandigarh"),
 }
 
 
