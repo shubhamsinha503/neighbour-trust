@@ -101,7 +101,7 @@ export default function ReportScreen() {
       await Share.share({
         message: `${report.locality.name}, ${report.locality.city} — Trust Score ${
           report.trust_score.score ?? "—"
-        }/100 on Neighbour Trust.`,
+        }/100 on Nestra.`,
       });
     } catch {
       /* dismissed */
