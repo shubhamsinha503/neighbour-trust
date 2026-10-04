@@ -87,8 +87,12 @@ jobs:
     #
     # The scheduled crons each run one agent and fit comfortably; this ceiling
     # is for the manual `all` run. Minutes are free on a public repository, so
-    # the only thing a generous limit costs is a later failure signal.
-    timeout-minutes: 110
+    # the only thing a generous limit costs is a later failure signal. Raised
+    # from 110 after an `all` run was cancelled at the limit: adding the
+    # central-zone extract (Delhi NCR) gave schools and connectivity a fourth
+    # zone to parse, and the full air+schools+connectivity+news pass no longer
+    # fit in 110 minutes.
+    timeout-minutes: 180
 
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
