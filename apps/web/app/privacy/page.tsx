@@ -5,7 +5,7 @@ import { ForgetMeButton } from "@/components/ForgetMeButton";
 export const metadata = {
   title: "Privacy",
   description:
-    "What Neighbour Trust collects, which is almost nothing, and what the "
+    "What Nestra collects, which is almost nothing, and what the "
     + "services behind it record.",
 };
 
@@ -34,6 +34,15 @@ export const metadata = {
  * persistent id — this page has to change in the same commit, or it becomes a
  * false statement rather than a stale one.
  *
+ * It also now describes the native Android app (Nestra): approximate foreground
+ * location for the "Show my neighbourhood" button, reverse-geocoded to a city
+ * name on the device and never sent to the server (apps/mobile/app/(tabs)/index.tsx);
+ * saved localities, language and recently-viewed held only in on-device storage
+ * (apps/mobile/src/saved.tsx); no sign-in, no cookies, and no analytics or ad SDK
+ * in the app's dependencies (apps/mobile/package.json). If the app starts sending
+ * location to the server, adds sign-in, or adds any tracking SDK, the app section
+ * has to change in the same commit.
+ *
  * The analytics script was added on 2026-09-08 in the same commit as the
  * wording below, which is the rule working rather than the rule being tested.
  *
@@ -52,17 +61,17 @@ export default function PrivacyPage() {
         href="/"
         className="text-[12px] font-semibold text-brand hover:underline"
       >
-        ← Neighbour Trust
+        ← Nestra
       </Link>
 
       <h1 className="mt-5 text-[24px] font-bold tracking-[-0.01em]">Privacy</h1>
       <p className="mt-1.5 text-[12px] text-ink-muted">
-        Last updated 22 September 2026
+        Last updated 4 October 2026
       </p>
 
       <Section title="The short version">
         <p>
-          Neighbour Trust has no advertising, and you never need an account to
+          Nestra has no advertising, and you never need an account to
           read anything on it. If you choose to sign in with Google — only to
           save localities, keep notes and compare them — we store your Google
           account id, email, name and what you save, and nothing else. You can
@@ -323,18 +332,57 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="If you install the app">
+      <Section title="The Nestra Android app">
         <p>
-          The installed app is the same website in a container. It requests no
-          Android permissions — no location, no contacts, no storage, no camera.
-          It cannot see anything on your phone.
+          Nestra is also a native Android app on Google Play. It shows the same
+          neighbourhood reports as the website and keeps the same posture: no
+          advertising, no account needed, and no third-party advertising or
+          analytics SDKs built into it — only the Expo/React Native framework it
+          is written with. It does not read your contacts, photos, messages,
+          call logs or device identifiers.
         </p>
         <p>
-          A small amount of the page is stored offline so that losing signal
-          shows a clear message rather than a browser error. Neighbourhood data
-          is deliberately not stored offline: a saved air quality reading would
-          still look current days later, and every figure here is supposed to
-          tell you how old it is.
+          <strong className="font-semibold text-ink-primary">
+            Location — optional, coarse, and it stays on your phone.
+          </strong>{" "}
+          The &ldquo;Show my neighbourhood&rdquo; button asks Android for
+          approximate (not precise) foreground location, once, so the app can
+          open the city you are in. Your coordinates are turned into a city name
+          by Android on the device itself and never sent to us — only the
+          resulting city name is used, exactly as if you had typed it into
+          search. If you decline the permission, or never press the button, the
+          app works the same; you just search by name instead. The app never
+          tracks your location in the background.
+        </p>
+        <p>
+          <strong className="font-semibold text-ink-primary">
+            What stays on your phone.
+          </strong>{" "}
+          Localities you save, the language you pick, and the localities you have
+          opened recently are stored only on your device, in the app&apos;s own
+          storage. They are not uploaded, not tied to any id, and not visible to
+          us. The app has no sign-in, so it holds no account for you at all.
+          Clearing the app&apos;s data or uninstalling removes all of it.
+        </p>
+        <p>
+          <strong className="font-semibold text-ink-primary">
+            What the app sends to our server.
+          </strong>{" "}
+          Only requests for the public neighbourhood data you are looking at — the
+          locality whose report you open, or the text you search. These carry no
+          name, no account and no device identifier; like any internet request
+          they reach our hosting (Render) with an IP address, which sits in
+          ordinary access logs and is not used to build a profile. The app sends
+          no analytics or usage events.
+        </p>
+        <p>
+          <strong className="font-semibold text-ink-primary">
+            The Sun &amp; Shadow map.
+          </strong>{" "}
+          A locality&apos;s sunlight map is drawn inside the app from map tiles
+          loaded from an OpenStreetMap-based tile service. Opening it fetches
+          those tiles from that external service, which — like any map — receives
+          the request for the tiles it serves; nothing about you is sent with it.
         </p>
       </Section>
 
@@ -454,6 +502,20 @@ export default function PrivacyPage() {
           viewed&rdquo;, pruned after 180 days, and erased with everything else
           by the same one-tap &ldquo;forget me&rdquo;. The banner wording, the
           storage, and this note shipped in the same commit.
+        </p>
+        <p>
+          <strong className="font-semibold text-ink-primary">
+            On 4 October 2026 the native Android app (Nestra) was documented
+          </strong>{" "}
+          — and the app section above was rewritten in the same change. The old
+          wording described an installed copy of the website that &ldquo;requests
+          no Android permissions — no location&rdquo;. The native app does ask for
+          one permission: approximate foreground location, used only for the
+          &ldquo;Show my neighbourhood&rdquo; button, resolved to a city name on
+          the device and never sent to us. Saying the app takes no location would
+          now be false, so the section was corrected before the app&apos;s listing
+          went live. The app has no sign-in, no cookies and no analytics SDK, so
+          the rest of this page — which is about the website — still holds.
         </p>
         <p>
           The commitment stands, and now has a record attached to it. If
