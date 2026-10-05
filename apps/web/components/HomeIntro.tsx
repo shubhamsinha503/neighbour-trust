@@ -40,7 +40,7 @@ export function HomeIntro({ stats }: { stats: CoverageStats | null }) {
           * confident and by then wrong figure — the count had reached 159. An
           * unavailable number should read as unavailable. */}
         — for {stats ? `${stats.localities} localities` : "localities"} across
-        Bengaluru, Gurugram, Hyderabad and Mumbai. Every number says where it came from, how old it
+        Delhi, Bengaluru, Gurugram, Hyderabad and Mumbai. Every number says where it came from, how old it
         is, and how much to trust it.
       </p>
 

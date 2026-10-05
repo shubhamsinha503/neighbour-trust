@@ -39,7 +39,7 @@ from apps.api.app.visits import router as visits_router  # noqa: E402
 app = FastAPI(
     title="Neighbour Trust API",
     version="0.1.0",
-    description="Sourced, confidence-tagged neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai.",
+    description="Sourced, confidence-tagged neighbourhood data for Delhi, Bengaluru, Gurugram, Hyderabad and Mumbai.",
 )
 
 # Allowed browser origins. Local dev origins are always permitted; production

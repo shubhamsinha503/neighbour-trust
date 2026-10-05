@@ -47,7 +47,7 @@ export default function AboutPage() {
           on the report instead.
         </p>
         <p>
-          Nestra is in early access, across Bengaluru, Gurugram,
+          Nestra is in early access, across Delhi, Bengaluru, Gurugram,
           Hyderabad and Mumbai. A category with nothing sourced yet is left off
           a report rather than shown as a blank or filled with an estimate.
         </p>

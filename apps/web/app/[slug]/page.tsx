@@ -15,7 +15,7 @@ import {
 } from "@/lib/api";
 
 const SITE_DESCRIPTION =
-  "Sourced, confidence-tagged neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai.";
+  "Sourced, confidence-tagged neighbourhood data for Delhi, Bengaluru, Gurugram, Hyderabad and Mumbai.";
 
 /**
  * Per-locality title and description.
