@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     template: "%s · Nestra",
   },
   description:
-    "Sourced, confidence-tagged neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai. " +
+    "Sourced, confidence-tagged neighbourhood data for Delhi, Bengaluru, Gurugram, Hyderabad and Mumbai. " +
     "Air quality, schools, and what local press reports about safety and water.",
   applicationName: "Nestra",
 
@@ -86,14 +86,14 @@ export const metadata: Metadata = {
     // than a number that impresses once and then quietly misleads.
     description:
       "Know the neighbourhood before you commit to it. Sourced, dated " +
-      "neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai.",
+      "neighbourhood data for Delhi, Bengaluru, Gurugram, Hyderabad and Mumbai.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Nestra",
     description:
       "Know the neighbourhood before you commit to it. Sourced, dated " +
-      "neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai.",
+      "neighbourhood data for Delhi, Bengaluru, Gurugram, Hyderabad and Mumbai.",
   },
 };
 

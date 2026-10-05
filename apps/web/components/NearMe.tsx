@@ -156,7 +156,7 @@ export function NearMe({ localities }: { localities: LocalitySummary[] }) {
         <p className="mt-2 text-center text-[11px] leading-[1.5] text-ink-muted">
           {state.status === "uncovered" ? (
             <>
-              We don&apos;t cover your area yet — we&apos;re in Bengaluru,
+              We don&apos;t cover your area yet — we&apos;re in Delhi, Bengaluru,
               Gurugram, Hyderabad and Mumbai so far. Search for a locality there
               instead.
             </>

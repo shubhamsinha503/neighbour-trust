@@ -17,7 +17,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Nestra",
     short_name: "Nestra",
     description:
-      "Sourced, confidence-tagged neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai. " +
+      "Sourced, confidence-tagged neighbourhood data for Delhi, Bengaluru, Gurugram, Hyderabad and Mumbai. " +
       "Every number says where it came from, how old it is, and how much to trust it.",
 
     start_url: "/",
