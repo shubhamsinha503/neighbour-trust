@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { categoryIcon } from "@/components/ui/categoryIcon";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { FlagRow } from "@/components/ui/FlagRow";
 import { Icon } from "@/components/ui/Icon";
 import { NearbyList } from "@/components/ui/NearbyList";
 import { PressableScale } from "@/components/ui/PressableScale";
@@ -179,8 +178,13 @@ export default function ReportScreen() {
   if (ts && ts.categories_counted < ts.categories_total) {
     considerations.push(t("con.limited").replace("{n}", String(ts.categories_counted)));
   }
-  const highlightsTop = highlights.slice(0, 5);
-  const considerationsTop = considerations.slice(0, 5);
+  // One simple pair: Pros and Cons. The warning flags (power cuts, poor air)
+  // are the sharpest cons, so they lead the list ahead of the softer
+  // category-derived ones, rather than living in a third section.
+  const pros = highlights;
+  const cons = [...(report?.flags ?? []).map((f) => f.headline), ...considerations];
+  const prosTop = pros.slice(0, 6);
+  const consTop = cons.slice(0, 6);
 
   return (
     <View style={styles.screen}>
@@ -372,26 +376,14 @@ export default function ReportScreen() {
               </View>
             )}
 
-            {/* Watch out for */}
-            {report.flags.length > 0 && (
-              <View style={styles.section}>
-                <Txt weight="bold" style={styles.sectionTitle}>
-                  {t("overview.watchOut")}
-                </Txt>
-                {report.flags.map((f, i) => (
-                  <FlagRow key={`${f.category}-${i}`} flag={f} />
-                ))}
-              </View>
-            )}
-
-            {/* Highlights */}
-            {highlightsTop.length > 0 && (
+            {/* Pros — the simple good side, for a reader who wants it at a glance. */}
+            {prosTop.length > 0 && (
               <View style={styles.section}>
                 <Card style={[styles.noteCard, { backgroundColor: theme.goodSoft }]}>
                   <Txt weight="bold" style={styles.noteTitle}>
-                    {t("overview.highlights")}
+                    {t("overview.pros")}
                   </Txt>
-                  {highlightsTop.map((h, i) => (
+                  {prosTop.map((h, i) => (
                     <View key={i} style={styles.noteRow}>
                       <View style={styles.noteIcon}>
                         <Icon name="check" size={13} color={theme.good} />
@@ -403,14 +395,15 @@ export default function ReportScreen() {
               </View>
             )}
 
-            {/* Considerations */}
-            {considerationsTop.length > 0 && (
+            {/* Cons — the warning flags (power cuts, poor air) lead, then the
+              * softer category weaknesses. One list, plainly labelled. */}
+            {consTop.length > 0 && (
               <View style={styles.section}>
                 <Card style={[styles.noteCard, { backgroundColor: theme.warnSoft }]}>
                   <Txt weight="bold" style={styles.noteTitle}>
-                    {t("overview.consider")}
+                    {t("overview.cons")}
                   </Txt>
-                  {considerationsTop.map((h, i) => (
+                  {consTop.map((h, i) => (
                     <View key={i} style={styles.noteRow}>
                       <View style={styles.noteIcon}>
                         <Icon name="warning" size={13} color={theme.warn} />
