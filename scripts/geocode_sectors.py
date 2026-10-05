@@ -9,10 +9,22 @@ searches. This fills that gap from the other direction: it generates the sector
 names and asks a geocoder where each one is, keeping only the ones that resolve
 to a real area inside the city.
 
-Same honesty bar as scripts/geocode_localities: a result is kept only when
-Nominatim returns a `place` or `boundary` record (an area), inside the city's
-box, and far enough from everything already seeded not to be a duplicate or an
-H3-cell collision. Everything else is dropped rather than guessed.
+Same honesty bar as scripts/geocode_localities, with one addition that matters
+for sector-planned cities. A result is kept only when Nominatim returns an area
+record whose own name is exactly "Sector N", inside the city's box, and far
+enough from everything already seeded not to be a duplicate or an H3-cell
+collision. Everything else is dropped rather than guessed.
+
+An area record here is a `place`/`boundary` settlement (as in geocode_localities)
+*or* a `landuse` polygon named exactly "Sector N". The landuse case is what
+unlocks a sector city: Noida records almost none of its sectors as named `place`
+nodes — querying "Sector 15, Noida" returns either a `landuse=residential`
+polygon literally named "Sector 15" (a real, mapped sector boundary) or, for the
+sectors OSM has not mapped at all, the Sector 18 centroid as a fuzzy fallback.
+The exact-name guard keeps the former and rejects the latter, so accepting an
+exact-named landuse polygon adds genuinely-located sectors without admitting a
+single centroid guess. A landuse polygon that merely *contains* a sector but is
+named something else never matches, exactly as before.
 
     python -m scripts.geocode_sectors --city Noida            # dry, prints a table
     python -m scripts.geocode_sectors --city Noida --write    # append to the seed file
@@ -75,6 +87,22 @@ def _in_box(lat: float, lon: float, box: tuple[float, float, float, float]) -> b
     return min_lat <= lat <= max_lat and min_lon <= lon <= max_lon
 
 
+# A sector is mapped either as a settlement node (`place`/`boundary`, accepted by
+# geocode_localities._is_place) or — far more often in Noida — as a `landuse`
+# polygon named "Sector N". Both describe the sector's extent; neither is a
+# feature standing inside it. This is only ever reached together with
+# _names_exact_sector, so a landuse polygon named anything but "Sector N" (the
+# surrounding village, a stray plot) is still rejected and cannot stand in.
+_SECTOR_LANDUSE_TYPES = ("residential", "commercial", "industrial")
+
+
+def _is_sector_area(hit: dict) -> bool:
+    """A record that describes a sector's extent, not something standing in it."""
+    if _is_place(hit):
+        return True
+    return hit.get("class") == "landuse" and hit.get("type") in _SECTOR_LANDUSE_TYPES
+
+
 def _names_exact_sector(hit: dict, n: int) -> bool:
     """True only if the result is actually "Sector N", not a fuzzy neighbour.
 
@@ -86,7 +114,10 @@ def _names_exact_sector(hit: dict, n: int) -> bool:
     """
     addr = hit.get("address") or {}
     target = f"sector {n}"
-    for key in ("suburb", "neighbourhood", "quarter", "city_district", "residential"):
+    for key in (
+        "suburb", "neighbourhood", "quarter", "city_district",
+        "residential", "commercial", "industrial",
+    ):
         val = (addr.get(key) or "").strip().lower()
         if val == target:
             return True
@@ -104,9 +135,10 @@ def geocode_sector(
     """(lat, lon, display_name) for "Sector N, city", or None if not an area here.
 
     Bounded to the city box so "Sector 50" cannot resolve to another city's
-    sector, filtered to area records (place/boundary) so it cannot resolve to a
-    shop or bus stop carrying the name, and required to name this exact sector so
-    a fuzzy match to a different sector or the city centroid is rejected.
+    sector, filtered to area records (a place/boundary settlement or a landuse
+    polygon, never a shop or bus stop carrying the name), and required to name
+    this exact sector so a fuzzy match to a different sector or the city centroid
+    is rejected.
     """
     hits = _get_with_backoff(
         client,
@@ -120,7 +152,7 @@ def geocode_sector(
         },
     )
     place = next(
-        (h for h in hits if _is_place(h) and _names_exact_sector(h, n)), None
+        (h for h in hits if _is_sector_area(h) and _names_exact_sector(h, n)), None
     )
     if place is None:
         return None
