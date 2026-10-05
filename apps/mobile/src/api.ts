@@ -50,6 +50,19 @@ export interface Flag {
   detail: string;
 }
 
+/**
+ * One thing the local press reports as coming to a locality. The headline is
+ * verbatim and carries a link to the article, so a reader can check the source
+ * themselves — these are press reports, not commitments.
+ */
+export interface UpcomingItem {
+  headline: string;
+  kind: string;
+  published_at?: string | null;
+  url?: string | null;
+  source?: string | null;
+}
+
 export interface Report {
   locality: {
     slug: string;
@@ -68,6 +81,7 @@ export interface Report {
   verdict: string;
   flags: Flag[];
   categories: ReportCategory[];
+  upcoming: UpcomingItem[];
   sources_used: string[];
 }
 
