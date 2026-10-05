@@ -1,5 +1,5 @@
 /**
- * The Neighbour Trust mark: a checkmark inside a location pin — "a place you
+ * The Nestra mark: a checkmark inside a location pin — "a place you
  * can trust." White glyph on the brand badge; the check is knocked out in the
  * brand colour so it reads on any brand hue (change --color-brand and the mark
  * follows).

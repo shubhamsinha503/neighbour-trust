@@ -4,7 +4,7 @@ export const metadata = {
   title: "About the data",
   description:
     "Where every figure comes from, how confidence is decided, and what "
-    + "Neighbour Trust refuses to score.",
+    + "Nestra refuses to score.",
 };
 
 /**
@@ -25,7 +25,7 @@ export default function AboutPage() {
         href="/"
         className="text-[12px] font-semibold text-brand hover:underline"
       >
-        ← Neighbour Trust
+        ← Nestra
       </Link>
 
       <h1 className="mt-5 text-[24px] font-bold leading-[1.25] tracking-[-0.015em]">
@@ -47,7 +47,7 @@ export default function AboutPage() {
           on the report instead.
         </p>
         <p>
-          Neighbour Trust is in early access, across Bengaluru, Gurugram,
+          Nestra is in early access, across Bengaluru, Gurugram,
           Hyderabad and Mumbai. A category with nothing sourced yet is left off
           a report rather than shown as a blank or filled with an estimate.
         </p>

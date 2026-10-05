@@ -26,7 +26,7 @@ import { ImageResponse } from "next/og";
 
 import { fetchReport } from "@/lib/api";
 
-export const alt = "Neighbour Trust locality report";
+export const alt = "Nestra locality report";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -64,7 +64,7 @@ export default async function OpengraphImage({
             fontSize: 44, fontWeight: 700,
           }}
         >
-          <div style={{ display: "flex", fontSize: 26, opacity: 0.85 }}>Neighbour Trust</div>
+          <div style={{ display: "flex", fontSize: 26, opacity: 0.85 }}>Nestra</div>
           <div style={{ display: "flex", marginTop: 16 }}>Neighbourhood data with its sources attached</div>
         </div>
       ),
@@ -96,7 +96,7 @@ export default async function OpengraphImage({
           >
             N
           </div>
-          <div style={{ display: "flex", fontWeight: 700 }}>Neighbour Trust</div>
+          <div style={{ display: "flex", fontWeight: 700 }}>Nestra</div>
         </div>
 
         <div style={{ display: "flex", alignItems: "flex-end", gap: 24, marginTop: 44 }}>

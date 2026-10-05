@@ -31,7 +31,7 @@ export default async function CoveragePage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
       <Link href="/" className="text-[12px] font-semibold text-brand hover:underline">
-        ← Neighbour Trust
+        ← Nestra
       </Link>
 
       <h1 className="mt-5 text-[24px] font-bold leading-[1.25] tracking-[-0.015em]">

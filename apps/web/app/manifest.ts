@@ -14,8 +14,8 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Neighbour Trust",
-    short_name: "Neighbour Trust",
+    name: "Nestra",
+    short_name: "Nestra",
     description:
       "Sourced, confidence-tagged neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai. " +
       "Every number says where it came from, how old it is, and how much to trust it.",
@@ -32,7 +32,7 @@ export default function manifest(): MetadataRoute.Manifest {
     // Colours the Android status bar and the TWA splash. The brand pink, matching
     // viewport.themeColor in layout.tsx — they must agree or an installed copy
     // launches a different colour than the site it opens.
-    theme_color: "#ff2d78",
+    theme_color: "#f72575",
 
     lang: "en-IN",
     dir: "ltr",
