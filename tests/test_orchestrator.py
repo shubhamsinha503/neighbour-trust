@@ -17,10 +17,7 @@ def envelope(payload: dict, confidence: str = "high", source: str = "Test") -> d
 
 AQ_GOOD = envelope({"current_aqi": 40.0, "aqi_band": "good", "nearest_station_km": 2.0})
 AQ_BAD = envelope({"current_aqi": 320.0, "aqi_band": "very_poor", "nearest_station_km": 2.0})
-SCHOOLS_GOOD = envelope(
-    {"schools_within_2km": 40, "median_pupil_teacher_ratio": 20.0,
-     "schools_with_staffing_data": 30}
-)
+SCHOOLS_GOOD = envelope({"schools_within_2km": 40})
 
 
 class TestAqiScore:
@@ -47,15 +44,17 @@ class TestAqiScore:
 
 
 class TestSchoolsScore:
-    def test_access_alone_is_capped(self):
-        """61 schools nearby with staffing known for one has not earned 100."""
-        assert score_mod.score_from_schools(61, None) <= 75
+    def test_access_is_capped(self):
+        """Schools is scored on access alone — how many are nearby, never their
+        quality — so even a saturated locality is 'plenty nearby', not 100."""
+        assert score_mod.score_from_schools(61) <= 75
+        assert score_mod.score_from_schools(40) <= 75
 
-    def test_staffing_improves_the_score(self):
-        assert score_mod.score_from_schools(40, 20.0) > score_mod.score_from_schools(40, None)
+    def test_more_schools_nearby_scores_higher(self):
+        assert score_mod.score_from_schools(20) > score_mod.score_from_schools(8)
 
-    def test_crowded_schools_score_worse(self):
-        assert score_mod.score_from_schools(40, 50.0) < score_mod.score_from_schools(40, 20.0)
+    def test_no_schools_scores_zero(self):
+        assert score_mod.score_from_schools(0) == 0
 
 
 class TestCategoryScore:
@@ -79,10 +78,12 @@ class TestCategoryScore:
 class TestComposite:
     def test_missing_categories_do_not_drag_the_score_down(self):
         """The central rule: absent data must not read as a bad neighbourhood.
-        Two categories at ~96 must produce ~96, not 96 * 2/6."""
+        Two present categories scoring high (clean air, plenty of schools nearby)
+        must produce a high composite — not that average divided by all five
+        weights, which would be ~39."""
         result = score_mod.compute({"air_quality": AQ_GOOD, "schools": SCHOOLS_GOOD})
         assert result.score is not None
-        assert result.score >= 85
+        assert result.score >= 75
 
     def test_coverage_is_reported(self):
         result = score_mod.compute({"air_quality": AQ_GOOD, "schools": SCHOOLS_GOOD})
@@ -148,23 +149,13 @@ class TestReconcile:
         found = reconcile.find({"air_quality": envelope({"current_aqi": 96.0})})
         assert not any(d.category == "air_quality" for d in found)
 
-    def test_surfaces_the_schools_coverage_gap(self):
-        """The Indiranagar case: 61 schools mapped, staffing known for one."""
+    def test_schools_never_produces_a_conflict(self):
+        """Schools is access-only now — no UDISE/staffing comparison — so it
+        raises no source-disagreement regardless of the counts."""
         found = reconcile.find({
             "schools": envelope({
                 "schools_within_2km": 61,
-                "schools_with_staffing_data": 1,
                 "presence_source": "OpenStreetMap",
-            })
-        })
-        assert any(d.category == "schools" for d in found)
-
-    def test_no_schools_conflict_when_coverage_is_good(self):
-        found = reconcile.find({
-            "schools": envelope({
-                "schools_within_2km": 40,
-                "schools_with_staffing_data": 35,
-                "presence_source": "UDISE",
             })
         })
         assert not any(d.category == "schools" for d in found)
@@ -174,18 +165,6 @@ class TestReconcile:
             "crime": envelope({"news": {"incidents_12m": 7}}, "community_estimated")
         })
         assert any("not counted in the score" in d.headline for d in found)
-
-    def test_notable_conflicts_sort_first(self):
-        found = reconcile.find({
-            "air_quality": envelope({"current_aqi": 96.0}),
-            "air_quality_aqicn": envelope({"epa_aqi": 134.0}),
-            "schools": envelope({
-                "schools_within_2km": 61,
-                "schools_with_staffing_data": 1,
-                "presence_source": "OpenStreetMap",
-            }),
-        })
-        assert found[0].severity == "notable"
 
 
 class TestAirQualitySummary:

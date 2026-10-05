@@ -57,6 +57,18 @@ function bandKey(score: number | null): string {
   return "band.mixed";
 }
 
+/** The strip sub-label for a category. Schools is scored purely on access — how
+ * many schools are nearby, never their quality — so its band reads as a count of
+ * what's close, not a "rating". A "Well rated" word on a card the detail screen
+ * flags Low confidence is exactly the contradiction we are avoiding. */
+function categoryBandKey(category: string, score: number | null): string {
+  if (category !== "schools") return bandKey(score);
+  if (score === null) return "band.unscored";
+  if (score >= 60) return "band.schoolsPlenty";
+  if (score >= 30) return "band.schoolsSome";
+  return "band.schoolsFew";
+}
+
 export default function ReportScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { t, categoryLabel } = useI18n();
@@ -117,13 +129,20 @@ export default function ReportScreen() {
   const highlights: string[] = [];
   const considerations: string[] = [];
   for (const c of available) {
-    if (c.score !== null && c.score >= 75) {
+    if (c.score === null) continue;
+    // Schools is an access measure, not a quality rating — so it is surfaced as
+    // "plenty / few schools nearby", never "scores well (75)" or "scores poorly",
+    // which would read as a verdict on schools we have no quality data for.
+    if (c.category === "schools") {
+      if (c.score >= 60) highlights.push(t("hl.schools"));
+      else if (c.score < 30) considerations.push(t("con.schools"));
+    } else if (c.score >= 75) {
       highlights.push(
         t("hl.strong")
           .replace("{cat}", categoryLabel(c.category, c.label))
           .replace("{n}", String(c.score)),
       );
-    } else if (c.score !== null && c.score < 55) {
+    } else if (c.score < 55) {
       considerations.push(
         t("con.weak")
           .replace("{cat}", categoryLabel(c.category, c.label))
@@ -273,7 +292,7 @@ export default function ReportScreen() {
                         >
                           {c.score ?? "—"}
                         </Txt>
-                        <Txt style={styles.stripBand}>{t(bandKey(c.score))}</Txt>
+                        <Txt style={styles.stripBand}>{t(categoryBandKey(c.category, c.score))}</Txt>
                       </View>
                     );
                     return route ? (

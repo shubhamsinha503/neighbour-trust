@@ -7,12 +7,11 @@
  * honesty note, sources — because that ordering encodes the psychology reasoning
  * in docs/strategy.md and shouldn't vary per category.
  *
- * What differs is how much work the honesty section does. Air quality has one
- * good source and one clean number. Schools has a current source that can only
- * count buildings and a four-year-old source that has the staffing numbers for a
- * fraction of them. A buyer reading "61 schools within 2 km" will assume we know
- * something about all 61, so the gap between the count and the known is stated as
- * its own stat tile rather than left to a footnote.
+ * What differs is how much work the honesty section does. This card answers one
+ * question only — how many schools are nearby and how close — because that is all
+ * open data supports at locality level. No open Indian source describes school
+ * quality, so the card never shows a quality signal and says so, keeping "nearby"
+ * from being read as "good".
  */
 
 import { useT } from "@/components/LanguageProvider";
@@ -46,10 +45,6 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
         .sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity))
     : payload.nearestSchools;
 
-  const staffingGap =
-    payload.schoolsWithin2km > 0 &&
-    payload.schoolsWithStaffingData < payload.schoolsWithin2km;
-
   return (
     <article className="rounded-[20px] border border-hairline bg-surface-1 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
       {/* 1 — verdict */}
@@ -65,13 +60,10 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
         </div>
       </header>
 
-      {/* 2 — stat tiles.
-          The count tiles always show. The two staffing tiles only appear when
-          there is staffing data to report: a "—" / "not enough data" tile and a
-          "0 of 17 nearby" tile read to a buyer as a broken product rather than
-          as honesty, so an empty staffing block is left out entirely instead.
-          The card never estimates — it just omits what it cannot fill. */}
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      {/* 2 — stat tiles. The card is about access, so the tiles count what is
+          nearby and how close. It never shows a staffing or quality figure — no
+          open source supports one — and never estimates. */}
+      <div className="grid grid-cols-2 gap-2.5">
         <StatTile
           label={t("schools.within2")}
           value={payload.schoolsWithin2km.toString()}
@@ -82,24 +74,6 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
           value={payload.schoolsWithin5km.toString()}
           sub={t("schools.schoolsWord")}
         />
-        {payload.medianPupilTeacherRatio !== undefined && (
-          <StatTile
-            label={t("schools.ppt")}
-            value={payload.medianPupilTeacherRatio.toFixed(0)}
-            sub={t("schools.medianWhereKnown")}
-          />
-        )}
-        {/* When we do know staffing for some schools, this tile stops the count
-            above from being over-read. When we know it for none, it is hidden
-            rather than shown as "0 of N". */}
-        {payload.schoolsWithStaffingData > 0 && (
-          <StatTile
-            label={t("schools.staffingKnownFor")}
-            value={payload.schoolsWithStaffingData.toString()}
-            sub={`of ${payload.schoolsWithin2km} nearby`}
-            muted={staffingGap}
-          />
-        )}
       </div>
 
       {payload.boardsAvailable.length > 0 && (
@@ -157,18 +131,6 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
                       .filter(Boolean)
                       .join(" · ")}
                   </div>
-                </div>
-                <div className="shrink-0 text-right">
-                  {school.pupilTeacherRatio !== undefined ? (
-                    <>
-                      <div className="text-[13px] font-bold text-ink-primary">
-                        {school.pupilTeacherRatio.toFixed(0)}:1
-                      </div>
-                      <div className="text-[9.5px] text-ink-muted">
-                        pupils/teacher
-                      </div>
-                    </>
-                  ) : null}
                 </div>
               </li>
             ))}

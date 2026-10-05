@@ -119,20 +119,24 @@ def score_from_aqi(aqi: float) -> int:
     return 0
 
 
-# Highest share of the schools meter reachable on access data alone, with no
-# staffing figures behind it. A locality with 61 schools nearby and staffing
-# known for one of them has not earned 100/100.
-PARTIAL_EVIDENCE_CEILING = 0.75
+# Highest share of the schools meter access alone can reach. The score measures
+# how many schools are within reach, which is a real and useful thing to know —
+# but how many schools are nearby is not how good they are, and no open source
+# gives us that, so a saturated-access locality is "plenty nearby", never a
+# perfect 100. The ceiling is the score refusing to overclaim.
+ACCESS_CEILING = 0.75
 
 
-def score_from_schools(within_2km: int, median_ptr: Optional[float]) -> int:
-    """0-100 from school access, and staffing where it is known."""
+def score_from_schools(within_2km: int) -> int:
+    """0-100 from school access alone — how many schools are within reach.
+
+    Quality is deliberately not part of this. No open Indian dataset describes
+    teaching quality at locality level (UDISE carries no exam results and its
+    staffing snapshot is years old), so the score says only what we can stand
+    behind: how many schools are nearby.
+    """
     access = min(100.0, (within_2km / 20.0) * 100.0)
-    if median_ptr is None:
-        return round(access * PARTIAL_EVIDENCE_CEILING)
-    # 20:1 or better is full marks, 60:1 is zero. The RTE norm is 30:1.
-    staffing = max(0.0, min(100.0, 100.0 - (median_ptr - 20.0) * (100.0 / 40.0)))
-    return round(access * 0.5 + staffing * 0.5)
+    return round(access * ACCESS_CEILING)
 
 
 def category_score(category: str, payload: dict[str, Any]) -> Optional[int]:
@@ -142,10 +146,7 @@ def category_score(category: str, payload: dict[str, Any]) -> Optional[int]:
         return score_from_aqi(aqi) if aqi is not None else None
 
     if category == "schools":
-        return score_from_schools(
-            payload.get("schools_within_2km", 0),
-            payload.get("median_pupil_teacher_ratio"),
-        )
+        return score_from_schools(payload.get("schools_within_2km", 0))
 
     if category == "infrastructure":
         # Computed by the agent, which has the distances; the orchestrator only
