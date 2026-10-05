@@ -63,16 +63,6 @@ export default function SchoolsScreen() {
           <View style={styles.grid}>
             <Stat label={t("schools.within2")} value={String(p.schools_within_2km)} />
             <Stat label={t("schools.within5")} value={String(p.schools_within_5km)} />
-            <Stat
-              label={t("schools.staffingKnown")}
-              value={String(p.schools_with_staffing_data)}
-            />
-            {p.median_pupil_teacher_ratio != null && (
-              <Stat
-                label={t("schools.ptr")}
-                value={String(p.median_pupil_teacher_ratio)}
-              />
-            )}
             {avgDist != null && (
               <Stat label={t("schools.avgDist")} value={`${avgDist.toFixed(1)} ${t("aq.km")}`} />
             )}

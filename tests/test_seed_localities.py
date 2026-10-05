@@ -63,7 +63,7 @@ def test_coordinates_are_in_the_stated_city(row):
 
 def test_all_seeded_cities_are_represented():
     cities = {row[2] for row in LOCALITIES}
-    assert cities == {"Bengaluru", "Gurugram", "Hyderabad", "Mumbai", "Delhi"}
+    assert cities == {"Bengaluru", "Gurugram", "Hyderabad", "Mumbai", "Delhi", "Noida"}
 
 
 def test_pincodes_look_like_pincodes():

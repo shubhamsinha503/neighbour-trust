@@ -70,15 +70,17 @@ export default function AboutPage() {
 
       <Section title="Schools">
         <p>
-          School locations come from OpenStreetMap, staffing and enrolment from
-          UDISE. The two disagree constantly — a locality can have sixty mapped
-          schools and staffing figures for one — so the card reports both numbers
-          rather than the flattering one.
+          School locations come from OpenStreetMap, so the card answers one
+          question: how many schools are near a locality, and how close. That is
+          a real and useful thing to know, and it is honestly all open data
+          supports here.
         </p>
         <p>
-          The UDISE snapshot is from January 2022. That is disclosed on every
-          card and is why schools never reaches high confidence. UDISE carries no
-          exam results at all, so nothing here is a ranking of school quality.
+          It is not a measure of school quality. No open Indian dataset publishes
+          teaching quality, exam results or current staffing at locality level,
+          so the card never shows one and never ranks schools. A locality with
+          many schools nearby reads as good <em>access</em> — not good schools —
+          and the card says exactly that.
         </p>
       </Section>
 
@@ -161,8 +163,8 @@ export default function AboutPage() {
             way and we have no way to correct for it yet.
           </Bullet>
           <Bullet>
-            Report a median from too few samples, or a school count we can see is
-            wrong.
+            Dress a school count up as a quality ranking, or report a figure from
+            too few samples.
           </Bullet>
           <Bullet>
             Fill an empty category with an estimate. Power and infrastructure
@@ -179,8 +181,8 @@ export default function AboutPage() {
         <p>
           Some of this will be wrong. A locality&apos;s name can appear in a
           national story that has nothing to do with living there; a monitoring
-          station can be further away than it looks; a 2022 staffing figure can
-          describe a school that has since changed completely.
+          station can be further away than it looks; a school OpenStreetMap maps
+          nearby can have closed or moved since it was recorded.
         </p>
         <p>
           Where we find such a case we fix it and say what it was, rather than

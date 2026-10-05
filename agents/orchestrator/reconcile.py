@@ -13,10 +13,7 @@ and each is a real thing a buyer would want to know:
      on different scales, and are frequently far apart. Reporting only the CPCB
      figure without saying the other exists is the "silent averaging" failure in
      a different costume.
-  2. **Two school counts for the same locality.** OpenStreetMap and UDISE
-     disagree by an order of magnitude in Bengaluru (61 vs 0 at Indiranagar).
-     That gap is itself a finding about Indian open data.
-  3. **A category counted vs a category merely covered.** Press coverage exists
+  2. **A category counted vs a category merely covered.** Press coverage exists
      for crime and water but produces no score, and a reader who sees incident
      counts will assume otherwise unless told.
 
@@ -73,34 +70,6 @@ def _aqi_scale_conflict(envelopes: dict[str, Any]) -> Optional[Disagreement]:
     )
 
 
-def _school_count_conflict(envelopes: dict[str, Any]) -> Optional[Disagreement]:
-    """OpenStreetMap vs UDISE on how many schools are nearby."""
-    schools = envelopes.get("schools")
-    if not schools:
-        return None
-
-    payload = schools.get("payload") or {}
-    nearby = payload.get("schools_within_2km", 0)
-    with_staffing = payload.get("schools_with_staffing_data", 0)
-    source = payload.get("presence_source") or "our map source"
-
-    # Only worth raising when the gap is wide enough to mislead.
-    if nearby == 0 or with_staffing >= nearby * 0.5:
-        return None
-
-    return Disagreement(
-        category="schools",
-        headline=f"{source} lists {nearby} schools nearby; official data covers {with_staffing}",
-        detail=(
-            f"{source} is current and maps {nearby} schools within 2 km. The government's "
-            f"UDISE survey — the only source with staffing and enrolment figures — has "
-            f"records for {with_staffing} of them, and its data is from January 2022. "
-            "So we can tell you what is nearby far better than we can tell you what it is like."
-        ),
-        severity="notable",
-    )
-
-
 def _unscored_coverage(envelopes: dict[str, Any], scoreable: tuple[str, ...]) -> list[Disagreement]:
     """Categories with information that deliberately earns no points."""
     found = []
@@ -137,10 +106,9 @@ def find(envelopes: dict[str, Any], *, scoreable: tuple[str, ...] = ()) -> list[
     """Every disagreement worth showing, most significant first."""
     found: list[Disagreement] = []
 
-    for detector in (_aqi_scale_conflict, _school_count_conflict):
-        result = detector(envelopes)
-        if result is not None:
-            found.append(result)
+    result = _aqi_scale_conflict(envelopes)
+    if result is not None:
+        found.append(result)
 
     found.extend(_unscored_coverage(envelopes, scoreable))
 
