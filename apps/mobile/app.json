@@ -7,7 +7,10 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "icon": "./assets/icon.png",
     "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#FBFBFA"
     },
     "ios": {
@@ -15,7 +18,11 @@
       "bundleIdentifier": "com.nestra.app"
     },
     "android": {
-      "package": "com.nestra.app"
+      "package": "com.nestra.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F72575"
+      }
     },
     "plugins": [
       "expo-router",
