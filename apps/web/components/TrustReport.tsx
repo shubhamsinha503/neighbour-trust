@@ -25,6 +25,7 @@ import type { Confidence } from "@schema/envelope";
 import { ExpandableCard } from "@/components/ExpandableCard";
 import { SunlightCard } from "@/components/SunlightCard";
 import { UpcomingCard } from "@/components/UpcomingCard";
+import { FloodCard } from "@/components/FloodCard";
 import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
 import type {
   ConnectivityFeature,
@@ -186,6 +187,8 @@ export async function TrustReport({
         lat={locality.lat}
         lon={locality.lon}
       />
+
+      <FloodCard flood={report.flood} />
 
       <UpcomingCard localityName={locality.name} items={report.upcoming} />
     </div>

@@ -63,6 +63,22 @@ export interface UpcomingItem {
   source?: string | null;
 }
 
+/**
+ * Modeled flood hazard for a locality. Always present on a report — `in_zone`
+ * is false when the model shows no meaningful flooding within ~1 km. It is a
+ * modeled, ~1 km screening layer, never a precise or observed figure, and the
+ * UI says so.
+ */
+export interface FloodInfo {
+  in_zone: boolean;
+  depth_m: number | null;
+  band: "deep" | "moderate" | "shallow" | null;
+  return_period_years: number;
+  source: string;
+  source_url: string;
+  vintage: string;
+}
+
 export interface Report {
   locality: {
     slug: string;
@@ -82,6 +98,7 @@ export interface Report {
   flags: Flag[];
   categories: ReportCategory[];
   upcoming: UpcomingItem[];
+  flood: FloodInfo;
   sources_used: string[];
 }
 
