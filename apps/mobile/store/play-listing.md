@@ -43,6 +43,10 @@ WHAT YOU CAN CHECK
 • Healthcare & green spaces — what's actually around you, counted from the map.
 • Safety & water signals — drawn from published local news, clearly labelled as
   press coverage rather than official statistics.
+• Flood risk — whether an area falls in a modeled flood zone, with the source
+  linked and clearly marked as modeled screening, not street-level certainty.
+• Reported as coming — infrastructure the local press has written about nearby,
+  shown as dated headlines you can tap through to the original article.
 • Sun & Shadow map — see how sunlight falls across an area through the day.
 
 HOW IT'S DIFFERENT
@@ -64,9 +68,9 @@ PRIVATE BY DEFAULT
 
 WHERE WE COVER
 
-Delhi, Bengaluru, Gurugram, Hyderabad and Mumbai, with more areas being added.
-Coverage and the amount of data vary by locality, and the app is honest about
-that on every card.
+Delhi, Noida, Bengaluru, Gurugram, Hyderabad and Mumbai, with more areas being
+added. Coverage and the amount of data vary by locality, and the app is honest
+about that on every card.
 
 Available in English, Hindi, Kannada, Telugu and Marathi.
 
