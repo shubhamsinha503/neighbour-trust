@@ -178,11 +178,15 @@ export default function ReportScreen() {
   if (ts && ts.categories_counted < ts.categories_total) {
     considerations.push(t("con.limited").replace("{n}", String(ts.categories_counted)));
   }
-  // One simple pair: Pros and Cons. The warning flags (power cuts, poor air)
-  // are the sharpest cons, so they lead the list ahead of the softer
-  // category-derived ones, rather than living in a third section.
-  const pros = highlights;
-  const cons = [...(report?.flags ?? []).map((f) => f.headline), ...considerations];
+  // One simple pair: Pros and Cons. A modeled flood zone is a sharp con and
+  // leads the list; being clear of one is a genuine reassurance and leads the
+  // pros. The warning flags (power cuts, poor air) come next, ahead of the
+  // softer category-derived lines, rather than living in a third section.
+  const inFloodZone = !!report?.flood?.in_zone;
+  const floodCon = inFloodZone ? [t("flood.con")] : [];
+  const floodPro = report && !inFloodZone ? [t("flood.clear")] : [];
+  const pros = [...highlights, ...floodPro];
+  const cons = [...floodCon, ...(report?.flags ?? []).map((f) => f.headline), ...considerations];
   const prosTop = pros.slice(0, 6);
   const consTop = cons.slice(0, 6);
 
@@ -411,6 +415,34 @@ export default function ReportScreen() {
                       <Txt style={styles.noteText}>{h}</Txt>
                     </View>
                   ))}
+                </Card>
+              </View>
+            )}
+
+            {/* Flood risk — only when the model shows a zone. The depth is a
+              * modeled, ~1 km screening figure, said plainly, with the source
+              * linked so a reader can check it. */}
+            {report.flood?.in_zone && (
+              <View style={styles.section}>
+                <Txt weight="bold" style={styles.sectionTitle}>
+                  {t("flood.title")}
+                </Txt>
+                <Card style={[styles.noteCard, { backgroundColor: theme.warnSoft }]}>
+                  <Txt style={styles.noteText}>
+                    {t("flood.line").replace(
+                      "{depth}",
+                      report.flood.depth_m != null ? report.flood.depth_m.toFixed(1) : "—",
+                    )}
+                  </Txt>
+                  <Txt style={styles.upcomingMeta}>{t("flood.caveat")}</Txt>
+                  <Pressable
+                    onPress={() => void Linking.openURL(report.flood.source_url)}
+                    style={{ marginTop: 2 }}
+                  >
+                    <Txt weight="semibold" style={styles.upcomingLink}>
+                      {report.flood.source}  ↗
+                    </Txt>
+                  </Pressable>
                 </Card>
               </View>
             )}

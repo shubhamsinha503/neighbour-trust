@@ -823,6 +823,10 @@ class ReportResponse(BaseModel):
     # credit a well-covered neighbourhood with more planned than an identical
     # one nobody writes about.
     upcoming: list[dict[str, Any]] = []
+    # Modeled flood hazard. Always present; `in_zone` is False when the model
+    # shows none within ~1 km. Never a score — a hazard depth to show and link,
+    # clearly labelled modeled. See agents/orchestrator/flood.py.
+    flood: dict[str, Any] = {}
     sources_used: list[str]
     generated_at: str
 
@@ -881,6 +885,7 @@ def debug_report(slug: str, request: Request) -> dict[str, Any]:
             ],
             categories=report.categories,
             upcoming=report.upcoming,
+            flood=report.flood,
             sources_used=report.sources_used,
             generated_at=report.generated_at.isoformat(),
         )
@@ -934,6 +939,7 @@ def get_report(slug: str) -> dict[str, Any]:
         ],
         "categories": report.categories,
         "upcoming": report.upcoming,
+        "flood": report.flood,
         "sources_used": report.sources_used,
         "generated_at": report.generated_at.isoformat(),
     }

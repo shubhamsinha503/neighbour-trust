@@ -123,6 +123,21 @@ export default function AboutPage() {
         </p>
       </Section>
 
+      <Section title="Flood risk">
+        <p>
+          Where a locality falls in a modeled flood zone, the report says so and
+          gives the depth a 1-in-100-year river flood would reach nearby. It
+          comes from WRI Aqueduct Floods, a global model at about 1 km — so it is
+          regional screening, not a street-level or observed figure, and the card
+          says exactly that and links the source.
+        </p>
+        <p>
+          It is never turned into a score. A modeled hazard is a fact to weigh,
+          not a number to average into the Trust Score, so a flood zone shows as
+          a plain warning and a clear locality as a plain reassurance.
+        </p>
+      </Section>
+
       <Section title="The Trust Score">
         <p>
           A weighted composite of the categories that can currently be scored,

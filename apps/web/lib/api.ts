@@ -329,6 +329,8 @@ export interface LocalityReport {
   categories: ReportCategory[];
   /** What the local press reports as planned, under way or newly opened. */
   upcoming: UpcomingItem[];
+  /** Modeled flood hazard; `inZone` is false when the model shows none. */
+  flood: FloodInfo;
   sourcesUsed: string[];
   generatedAt: string;
 }
@@ -347,6 +349,21 @@ export interface UpcomingItem {
   publishedAt?: string;
   url?: string;
   source?: string;
+}
+
+/**
+ * Modeled flood hazard for a locality. Always present; `inZone` is false when
+ * the model shows no meaningful flooding within ~1 km. Modeled, ~1 km screening
+ * — never a precise or observed figure, and the card says so.
+ */
+export interface FloodInfo {
+  inZone: boolean;
+  depthM: number | null;
+  band: "deep" | "moderate" | "shallow" | null;
+  returnPeriodYears: number;
+  source: string;
+  sourceUrl: string;
+  vintage: string;
 }
 
 export async function fetchReport(slug: string): Promise<LocalityReport> {
@@ -398,6 +415,15 @@ export async function fetchReport(slug: string): Promise<LocalityReport> {
         source: u.source ?? undefined,
       }),
     ).filter((u) => u.headline),
+    flood: {
+      inZone: !!(raw.flood as Record<string, any>)?.in_zone,
+      depthM: (raw.flood as Record<string, any>)?.depth_m ?? null,
+      band: (raw.flood as Record<string, any>)?.band ?? null,
+      returnPeriodYears: (raw.flood as Record<string, any>)?.return_period_years ?? 100,
+      source: (raw.flood as Record<string, any>)?.source ?? "",
+      sourceUrl: (raw.flood as Record<string, any>)?.source_url ?? "",
+      vintage: (raw.flood as Record<string, any>)?.vintage ?? "",
+    },
     sourcesUsed: raw.sources_used ?? [],
     generatedAt: raw.generated_at,
   };

@@ -30,6 +30,7 @@ from neighbour_trust_schema.envelope import Confidence
 from agents.common import db, freshness
 from agents.orchestrator import (  # noqa: I001
     flags as flags_mod,
+    flood as flood_mod,
     reconcile,
     reports as reports_mod,
     score as score_mod,
@@ -80,6 +81,9 @@ class LocalityReport:
     # Infrastructure reported as planned, under way or newly opened nearby.
     # Headlines, not a summary — see `_upcoming`.
     upcoming: list[dict[str, Any]] = field(default_factory=list)
+    # Modeled flood hazard for this locality (always present; `in_zone` False
+    # when the model shows none). Never scored — see agents/orchestrator/flood.py.
+    flood: dict[str, Any] = field(default_factory=dict)
 
 
 def _load_envelopes(conn, h3_cell: str) -> dict[str, Any]:
@@ -385,12 +389,17 @@ def build_report(conn, locality: dict[str, Any]) -> LocalityReport:
     order = {c: i for i, c in enumerate(REPORT_CATEGORIES)}
     categories.sort(key=lambda c: order[c["category"]])
 
+    flood = flood_mod.build(locality["slug"])
+
     sources = sorted(
         {
             envelope.get("source_name")
             for envelope in envelopes.values()
             if envelope.get("source_name")
         }
+        # Flood hazard is not an envelope, so its source has to be added by hand
+        # or the "Data pulled from" line would omit what the flood card shows.
+        | ({flood["source"]} if flood["in_zone"] else set())
     )
 
     # Resident flags join the ones derived from press and sensors, and are
@@ -414,4 +423,5 @@ def build_report(conn, locality: dict[str, Any]) -> LocalityReport:
         generated_at=now,
         envelopes=envelopes,
         upcoming=_upcoming(envelopes),
+        flood=flood,
     )
