@@ -23,10 +23,10 @@
      app reads from here, so the whole product's colour is these four lines —
      swap them for clay (#b5502f), teal (#0e6e6e) or coral (#fa5138) and the
      entire redesign re-skins with no other change. Currently: vibrant pink. */
-  --color-brand: #ff2d78;
-  --color-brand-soft: rgba(255, 45, 120, 0.1);
-  --color-brand-deep: #b0114e;
-  --color-brand-bright: #ff5290;
+  --color-brand: #f72575;
+  --color-brand-soft: rgba(247, 37, 117, 0.1);
+  --color-brand-deep: #d91361;
+  --color-brand-bright: #ff5c9b;
 
   --color-series-blue: #2a78d6;
   --color-series-violet: #4a3aa7;

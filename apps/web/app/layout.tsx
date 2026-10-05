@@ -44,19 +44,19 @@ const caveat = Caveat({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Neighbour Trust",
+    default: "Nestra",
     // Locality pages set their own name; this frames it without repetition.
-    template: "%s · Neighbour Trust",
+    template: "%s · Nestra",
   },
   description:
     "Sourced, confidence-tagged neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai. " +
     "Air quality, schools, and what local press reports about safety and water.",
-  applicationName: "Neighbour Trust",
+  applicationName: "Nestra",
 
   // Apple ignores the manifest and reads these instead.
   appleWebApp: {
     capable: true,
-    title: "Neighbour Trust",
+    title: "Nestra",
     statusBarStyle: "default",
   },
 
@@ -75,9 +75,9 @@ export const metadata: Metadata = {
   // the product rather than an afterthought.
   openGraph: {
     type: "website",
-    siteName: "Neighbour Trust",
+    siteName: "Nestra",
     locale: "en_IN",
-    title: "Neighbour Trust",
+    title: "Nestra",
     // No count. This said "44 localities" and stayed saying it after the
     // number became 159 — static metadata cannot know, and a link preview is
     // exactly where a stale figure does most damage: a report gets forwarded to
@@ -90,7 +90,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Neighbour Trust",
+    title: "Nestra",
     description:
       "Know the neighbourhood before you commit to it. Sourced, dated " +
       "neighbourhood data for Bengaluru, Gurugram, Hyderabad and Mumbai.",
@@ -100,7 +100,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   // Colours the Android status bar to match the hero, so an installed copy
   // reads as one surface rather than a page inside a browser.
-  themeColor: "#ff2d78",
+  themeColor: "#f72575",
   width: "device-width",
   initialScale: 1,
   // Not `maximumScale: 1`. Locking zoom is the standard way to make a web app

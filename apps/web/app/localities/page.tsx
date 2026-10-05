@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "All localities",
   description:
-    "Every locality Neighbour Trust covers in Bengaluru, Gurugram, Hyderabad and Mumbai, with its Trust Score and anything flagged.",
+    "Every locality Nestra covers in Bengaluru, Gurugram, Hyderabad and Mumbai, with its Trust Score and anything flagged.",
 };
 
 /**

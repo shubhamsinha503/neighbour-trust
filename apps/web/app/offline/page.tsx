@@ -1,4 +1,4 @@
-export const metadata = { title: "Offline · Neighbour Trust" };
+export const metadata = { title: "Offline · Nestra" };
 
 /**
  * Shown when a navigation fails because the device has no connection.

@@ -31,7 +31,7 @@ const NOMINATIM = "https://nominatim.openstreetmap.org/search";
  * contact address is a deployment fact, not a source-code one.
  */
 const CONTACT = process.env.GEOCODER_CONTACT ?? "https://neighbourtrust.com";
-const USER_AGENT = `NeighbourTrust/0.1 (${CONTACT})`;
+const USER_AGENT = `Nestra/0.1 (${CONTACT})`;
 
 /**
  * Both launch cities, as bounding boxes. Searches are biased to these rather

@@ -1,9 +1,9 @@
 """Generate the app icon set from the brand mark.
 
-The mark is the same one the site header uses: a white "N" on the brand green
+The mark is the same one the site header uses: a white "N" on the Nestra pink
 gradient. Drawn here rather than exported from a design tool so the icons stay in
-step with globals.css — the two greens below are --color-brand-deep and
---color-brand-bright, and if those change this is the one place to update.
+step with globals.css — the two pinks below are --color-brand-deep and
+--color-brand, and if those change this is the one place to update.
 
 Android needs two shapes of the same icon and treats them differently:
 
@@ -26,8 +26,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 OUT = pathlib.Path("apps/web/public/icons")
 
-BRAND_DEEP = (14, 90, 63)     # --color-brand-deep  #0e5a3f
-BRAND_BRIGHT = (27, 175, 122)  # --color-brand-bright #1baf7a
+BRAND_DEEP = (217, 19, 97)     # --color-brand-deep  #d91361
+BRAND_BRIGHT = (247, 37, 117)  # --color-brand        #f72575
 
 # Android's maskable safe zone: the inner 80% of the canvas is always visible.
 # The mark is sized against that rather than the full square.

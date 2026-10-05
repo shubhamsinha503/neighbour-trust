@@ -213,7 +213,7 @@ function Masthead() {
     <div className="flex items-center gap-2.5">
       <LogoMark />
       <div className="font-display text-[20px] font-bold tracking-[-0.02em]">
-        Neighbour Trust
+        Nestra
       </div>
     </div>
   );

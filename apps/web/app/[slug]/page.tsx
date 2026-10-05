@@ -21,7 +21,7 @@ const SITE_DESCRIPTION =
  * Per-locality title and description.
  *
  * Every locality page previously served the site's default title, so Google saw
- * forty-four near-identical pages and a shared link showed "Neighbour Trust"
+ * forty-four near-identical pages and a shared link showed "Nestra"
  * whatever it pointed at. Search and sharing are this product's two free
  * channels and both were broken by the same omission.
  *
@@ -67,8 +67,8 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: `/${slug}` },
-    openGraph: { title: `${title} · Neighbour Trust`, description, type: "article" },
-    twitter: { card: "summary_large_image", title: `${title} · Neighbour Trust`, description },
+    openGraph: { title: `${title} · Nestra`, description, type: "article" },
+    twitter: { card: "summary_large_image", title: `${title} · Nestra`, description },
   };
 }
 
