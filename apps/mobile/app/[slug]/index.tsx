@@ -2,6 +2,7 @@ import * as Haptics from "expo-haptics";
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -67,6 +68,26 @@ function categoryBandKey(category: string, score: number | null): string {
   if (score >= 60) return "band.schoolsPlenty";
   if (score >= 30) return "band.schoolsSome";
   return "band.schoolsFew";
+}
+
+/** A short, plain tag for a reported project — Transit, Roads, etc. Matched on
+ * the classifier's kind and, failing that, the headline, same as the web card. */
+function upcomingTag(kind = "", headline = ""): string {
+  const text = `${kind} ${headline}`.toLowerCase();
+  if (/metro|rail|rrts/.test(text)) return "Transit";
+  if (/road|flyover|underpass|corridor|expressway|tunnel|junction/.test(text)) return "Roads";
+  if (/legal|court|stay|litigat/.test(text)) return "Legal";
+  if (/water|sewer|drain|power|electric|utility/.test(text)) return "Utilities";
+  if (/hospital|school|park|civic|library/.test(text)) return "Civic";
+  return "Project";
+}
+
+/** "Oct 2026" from an ISO date, or null if there isn't a usable one. */
+function upcomingWhen(iso?: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 }
 
 export default function ReportScreen() {
@@ -411,6 +432,52 @@ export default function ReportScreen() {
               </View>
             )}
 
+            {/* Reported as coming — development the local press has written
+              * about, each linked to its source so a reader can check it. These
+              * are press reports, not commitments, which the title and the dated
+              * source line make plain. */}
+            {report.upcoming && report.upcoming.length > 0 && (
+              <View style={styles.section}>
+                <Txt weight="bold" style={styles.sectionTitle}>
+                  {t("upcoming.title")}
+                </Txt>
+                <Txt style={styles.upcomingNote}>{t("upcoming.note")}</Txt>
+                <Card style={styles.upcomingCard}>
+                  {report.upcoming.map((item, i) => {
+                    const when = upcomingWhen(item.published_at);
+                    const meta = [item.source, when].filter(Boolean).join(" · ");
+                    return (
+                      <Pressable
+                        key={i}
+                        disabled={!item.url}
+                        onPress={() => item.url && void Linking.openURL(item.url)}
+                        style={[styles.upcomingRow, i > 0 && styles.upcomingRowDivider]}
+                      >
+                        <View style={styles.upcomingTag}>
+                          <Txt weight="semibold" style={styles.upcomingTagText}>
+                            {upcomingTag(item.kind, item.headline)}
+                          </Txt>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Txt
+                            weight="semibold"
+                            style={[styles.upcomingHeadline, item.url && styles.upcomingLink]}
+                          >
+                            {item.headline}
+                          </Txt>
+                          {meta.length > 0 && (
+                            <Txt style={styles.upcomingMeta}>
+                              {meta}{item.url ? "  ↗" : ""}
+                            </Txt>
+                          )}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </Card>
+              </View>
+            )}
+
             {/* Sunlight */}
             <View style={styles.section}>
               <SunlightCard
@@ -538,6 +605,21 @@ const styles = StyleSheet.create({
   noteRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   noteIcon: { marginTop: 1 },
   noteText: { flex: 1, fontSize: 13.5, color: theme.ink, lineHeight: 19 },
+  upcomingNote: { fontSize: 12.5, color: theme.inkSecondary, marginTop: -6, marginBottom: 12, lineHeight: 18 },
+  upcomingCard: { padding: 16, gap: 0 },
+  upcomingRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 12 },
+  upcomingRowDivider: { borderTopWidth: 1, borderTopColor: theme.hairline },
+  upcomingTag: {
+    marginTop: 1,
+    backgroundColor: theme.brandSoft ?? theme.plane,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  upcomingTagText: { fontSize: 10.5, color: theme.brandDeep ?? theme.brand },
+  upcomingHeadline: { fontSize: 13.5, color: theme.ink, lineHeight: 19 },
+  upcomingLink: { color: theme.brandDeep ?? theme.brand },
+  upcomingMeta: { fontSize: 11, color: theme.inkMuted, marginTop: 3 },
   actions: { flexDirection: "row", gap: 12, marginTop: 24 },
   sources: { marginTop: 24 },
   sourcesLabel: { fontSize: 10, color: theme.inkMuted },
