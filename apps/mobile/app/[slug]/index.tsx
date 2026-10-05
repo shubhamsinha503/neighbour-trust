@@ -286,10 +286,6 @@ export default function ReportScreen() {
                   </Txt>
                 </View>
                 <Txt style={styles.verdict}>{report.verdict}</Txt>
-                <Txt style={styles.basedOn}>
-                  {t("report.basedOn")} {ts.categories_counted} {t("report.of")}{" "}
-                  {ts.categories_total} {t("report.categories")}
-                </Txt>
               </View>
             </Card>
 
@@ -466,7 +462,6 @@ export default function ReportScreen() {
                 <Txt weight="bold" style={styles.sectionTitle}>
                   {t("upcoming.title")}
                 </Txt>
-                <Txt style={styles.upcomingNote}>{t("upcoming.note")}</Txt>
                 <Card style={styles.upcomingCard}>
                   {report.upcoming.map((item, i) => {
                     const when = upcomingWhen(item.published_at);

@@ -180,13 +180,17 @@ def _verdict_sentence(trust: score_mod.TrustScore, categories: list[dict[str, An
         parts.append(f"driven by {CATEGORY_LABELS[best['category']].lower()}")
 
     sentence = " — ".join(parts) + "."
-    # The coverage caveat is part of the headline, not a footnote: a score built
-    # on two of six categories must never be read as a verdict on the whole
-    # neighbourhood.
-    return (
-        f"{sentence} Based on {trust.categories_counted} of "
-        f"{trust.categories_total} categories, so treat it as partial."
-    )
+    # The coverage caveat is part of the headline when the score genuinely rests
+    # on only some categories — a score built on two of five must not be read as a
+    # verdict on the whole neighbourhood. But at full coverage it is both
+    # redundant and wrong: "5 of 5 categories, so treat it as partial" contradicts
+    # itself, so it is only added when coverage is actually partial.
+    if trust.categories_counted < trust.categories_total:
+        return (
+            f"{sentence} Based on {trust.categories_counted} of "
+            f"{trust.categories_total} categories, so treat it as partial."
+        )
+    return sentence
 
 
 def _biggest_watchout(categories: list[dict[str, Any]]) -> Optional[dict[str, str]]:
