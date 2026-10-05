@@ -11,6 +11,12 @@ import { fetchAirQuality, NoDataError, type AirQualityDetail } from "@/src/api";
 import { useI18n } from "@/src/i18n";
 import { theme } from "@/src/theme";
 
+/** One decimal, with no trailing ".0" — a concentration like 43.4086956 is
+ * noise past the first decimal and a long raw float reads as a bug. */
+function round1(n: number): string {
+  return String(Math.round(n * 10) / 10);
+}
+
 export default function AirQualityScreen() {
   const { slug, score } = useLocalSearchParams<{ slug: string; score?: string }>();
   const { t, categoryLabel } = useI18n();
@@ -75,19 +81,19 @@ export default function AirQualityScreen() {
             />
             <Stat
               label="PM2.5"
-              value={p.pm2_5 != null ? String(p.pm2_5) : "—"}
+              value={p.pm2_5 != null ? round1(p.pm2_5) : "—"}
               sub={t("aq.unit")}
             />
             <Stat
               label="PM10"
-              value={p.pm10 != null ? String(p.pm10) : "—"}
+              value={p.pm10 != null ? round1(p.pm10) : "—"}
               sub={t("aq.unit")}
             />
             {p.no2 != null ? (
-              <Stat label="NO₂" value={String(p.no2)} sub={t("aq.unit")} />
+              <Stat label="NO₂" value={round1(p.no2)} sub={t("aq.unit")} />
             ) : null}
             {p.o3 != null ? (
-              <Stat label="O₃" value={String(p.o3)} sub={t("aq.unit")} />
+              <Stat label="O₃" value={round1(p.o3)} sub={t("aq.unit")} />
             ) : null}
             {p.dominant_pollutant ? (
               <Stat label={t("aq.dominant")} value={p.dominant_pollutant} />
