@@ -9,10 +9,10 @@
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nestra.app"
+      "bundleIdentifier": "com.nestra503.app"
     },
     "android": {
-      "package": "com.nestra.app",
+      "package": "com.nestra503.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F72575"
