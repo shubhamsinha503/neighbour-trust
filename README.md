@@ -1,211 +1,140 @@
-# Neighbour Trust
+<p align="center">
+  <img src="design/play/feature-graphic.png" alt="Nestra — know where you live" width="100%" />
+</p>
 
-Sourced, confidence-tagged neighbourhood data for Indian home buyers. Launch
-cities: **Bengaluru and Gurugram**.
+<h1 align="center">Nestra — Neighbour Trust</h1>
 
-The planning context lives in `docs/` and is *decided*, not up for re-derivation:
+<p align="center">
+  <b>Sourced, confidence-tagged neighbourhood data for Indian home buyers.</b><br/>
+  Every number shows where it came from, how old it is, and how much to trust it.
+</p>
 
-1. **`docs/strategy.md`** — the problem, the six-agent architecture, sources and
-   confidence logic per category, the consumer-psychology reasoning behind the
-   UI, and the city-selection analysis.
-2. **`docs/build-roadmap.md`** — the stack decision and the five-phase build
-   sequence.
-3. **`design/mockup-v2-psychology.html`** — the UI direction. Its tokens are now
-   the design system (see `apps/web/app/globals.css`); the file itself is the
-   reference, not the implementation.
+<p align="center">
+  <a href="https://neighbour-trust-virid.vercel.app">🌐 Live web app</a> ·
+  📱 Android (Google Play — internal testing) ·
+  <a href="https://neighbour-trust-virid.vercel.app/about">How the data works</a> ·
+  <a href="https://neighbour-trust-virid.vercel.app/privacy">Privacy</a>
+</p>
 
-## Where the build is
+<p align="center">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" />
+  <img alt="React Native" src="https://img.shields.io/badge/React%20Native%20(Expo)-000020?logo=expo&logoColor=white" />
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white" />
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" />
+  <img alt="Python" src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white" />
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white" />
+</p>
 
-**Phase 0, Phase 1, and the first agent of Phase 2 are done.** Air quality and
-schools are both live end-to-end for both cities: fetch → normalize → store →
-serve → render, on a scheduler.
+---
 
-Air quality went first because its data is genuinely good, so any failure would
-be a pipeline bug. That worked. Schools is the first category where the *data* is
-the hard part — see "What live testing changed" below — and it is the real test
-of whether "we show our work" survives a weak source.
+## What it is
 
-| Piece | State |
-|---|---|
-| Repo scaffold per the roadmap's structure | done |
-| Envelope as real Pydantic + TS types | done, `packages/schema/` |
-| Postgres + PostGIS + H3 keying | done, `infra/migrations/001_init.sql` |
-| Air quality agent (CPCB / OpenAQ / AQICN) | done, `agents/air_quality/` |
-| FastAPI endpoint | done, `apps/api/` |
-| Next.js card in the mockup's language | done, `apps/web/` |
-| Hourly scheduler + run log + deploy config | done, `agents/scheduler.py`, `infra/DEPLOY.md` |
-| Schools agent (UDISE + OpenStreetMap) | done, `agents/schools/` |
-| Crime, water, power, infrastructure | not started — Phase 2 |
+Most property apps are trying to sell you the house. **Nestra isn't.** It pulls
+together public information about an area — air quality, schools, flood risk,
+connectivity, safety signals — so a buyer or renter can judge a neighbourhood
+for themselves. The product's single differentiating principle: **it shows its
+work.** No invented "trust scores" presented as fact; every figure on a locality
+report names its **source**, its **date**, and its **confidence**, and a card
+that has no reliable data says so instead of filling the gap with a guess.
 
-**Deploying?** Read `infra/DEPLOY.md` first — Railway's default Postgres has no
-PostGIS, and getting that wrong is an afternoon.
+It ships as a **native Android app** (Expo / React Native) and a
+**production web app** (Next.js), backed by a **FastAPI** service and a set of
+**Python data-ingestion agents**, all in one TypeScript + Python monorepo.
 
-**The scheduler is the time-sensitive part.** OpenAQ serves a 90-day history
-window and the other two sources serve none, so every hour it isn't running is an
-hour of trend data that becomes permanently unrecoverable. `aq_observation` is
-the one asset here that compounds.
+## Highlights
 
-## Quickstart
+- 📍 **1,671 localities across 6 cities** — Delhi, Noida, Bengaluru, Gurugram, Hyderabad, Mumbai.
+- 🌊 **289 flood-prone localities** auto-flagged by sampling WRI Aqueduct flood-hazard rasters at each locality centroid.
+- 🧭 **Geospatial pipeline** — OpenStreetMap / Nominatim geocoding, exact-sector matching, and GDAL remote-raster reads.
+- 🤖 **LLM-powered Q&A** over each locality's structured data (Groq), plus an automated news classifier for safety/water signals.
+- 🌐 **5 languages** — English, Hindi, Kannada, Telugu, Marathi — across both app and web.
+- 🔒 **Privacy-first** — no account required, no tracking/ad SDKs, approximate location resolved on-device and never transmitted.
+- 🚀 **Shipped end-to-end** — from data pipeline to a Google Play submission, with automated builds (EAS) and scheduled ingestion (GitHub Actions).
 
-```bash
-cp .env.example .env        # then fill in the keys — see Credentials below
-make setup                  # venv + pip + npm
-make db                     # Postgres+PostGIS on :5433
-make seed                   # the 11 launch localities
-make fetch                  # pull live air quality
-make api                    # FastAPI on :8000
-make web                    # Next.js on :3000
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Sources["Public data sources"]
+    A1[CPCB / OpenAQ<br/>air quality]
+    A2[UDISE / OpenStreetMap<br/>schools & amenities]
+    A3[WRI Aqueduct<br/>flood rasters]
+    A4[Local news<br/>safety & water]
+  end
+
+  subgraph Agents["Python ingestion agents"]
+    B1[Geocoding<br/>Nominatim]
+    B2[Orchestrator<br/>score · reconcile · verdict]
+  end
+
+  Sources --> Agents
+  CI[GitHub Actions<br/>scheduled ingest] --> Agents
+  Agents --> DB[(PostgreSQL · Neon)]
+  DB --> API[FastAPI service · Render]
+  API --> Groq[LLM Q&A · Groq]
+
+  API --> Web[Next.js web · Vercel]
+  API --> Mobile[React Native app · Expo / Play]
 ```
 
-Then open http://localhost:3000.
+A locality report is assembled by the orchestrator, which **scores each category
+only where the data supports it, reconciles disagreements between sources
+instead of averaging them away, and attaches a confidence level and source/date
+to every figure** before the API serves it to both clients.
 
-## Credentials
+## Tech stack
 
-Three free keys. Nothing falls back to sample data — a missing key raises an
-error naming the signup URL, because a pipeline that silently serves fixtures is
-the exact failure this phase existed to rule out.
+| Layer | Technologies |
+|---|---|
+| **Mobile** | React Native, Expo (SDK 57), Expo Router, TypeScript, EAS Build, i18n |
+| **Web** | Next.js (App Router), React, TypeScript, Tailwind CSS |
+| **Backend** | Python, FastAPI, Pydantic, REST |
+| **Data / agents** | Python, OpenStreetMap / Nominatim, GDAL (geospatial rasters), news classification, Groq LLM |
+| **Data store** | PostgreSQL (Neon), PostGIS / H3 spatial keying |
+| **Infra / DevOps** | Vercel (web), Render (API), GitHub Actions (CI/CD + scheduled ingest), monorepo |
 
-| Env var | Where to get it | Used for |
-|---|---|---|
-| `DATA_GOV_IN_API_KEY` | [data.gov.in](https://www.data.gov.in/) → register → My Account | CPCB real-time AQI — the official source of record |
-| `OPENAQ_API_KEY` | [explore.openaq.org/register](https://explore.openaq.org/register) | Live CPCB values **and** the 30-day trend |
-| `AQICN_TOKEN` | [aqicn.org/data-platform/token](https://aqicn.org/data-platform/token/) | Corroboration only — see the caveats below |
+## Engineering highlights
 
-## What live testing changed
+- **Honesty-first data model.** The report schema carries source, vintage, and
+  confidence on every field; the orchestrator refuses to emit a category score
+  when the underlying data is too thin, and the UI renders that absence
+  explicitly rather than hiding it. Designing *for* missing data was the core
+  product constraint.
+- **Flood-risk screening from raster models.** A sampler reads a national WRI
+  Aqueduct inundation-depth raster, takes the max depth in a window around each
+  locality centroid, and bands it into a plain, dated warning — correctly
+  flagging real Yamuna-floodplain localities while staying honest that it is
+  ~1 km modeled screening, not a street-level survey.
+- **Robust geocoding.** Exact-sector-name matching over Nominatim results
+  (place/boundary vs. landuse polygons) expanded locality coverage substantially
+  without accepting wrong matches.
+- **Five-language parity.** A shared key-based i18n layer keeps the app and web
+  in sync across English, Hindi, Kannada, Telugu, and Marathi.
 
-Six things turned up against real responses that no amount of reading the docs
-would have surfaced. Each one is a comment in the code at the point it matters:
-
-**The AQI must be computed from 24-hour means, not the latest hour.** CPCB's
-breakpoint table is *defined* on 24-hour averages (8-hour for CO and O3), so
-indexing a single instantaneous reading against it inflates the number badly.
-Vikas Sadan, Gurugram read 140.5 µg/m³ of PM2.5 at 19:15 on 2026-08-17 — AQI 316,
-"Very Poor" — against a 24-hour mean of 89.6, which is AQI 206, "Poor". The card
-would have announced a crisis band on an ordinary evening. The headline is now
-the 24-hour figure, with the latest hour shown beside it as context.
-
-**The nearest sensor is often not a station that can produce an AQI.** OpenAQ's
-Indian coverage mixes regulatory CPCB/KSPCB stations with community low-cost
-sensors that report only PM and particle counts. Around Koramangala the closest
-entry is one of those, and it cannot meet CPCB's three-pollutant minimum — the
-agent now walks outward to the next candidate instead of reporting "no data"
-while a full KSPCB station sits unread just behind it. Station provider is also
-carried into `source_name`, so a community sensor is never labelled "CPCB".
-
-**Neither official source serves history.** CPCB-via-data.gov.in and the AQICN
-free API are both current-value-only. The 30-day trend chart therefore has no
-source under the stack as originally specified. OpenAQ (free, 90-day window,
-carries the same CPCB feeds) fills it, and `aq_observation` accumulates our own
-readings forward so the chart survives OpenAQ's window rolling past us.
-
-**AQICN's India data can be badly stale.** Every Bengaluru station queried on
-2026-08-17 returned readings timestamped 2026-06-23 — eight weeks old, served
-through the same fields as current data. The confidence rule in
-`agents/air_quality/agent.py` now degrades on *staleness as well as distance*;
-the original spec keyed on distance alone, which would have labelled two-month-old
-data "High confidence".
-
-**AQICN's `feed/geo:` returned a station 1,700 km away.** A query for
-Indiranagar, Bengaluru answered with a Delhi station in a different regulatory
-jurisdiction. All nearest-station logic now ranks candidates by our own haversine
-distance against a hard radius, and never trusts an upstream's idea of "nearby".
-
-**OpenAQ's free tier allows 60 requests per minute, and that shapes the agent.**
-A full run touches ~10 localities, each considering several stations, each
-station needing one sensor-listing call plus one per pollutant for the 24-hour
-window. Unmanaged, a run exhausts the minute's budget in the first two localities
-and every subsequent one reports "no station in range" — throttling that looks
-exactly like missing data. The client now reads the rate-limit headers, pauses
-before running out, retries on 429, and caches per-station responses across
-localities. A full 11-locality run takes about 3.5 minutes as a result, which is
-fine against an hourly schedule.
-
-**AQICN is on the US EPA scale, not CPCB's.** Its `iaqi` values are already EPA
-sub-indices rather than concentrations, and the same PM2.5 reading produces a
-different number and a different word under each scale. AQICN is therefore stored
-as its own clearly-labelled envelope and never contributes to the displayed
-number — an Indian buyer cross-checks against CPCB bulletins, so everything shown
-is CPCB.
-
-## The schools problem, in one table
-
-Measured on 2026-08-17, schools within 2 km:
-
-| Locality | OpenStreetMap | UDISE |
-|---|---|---|
-| Indiranagar | 61 | **0** |
-| Jayanagar | 76 | 27 |
-| Sector 14, Gurugram | — | 90 |
-
-UDISE's Bengaluru records are not merely stale, they are **spatially
-incomplete**: schools are recorded for the district but their coordinates do not
-put them where the schools are. Gurugram is healthy. So the agent uses two
-sources that answer different questions and never blends them:
-
-- **OpenStreetMap** answers *what schools are here* — counts, names, distances.
-  Current, ODbL-licensed, no API key.
-- **UDISE** answers *how well staffed is it* — pupil-teacher ratio, enrolment,
-  classrooms. It is the only source with those numbers, and it is from
-  January 2022.
-
-The card therefore says "61 schools within 2 km; staffing known for 1 of them, as
-of 2022" rather than implying we know 61 schools' worth of detail. Everything
-schools ships at **Low** confidence, and it cannot reach High at any age because
-no open dataset publishes exam results for these schools — so the score measures
-access and capacity, never teaching quality.
-
-Two guards exist because of this:
-
-- `agents/schools/coverage.py` refuses to publish counts measured to be wrong.
-  "0 schools near Indiranagar" is not a cautious number, it is a false one.
-- No median is published from fewer than three schools. A "median pupil-teacher
-  ratio" from one school is not a median.
-
-**Google Places was considered and rejected** as a source: its terms forbid
-retaining content beyond ~30 days and forbid building a derived database, which
-is exactly what this pipeline is. OSM has no such restriction.
-
-## Layout
+## Monorepo layout
 
 ```
 apps/
-  web/                 Next.js + Tailwind; tokens from the v2 mockup
-  api/                 FastAPI — localities + air quality endpoints
-agents/
-  common/              config, db, H3 geo helpers, locality seed
-  air_quality/         the one built agent
-    aqi.py             CPCB National AQI computation
-    sources/           cpcb.py (data.gov.in), openaq.py, aqicn.py
-  schools/ crime/ water/ power/ infrastructure/ news_monitor/ orchestrator/
-                       placeholders — Phase 2+
-packages/schema/       the envelope, Pydantic + TypeScript
-infra/                 docker-compose, SQL migrations
-docs/ design/          the planning handoff
-tests/                 AQI maths and confidence rules
+  mobile/   Expo / React Native app (Android, Google Play)
+  web/      Next.js web app (Vercel)
+  api/      FastAPI service (Render)
+agents/     Python ingestion + orchestration (air quality, schools, flood, …)
+infra/      Postgres migrations, deploy config
+docs/       Strategy, build roadmap, architecture decisions
 ```
 
-## Known follow-ups
+## Status
 
-**Next.js 16 upgrade.** We run 15.5.24, which clears the critical CVE-2025-66478
-that shipped in 15.1.6. Two advisories remain and both need Next 16, a breaking
-major: a moderate Next issue, and a high-severity PostCSS one. The PostCSS
-advisories all concern processing *attacker-controlled* CSS — sourceMappingURL
-path traversal, XSS via an unescaped `</style>` — and PostCSS here only ever
-processes `apps/web/app/globals.css`, which we author. Practical exposure is
-nil; the upgrade is worth doing on a week where a breaking change can be tested
-rather than shipped blind.
+- **Web:** live in production on Vercel.
+- **Android:** submitted to Google Play internal testing.
+- **Coverage:** 6 cities, 1,671 localities, expanding.
 
-## Still open
+## Design & planning
 
-Unchanged from the planning handoff, none of it blocking Phase 2:
+The product reasoning, six-agent architecture, per-category source/confidence
+logic, and UI psychology are written up in [`docs/strategy.md`](docs/strategy.md)
+and [`docs/build-roadmap.md`](docs/build-roadmap.md).
 
-- Whether crime/safety ships as a number at all, or as a qualitative
-  "resident-reported perception" label.
-- Build-vs-partner for RERA scraping (K-RERA + HRERA).
-- Whether Bengaluru's OpenCity crime datasets and Gurugram's DHBVN outage page
-  are usable — both still unverified hands-on.
+---
 
-One new one, from this phase: **AQICN's free tier forbids use in paid
-applications and redistribution.** If the B2B trust-score API in
-`docs/strategy.md` ever ships, AQICN needs a written agreement first. CPCB via
-data.gov.in carries no such restriction, which is part of why it is primary.
+<p align="center"><i>Know where you live.</i></p>
