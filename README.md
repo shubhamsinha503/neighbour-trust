@@ -151,11 +151,15 @@ Answers a buyer's free-text question about one locality, strictly from stored da
 
 ### How it was built
 
-Developed with an **agentic AI coding workflow** (Claude Code): architecture, the
-data-honesty rules, model selection and review were human-directed, with an AI
-pair generating and iterating the implementation under pull-request review and
-squash-merge. The payoff is a codebase where every data decision is documented
-and checkable in the source — the same standard the product holds its data to.
+The engineering judgment is mine: the system architecture, the data-honesty
+model, the defence-in-depth approach to the Q&A agent (verify the output against
+the known sources rather than trusting the prompt), the measure-don't-guess
+method for model selection, and the operational constraints (rate limiting,
+provider fallback, audit trail) were all my design decisions. I used an AI coding
+assistant (Claude Code) to accelerate the implementation under my direction,
+reviewing every change through pull requests before merge. The payoff is a
+codebase where every data decision is documented and checkable in the source —
+the same standard the product holds its data to.
 
 ## Tech stack
 
