@@ -46,14 +46,28 @@ def run_once(
 ) -> JobOutcome:
     """Fetch, normalize and store air quality for every locality (or just one).
 
-    Raises NoSourcesConfigured if no upstream key is available — deliberately
-    loud rather than a quiet no-op, because a scheduler silently doing nothing
-    for a week looks identical to a scheduler working fine on stale data.
+    Raises NoSourcesConfigured only when there is genuinely no source at all —
+    no station key AND the keyless CAMS model turned off. Deliberately loud
+    rather than a quiet no-op, because a scheduler silently doing nothing for a
+    week looks identical to a scheduler working fine on stale data.
+
+    When no station key is set but CAMS is on, the run proceeds model-only: the
+    station chain yields nothing and every locality falls through to a modelled,
+    LOW-confidence PM2.5 estimate (basis=cams_model). That keeps every card
+    populated with real, clearly-labelled data instead of a blank — without
+    inventing a station reading.
     """
     if not OPENAQ.is_set() and not DATA_GOV_IN.is_set():
-        raise NoSourcesConfigured(
-            "No air quality source configured — set DATA_GOV_IN_API_KEY or "
-            "OPENAQ_API_KEY. See .env.example."
+        if not aq_agent.CAMS_FALLBACK:
+            raise NoSourcesConfigured(
+                "No air quality source configured — set DATA_GOV_IN_API_KEY or "
+                "OPENAQ_API_KEY, or enable the keyless CAMS fallback. See "
+                ".env.example."
+            )
+        log.warning(
+            "No station key set (DATA_GOV_IN_API_KEY / OPENAQ_API_KEY). Running "
+            "CAMS model-only: every locality gets a modelled, LOW-confidence "
+            "PM2.5 estimate labelled cams_model — no station readings this pass."
         )
 
     sources = aq_agent.available_clients()

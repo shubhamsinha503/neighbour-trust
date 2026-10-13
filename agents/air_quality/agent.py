@@ -707,9 +707,16 @@ def _store_aqicn_corroboration(
 
 
 def available_clients() -> dict[str, bool]:
-    """Which sources are configured — used by run.py to report before fetching."""
+    """Which sources are configured — used by run.py to report before fetching.
+
+    The CAMS model is keyless (Open-Meteo), so when CAMS_FALLBACK is on it is
+    always available and is the floor beneath every locality: even with no
+    station key set, every locality still gets a modelled, LOW-confidence PM2.5
+    estimate labelled cams_model rather than a blank card.
+    """
     return {
         "CPCB via data.gov.in": DATA_GOV_IN.is_set(),
         "CPCB via OpenAQ": OPENAQ.is_set(),
         "AQICN": AQICN.is_set(),
+        "CAMS model (keyless, estimate)": CAMS_FALLBACK,
     }
