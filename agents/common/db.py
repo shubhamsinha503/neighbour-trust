@@ -848,8 +848,22 @@ def empty_localities(conn: psycopg.Connection) -> list[dict[str, Any]]:
     ).fetchall()
 
 
+# The categories that actually appear on a locality report — the five the
+# "{n}/5 documented" count is measured against. Mirrors
+# agents/orchestrator/score.py SCOREABLE; kept as a local list because
+# orchestrator imports this module, not the other way round. power is a flag,
+# not a card, and development is explicitly not a report category, so neither is
+# counted — counting them produced an over-count like "7/5".
+REPORT_CATEGORIES = ("air_quality", "schools", "crime", "water", "infrastructure")
+
+
 def coverage_by_cell(conn: psycopg.Connection) -> dict[str, int]:
-    """How many categories hold data, per H3 cell.
+    """How many report categories hold data, per H3 cell.
+
+    Counts only the five categories that render on a report (REPORT_CATEGORIES),
+    so the figure matches the "/5 documented" label. Counting every category in
+    data_envelope — power, development — produced a numerator above the
+    denominator ("7/5").
 
     Kept out of list_localities deliberately. That function's columns are pinned
     by tests/test_db_contract.py against get_locality, after the two diverged
@@ -861,8 +875,10 @@ def coverage_by_cell(conn: psycopg.Connection) -> dict[str, int]:
         """
         SELECT h3_cell, COUNT(DISTINCT category) AS n
         FROM data_envelope
+        WHERE category = ANY(%s)
         GROUP BY h3_cell
-        """
+        """,
+        (list(REPORT_CATEGORIES),),
     ).fetchall()
     return {r["h3_cell"]: int(r["n"]) for r in rows}
 
