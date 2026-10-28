@@ -9,6 +9,8 @@ saves at this size.
 from __future__ import annotations
 
 import json
+import logging
+import time
 from contextlib import contextmanager
 from datetime import date, datetime
 from typing import Any, Iterable, Iterator, Optional
@@ -19,11 +21,56 @@ from psycopg.rows import dict_row
 from agents.common.config import database_url
 from agents.common.geo import cell_centroid
 
+log = logging.getLogger(__name__)
+
+# Serverless Postgres (Neon scale-to-zero) suspends the compute when idle and
+# takes a few seconds to wake on the next connection. During that window a
+# connect attempt is refused or times out, which otherwise surfaces as a 500 on
+# the first request after an idle period. Retry connection establishment with
+# backoff so a request that arrives while the database is waking waits out the
+# cold start instead of failing. Only the connect is retried — once a connection
+# is open, query errors propagate unchanged.
+_CONNECT_ATTEMPTS = 4
+_CONNECT_BACKOFF_SECONDS = 1.5
+_CONNECT_TIMEOUT_SECONDS = 10
+
+
+def _connect_with_retry() -> psycopg.Connection:
+    last_exc: Optional[psycopg.OperationalError] = None
+    for attempt in range(1, _CONNECT_ATTEMPTS + 1):
+        try:
+            return psycopg.connect(
+                database_url(),
+                row_factory=dict_row,
+                connect_timeout=_CONNECT_TIMEOUT_SECONDS,
+            )
+        except psycopg.OperationalError as exc:
+            last_exc = exc
+            if attempt == _CONNECT_ATTEMPTS:
+                break
+            wait = _CONNECT_BACKOFF_SECONDS * attempt
+            log.warning(
+                "db connect attempt %d/%d failed (%s); retrying in %.1fs — "
+                "likely a serverless cold start",
+                attempt,
+                _CONNECT_ATTEMPTS,
+                exc,
+                wait,
+            )
+            time.sleep(wait)
+    assert last_exc is not None
+    raise last_exc
+
 
 @contextmanager
 def connect() -> Iterator[psycopg.Connection]:
-    """Open a connection with dict rows. Commits on clean exit, rolls back on error."""
-    with psycopg.connect(database_url(), row_factory=dict_row) as conn:
+    """Open a connection with dict rows. Commits on clean exit, rolls back on error.
+
+    Connection establishment is retried with backoff (see _connect_with_retry)
+    so a serverless-Postgres cold start — Neon scale-to-zero waking on the first
+    request after idle — waits out the wake rather than surfacing as a 500.
+    """
+    with _connect_with_retry() as conn:
         yield conn
 
 
