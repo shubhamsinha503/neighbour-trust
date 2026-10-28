@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import json
 import logging
+import socket
 import time
 from contextlib import contextmanager
 from datetime import date, datetime
 from typing import Any, Iterable, Iterator, Optional
 
 import psycopg
+from psycopg import conninfo as pg_conninfo
 from psycopg.rows import dict_row
 
 from agents.common.config import database_url
@@ -23,27 +25,64 @@ from agents.common.geo import cell_centroid
 
 log = logging.getLogger(__name__)
 
-# Serverless Postgres (Neon scale-to-zero) suspends the compute when idle and
-# takes a few seconds to wake on the next connection. During that window a
-# connect attempt is refused or times out, which otherwise surfaces as a 500 on
-# the first request after an idle period. Retry connection establishment with
-# backoff so a request that arrives while the database is waking waits out the
-# cold start instead of failing. Only the connect is retried — once a connection
-# is open, query errors propagate unchanged.
+# Connection hardening, for two failure modes seen against Neon:
+#   1. Serverless scale-to-zero suspends the compute when idle and takes a few
+#      seconds to wake on the next connection; during that window a connect is
+#      refused or times out. Retried with backoff so a request arriving while the
+#      database wakes waits it out instead of surfacing a 500. Only the connect is
+#      retried — once a connection is open, query errors propagate unchanged.
+#   2. The host can resolve to IPv6, which GitHub Actions runners cannot route to
+#      ("Network is unreachable"), silently freezing ingestion. _ipv4_hostaddr
+#      pins the TCP target to IPv4 while keeping the hostname for TLS SNI.
 _CONNECT_ATTEMPTS = 4
 _CONNECT_BACKOFF_SECONDS = 1.5
 _CONNECT_TIMEOUT_SECONDS = 10
 
 
+def _ipv4_hostaddr(url: str) -> Optional[str]:
+    """Resolve the connection host to an IPv4 address, or None.
+
+    GitHub Actions runners have no IPv6 route, so when the database host
+    resolves to an AAAA record the connection fails with "Network is
+    unreachable" and every ingestion run dies at connect. Pinning the TCP target
+    to IPv4 via `hostaddr` avoids that, while the hostname stays in the conninfo
+    for TLS SNI — which Neon needs to route to the right endpoint — so SNI
+    routing and certificate checks are unaffected. Returns None when the host is
+    already a literal IP, cannot be parsed, or has no IPv4 address, in which case
+    the connection is made unchanged.
+    """
+    try:
+        host = pg_conninfo.conninfo_to_dict(url).get("host")
+    except Exception:
+        return None
+    if not host:
+        return None
+    try:
+        socket.inet_aton(host)
+        return None  # already an IPv4 literal
+    except OSError:
+        pass
+    try:
+        infos = socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_STREAM)
+    except OSError:
+        return None
+    return infos[0][4][0] if infos else None
+
+
 def _connect_with_retry() -> psycopg.Connection:
+    url = database_url()
+    kwargs: dict[str, Any] = {
+        "row_factory": dict_row,
+        "connect_timeout": _CONNECT_TIMEOUT_SECONDS,
+    }
+    hostaddr = _ipv4_hostaddr(url)
+    if hostaddr:
+        kwargs["hostaddr"] = hostaddr
+
     last_exc: Optional[psycopg.OperationalError] = None
     for attempt in range(1, _CONNECT_ATTEMPTS + 1):
         try:
-            return psycopg.connect(
-                database_url(),
-                row_factory=dict_row,
-                connect_timeout=_CONNECT_TIMEOUT_SECONDS,
-            )
+            return psycopg.connect(url, **kwargs)
         except psycopg.OperationalError as exc:
             last_exc = exc
             if attempt == _CONNECT_ATTEMPTS:
