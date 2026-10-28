@@ -66,6 +66,12 @@ export default function AboutPage() {
           served by community low-cost sensors measuring PM2.5 alone. Those cards
           say exactly that rather than presenting the number as a full AQI.
         </p>
+        <p>
+          Where no live station of any kind is in range, the card falls back to a
+          modelled PM2.5 estimate from the Copernicus CAMS model. It is marked as
+          a low-confidence estimate and never shown as a station measurement — a
+          modelled figure to weigh, not a reading we stand behind as fact.
+        </p>
       </Section>
 
       <Section title="Schools">

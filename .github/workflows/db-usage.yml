@@ -1,0 +1,88 @@
+# Weekly check of Neon compute-hour usage against the Free-plan allowance.
+#
+# The Free plan includes 100 compute-hours per month. With scale-to-zero on,
+# normal usage sits well under that, but a runaway job (something keeping the
+# database awake) would burn through it silently and suspend the compute at
+# month end. This surfaces the number in the Actions summary once a week and
+# warns before it becomes a problem — it changes nothing, it only reports.
+#
+# Setup (one time): add a repository secret NEON_API_KEY — a Neon API key from
+#   Neon Console -> Account settings -> API keys. No project id is needed; the
+#   account consumption endpoint covers every project on the account.
+#
+# Without the secret the job exits cleanly with a note rather than failing, so
+# it never turns the Actions tab red just because the key is not set yet.
+
+name: DB usage
+
+on:
+  schedule:
+    # Mondays 06:08 UTC. Off the hour for the same politeness reason the ingest
+    # jobs are, though nothing here is time-sensitive.
+    - cron: "8 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compute-hours:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report Neon compute-hours this month
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          # Free-plan monthly allowance and the fraction at which to warn.
+          ALLOWANCE_HOURS: "100"
+          WARN_FRACTION: "0.7"
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NEON_API_KEY}" ]; then
+            echo "NEON_API_KEY secret is not set — skipping usage check." >> "$GITHUB_STEP_SUMMARY"
+            echo "Add it in Settings -> Secrets and variables -> Actions to enable this." >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice::NEON_API_KEY not set; skipped compute-hour check."
+            exit 0
+          fi
+
+          # Current calendar month, UTC — matches how the allowance is counted.
+          FROM="$(date -u +%Y-%m-01T00:00:00Z)"
+          TO="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          resp="$(curl -sS -w '\n%{http_code}' \
+            -H "Authorization: Bearer ${NEON_API_KEY}" \
+            -H "Accept: application/json" \
+            "https://console.neon.tech/api/v2/consumption_history/account?from=${FROM}&to=${TO}&granularity=monthly")"
+
+          body="$(printf '%s' "$resp" | head -n -1)"
+          code="$(printf '%s' "$resp" | tail -n 1)"
+
+          if [ "$code" != "200" ]; then
+            echo "Neon API returned HTTP ${code}." >> "$GITHUB_STEP_SUMMARY"
+            echo "$body" | head -c 500 >> "$GITHUB_STEP_SUMMARY" || true
+            echo "::warning::Neon usage check failed with HTTP ${code} — the key may be invalid or the API shape changed."
+            exit 0
+          fi
+
+          # Sum compute_time_seconds across every project's period in the window.
+          secs="$(printf '%s' "$body" \
+            | jq '[.periods[]?.consumption[]?.compute_time_seconds // 0] | add // 0')"
+
+          hours="$(awk "BEGIN { printf \"%.1f\", ${secs} / 3600 }")"
+          limit="${ALLOWANCE_HOURS}"
+          warn_at="$(awk "BEGIN { printf \"%.0f\", ${limit} * ${WARN_FRACTION} }")"
+
+          {
+            echo "## Neon compute-hours this month"
+            echo ""
+            echo "- Used: **${hours} / ${limit}** compute-hours"
+            echo "- Window: ${FROM} to ${TO}"
+            echo "- Warn threshold: ${warn_at} hours (${WARN_FRACTION} of allowance)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          over="$(awk "BEGIN { print (${hours} >= ${warn_at}) ? 1 : 0 }")"
+          if [ "$over" = "1" ]; then
+            echo "::warning::Neon compute-hours at ${hours}/${limit} this month — approaching the Free-plan allowance. Consider widening the hourly ingestion cadence."
+          else
+            echo "::notice::Neon compute-hours at ${hours}/${limit} this month — well within the Free-plan allowance."
+          fi
