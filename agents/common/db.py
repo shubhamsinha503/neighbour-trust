@@ -13,7 +13,7 @@ import logging
 import socket
 import time
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Iterable, Iterator, Optional
 
 import psycopg
@@ -941,6 +941,29 @@ def empty_localities(conn: psycopg.Connection) -> list[dict[str, Any]]:
 # not a card, and development is explicitly not a report category, so neither is
 # counted — counting them produced an over-count like "7/5".
 REPORT_CATEGORIES = ("air_quality", "schools", "crime", "water", "infrastructure")
+
+
+def fresh_envelope_cells(
+    conn: psycopg.Connection, *, category: str, within: timedelta
+) -> set[str]:
+    """H3 cells with a `category` envelope fetched within `within` of now.
+
+    One small query returning only the cell ids, so an ingest pass can skip the
+    localities it refreshed recently instead of re-fetching and re-writing every
+    one every run. That skip is what keeps the pass inside its time budget and
+    off the network-transfer allowance — re-pulling 30-day trends for 1,600+
+    localities every hour is what exhausted it.
+    """
+    rows = conn.execute(
+        """
+        SELECT DISTINCT h3_cell
+        FROM data_envelope
+        WHERE category = %s::category_t
+          AND fetched_at >= now() - %s
+        """,
+        (category, within),
+    ).fetchall()
+    return {r["h3_cell"] for r in rows}
 
 
 def coverage_by_cell(conn: psycopg.Connection) -> dict[str, int]:
