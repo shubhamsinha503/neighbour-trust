@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from datetime import timedelta
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -28,6 +29,23 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--locality", help="Run for a single locality slug.")
     parser.add_argument("--trend-days", type=int, default=30)
     parser.add_argument("--dry-run", action="store_true", help="Fetch but roll back all writes.")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Refresh every locality, ignoring the recently-refreshed skip.",
+    )
+    parser.add_argument(
+        "--freshness-hours",
+        type=float,
+        default=aq_job.DEFAULT_FRESHNESS.total_seconds() / 3600,
+        help="Skip localities refreshed within this many hours (0 disables the skip).",
+    )
+    parser.add_argument(
+        "--max-seconds",
+        type=float,
+        default=aq_job.DEFAULT_MAX_RUNTIME_SECONDS,
+        help="Wall-clock budget for the pass; it stops cleanly after this (0 disables).",
+    )
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args(argv)
 
@@ -56,6 +74,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             locality_slug=args.locality,
             trend_days=args.trend_days,
             dry_run=args.dry_run,
+            freshness=(
+                timedelta(hours=args.freshness_hours) if args.freshness_hours > 0 else None
+            ),
+            max_runtime_seconds=args.max_seconds if args.max_seconds > 0 else None,
+            force_refresh=args.force,
         )
     except aq_job.NoSourcesConfigured as exc:
         print(exc, file=sys.stderr)
@@ -78,6 +101,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         else:
             print(f"  SKIP {result.slug:<18} {result.reason}")
 
+    print(
+        f"\nStored {outcome.ok}, skipped {outcome.skipped}, "
+        f"fresh-skipped {outcome.fresh}"
+        + (" — stopped on time budget (rest run next pass)" if outcome.budget_hit else "")
+    )
+
     if args.dry_run:
         print("\nDry run — all writes rolled back.")
 
@@ -96,7 +125,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     # genuinely broken credential surfaces as fetch errors in the log above, and
     # a total misconfiguration still exits non-zero via NoSourcesConfigured.
     stored = len(outcome.results) - outcome.skipped
-    if stored == 0 and outcome.results:
+    if stored == 0 and outcome.results and outcome.fresh == 0:
         print(
             f"\nAll {outcome.skipped} localities skipped — nothing stored. No live "
             f"air-quality station within range of any locality; upstream feeds are "
