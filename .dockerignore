@@ -1,0 +1,24 @@
+# Keep the build context small and the image clean. The API needs only
+# apps/api, agents/, packages/, and requirements.txt — everything else is noise
+# (and node_modules would be hundreds of MB).
+.git
+.github
+**/__pycache__
+**/*.pyc
+**/*.pyo
+
+# Frontends — not part of the API image.
+apps/web
+apps/mobile
+
+# Local-only, heavy, or irrelevant to serving.
+.env
+.env.*
+.venv
+venv
+infra
+docs
+design
+scripts
+*.md
+*.log
