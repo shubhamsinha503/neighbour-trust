@@ -417,12 +417,16 @@ class OpenAICompatibleClassifier:
         "openrouter": ("https://openrouter.ai/api/v1", "", "OPENROUTER_API_KEY", 60),
         "cerebras": ("https://api.cerebras.ai/v1", "", "CEREBRAS_API_KEY", 30),
         # Google Gemini through its OpenAI-compatible endpoint (the trailing
-        # slash matters). A free AI Studio key reaches it; gemini-3.8-flash is
-        # the current general-purpose Flash model (2.5-flash is deprecated). The
-        # free tier meters a low requests-per-minute, so pace conservatively.
+        # slash matters). A free AI Studio key reaches it. Default to
+        # gemini-3.5-flash-lite: on the free tier the larger gemini-3.8-flash
+        # frequently returns 503 (overloaded) and gemini-3.1-pro-preview 429,
+        # while flash-lite answers reliably — and grounded Q&A reads provided
+        # facts rather than doing heavy reasoning, so lite is plenty. Override
+        # with QA_MODEL=gemini-3.8-flash once that model has capacity. The free
+        # tier meters a low requests-per-minute, so pace conservatively.
         "gemini": (
             "https://generativelanguage.googleapis.com/v1beta/openai/",
-            "gemini-3.8-flash",
+            "gemini-3.5-flash-lite",
             "GEMINI_API_KEY",
             10,
         ),
