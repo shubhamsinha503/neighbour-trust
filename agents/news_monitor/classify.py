@@ -416,6 +416,16 @@ class OpenAICompatibleClassifier:
         "scalemax": ("https://api.scalemax.pro/token/v1", "dsv4-flash-unlimited", "SCALEMAX_API_KEY", 60),
         "openrouter": ("https://openrouter.ai/api/v1", "", "OPENROUTER_API_KEY", 60),
         "cerebras": ("https://api.cerebras.ai/v1", "", "CEREBRAS_API_KEY", 30),
+        # Google Gemini through its OpenAI-compatible endpoint (the trailing
+        # slash matters). A free AI Studio key reaches it; gemini-3.8-flash is
+        # the current general-purpose Flash model (2.5-flash is deprecated). The
+        # free tier meters a low requests-per-minute, so pace conservatively.
+        "gemini": (
+            "https://generativelanguage.googleapis.com/v1beta/openai/",
+            "gemini-3.8-flash",
+            "GEMINI_API_KEY",
+            10,
+        ),
         # A model you host yourself. No key, no rate limit, no bill.
         "ollama": ("http://localhost:11434/v1", "qwen2.5:7b", "OLLAMA_KEY", 600),
     }

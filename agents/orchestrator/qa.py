@@ -526,16 +526,24 @@ class OpenAICompatibleQaClient:
 
 
 def build_client() -> QaClient:
-    """Claude when an Anthropic key is present, otherwise the first configured
+    """The explicitly chosen provider, else Claude, else the first configured
     OpenAI-compatible provider in order.
 
-    The order (QA_PROVIDER or CLASSIFIER_PROVIDER, default "deepseek,groq") is a
-    fallback chain: the first provider whose key is set is used, so a deployment
-    with a funded DeepSeek key uses DeepSeek and falls back to Groq only if that
-    key is absent — matching how the news classifier picks a provider. Whichever
-    is chosen answers every question, so no single answer mixes two models.
+    An explicit QA_PROVIDER wins, so a deployment can run Q&A on Gemini (or any
+    other OpenAI-compatible provider) even when an Anthropic key is also present
+    — which is what a "must use Gemini" constraint needs. With no explicit
+    choice, Claude is used when its key is set.
+
+    The order (QA_PROVIDER or CLASSIFIER_PROVIDER, default "scalemax,deepseek,
+    groq") is a fallback chain: the first provider whose key is set is used, so a
+    deployment with a funded DeepSeek key uses DeepSeek and falls back to Groq
+    only if that key is absent — matching how the news classifier picks a
+    provider. Whichever is chosen answers every question, so no single answer
+    mixes two models.
     """
-    if os.environ.get("ANTHROPIC_API_KEY"):
+    explicit = (os.environ.get("QA_PROVIDER") or "").strip()
+
+    if not explicit and os.environ.get("ANTHROPIC_API_KEY"):
         return ClaudeQaClient()
 
     from agents.news_monitor.classify import OpenAICompatibleClassifier
@@ -543,7 +551,7 @@ def build_client() -> QaClient:
     order = [
         p.strip()
         for p in (
-            os.environ.get("QA_PROVIDER")
+            explicit
             or os.environ.get("CLASSIFIER_PROVIDER")
             or "scalemax,deepseek,groq"
         ).split(",")
@@ -561,11 +569,16 @@ def build_client() -> QaClient:
             return OpenAICompatibleQaClient(provider=provider)
         except Exception as exc:  # pragma: no cover - construction is cheap
             last_error = exc
+
+    # Explicit chain exhausted, or it named only providers with no key or an
+    # unknown name: fall back to Claude when its key is set.
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return ClaudeQaClient()
     if last_error is not None:
         raise last_error
     raise RuntimeError(
-        "No question-answering provider configured. Set DEEPSEEK_API_KEY or "
-        "GROQ_API_KEY (and optionally QA_PROVIDER)."
+        "No question-answering provider configured. Set GEMINI_API_KEY (and "
+        "QA_PROVIDER=gemini), or DEEPSEEK_API_KEY / GROQ_API_KEY."
     )
 
 
