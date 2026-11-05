@@ -96,7 +96,7 @@ export function ConsentBanner() {
     <div
       role="dialog"
       aria-label={t("consent.title")}
-      className="fixed inset-x-0 bottom-0 z-50 px-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-2"
+      className="fixed inset-x-0 bottom-[calc(70px+env(safe-area-inset-bottom,0px))] z-50 px-4 pt-2"
     >
       <div className="mx-auto max-w-3xl rounded-2xl border border-hairline bg-surface-1 p-4 shadow-[0_6px_24px_rgba(0,0,0,0.12)]">
         <p className="text-[13px] leading-[1.6] text-ink-secondary">

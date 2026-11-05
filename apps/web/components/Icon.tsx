@@ -17,7 +17,11 @@ export type IconName =
   | "book"
   | "plus"
   | "tree"
-  | "sun";
+  | "sun"
+  | "home"
+  | "map"
+  | "bookmark"
+  | "user";
 
 const PATHS: Record<IconName, { d: string; fill?: boolean }[]> = {
   heart: [{ d: "M12 20.5 4.5 13A4.6 4.6 0 0 1 12 7.8 4.6 4.6 0 0 1 19.5 13Z", fill: true }],
@@ -32,6 +36,10 @@ const PATHS: Record<IconName, { d: string; fill?: boolean }[]> = {
   plus: [{ d: "M12 6v12M6 12h12" }],
   tree: [{ d: "M12 3c3 0 5 2.5 5 5.5 0 .9-.2 1.7-.6 2.4A4.5 4.5 0 0 1 14 20h-4a4.5 4.5 0 0 1-2.4-9.1A5.3 5.3 0 0 1 7 8.5C7 5.5 9 3 12 3Z" }, { d: "M12 14v7" }],
   sun: [{ d: "M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z" }, { d: "M12 2v2m0 16v2M4.2 4.2l1.4 1.4m12.8 12.8 1.4 1.4M2 12h2m16 0h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" }],
+  home: [{ d: "M3 11l9-8 9 8" }, { d: "M5 10v10h14V10" }, { d: "M10 20v-6h4v6" }],
+  map: [{ d: "M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z" }, { d: "M9 4v14m6-12v14" }],
+  bookmark: [{ d: "M6 4h12v16l-6-4-6 4Z" }],
+  user: [{ d: "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" }, { d: "M4.5 21a7.5 7.5 0 0 1 15 0" }],
 };
 
 export function Icon({
