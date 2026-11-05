@@ -21,18 +21,15 @@
 import { categoryLabel } from "@/lib/i18n";
 import { getServerT } from "@/lib/i18n-server";
 import Link from "next/link";
-import type { Confidence } from "@schema/envelope";
-import { ExpandableCard } from "@/components/ExpandableCard";
+import { CategoryStrip } from "@/components/CategoryStrip";
 import { SunlightCard } from "@/components/SunlightCard";
 import { UpcomingCard } from "@/components/UpcomingCard";
 import { FloodCard } from "@/components/FloodCard";
-import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
 import type {
   ConnectivityFeature,
   ConnectivityView,
   Flag,
   LocalityReport,
-  ReportCategory,
 } from "@/lib/api";
 
 const SCORE_COLORS: Array<[number, string]> = [
@@ -134,33 +131,11 @@ export async function TrustReport({
         )}
       </section>
 
-      {/* 4 — the category grid, empties included */}
-      <h3 className="mb-2.5 mt-6 text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
-        {t("report.categoriesHeader")}
-      </h3>
-      {/* Categories we have something for get a card. Categories we have nothing
-        * for get one line between them, rather than a full card each saying
-        * "no source yet" — four of those turned the page into a wall and pushed
-        * the parts that carry information below the fold. They stay listed,
-        * because a grid that silently shows two is a different claim than one
-        * that lists them all and admits which are empty. */}
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        {report.categories
-          .filter((category) => category.available)
-          .map((category) => (
-            <CategoryCard
-              key={category.category}
-              category={category}
-              slug={locality.slug}
-              localityName={locality.name}
-            />
-          ))}
-      </div>
-      {/* Categories we have no data for are simply not shown. We still never
-        * estimate them — a blank card is just left out rather than announced,
-        * because "No data yet for Safety, Water" read to a buyer as the product
-        * being broken, not as candour. The score chip already states how many
-        * categories fed it, which is where the honest count belongs. */}
+      {/* 4 — category scores, shown as the native app's horizontal strip so the
+        * two products read as one. Only scored categories appear, matching the
+        * app; the honest count of what fed the overall score stays on the score
+        * chip above. */}
+      <CategoryStrip categories={report.categories} slug={locality.slug} />
 
       {/* One route in per page, whatever the categories hold. The per-card link
         * only appears on a card with nothing measured, and a category with
@@ -425,145 +400,6 @@ function ScoreMeter({ trust }: { trust: LocalityReport["trustScore"] }) {
   );
 }
 
-async function CategoryCard({
-  category,
-  slug,
-  localityName,
-}: {
-  category: ReportCategory;
-  slug: string;
-  localityName: string;
-}) {
-  const { t } = await getServerT();
-  // Connectivity earned a detail page when its distances became re-measurable
-  // from an address — the tile can only show one line, and "nearest station
-  // 0.21 km" is measured from the locality centre until someone says otherwise.
-  const hasDetailPage =
-    category.category === "air_quality" ||
-    category.category === "schools" ||
-    category.category === "infrastructure";
-  const color =
-    category.score !== null ? colorForScore(category.score) : "var(--color-gridline)";
-
-  const cardClass = `h-full rounded-2xl border p-3.5 ${
-    category.counted
-      ? "border-hairline bg-surface-1"
-      : "border-dashed border-gridline bg-page-plane"
-  }`;
-
-  /*
-    An unscored category shows no number and no meter at all.
-
-    It used to render an em dash above an empty progress bar, which is the
-    shape of a broken component rather than of an answer — the eye reads a
-    zero-width bar as a score of nothing, which is the one reading this
-    product must never invite.
-
-    The alternative considered and rejected was giving unscored categories a
-    default number. Silence in the local press is not evidence of safety,
-    and scoring it as though it were would rank the neighbourhoods nobody
-    writes about above the ones that get covered.
-  */
-  const header = (
-    <>
-      <div className="mb-1.5 flex items-start justify-between gap-2">
-        <div className="text-[12.5px] font-semibold text-ink-primary">
-          {categoryLabel(t, category.category, category.label)}
-        </div>
-        {category.score !== null && (
-          <div className="flex shrink-0 items-center gap-1.5">
-            {/* A baseline is not a measurement, so it must not look like one. */}
-            {category.isBaseline && (
-              <span className="rounded bg-page-plane px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-ink-muted">
-                {t("report.baselineTag")}
-              </span>
-            )}
-            <div
-              className="text-[17px] font-bold leading-none"
-              style={{ color: category.isBaseline ? "var(--color-ink-muted)" : color }}
-            >
-              {category.score}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {category.score !== null && (
-        <div className="mb-1 h-[5px] w-full overflow-hidden rounded-[3px] bg-gridline">
-          <div
-            className={`h-full rounded-[3px] ${category.isBaseline ? "opacity-40" : ""}`}
-            style={{
-              width: `${category.score}%`,
-              background: category.isBaseline ? "var(--color-ink-muted)" : color,
-            }}
-          />
-        </div>
-      )}
-    </>
-  );
-
-  // Folded by default and opened by tapping the card: the grid is read at a
-  // glance, and a paragraph under every score made the page a wall of text.
-  const detail = (
-    <>
-      <div className="mt-2 text-[11px] leading-[1.45] text-ink-secondary">
-        {category.summary || category.status}
-      </div>
-      {/* The invitation belongs on exactly the cards where we admit we know
-        * little: nothing measurable, or a baseline standing in for silence. */}
-      {(category.score === null || category.isBaseline) && (
-        <ReportLink category={category.label} localityName={localityName} />
-      )}
-    </>
-  );
-
-  const footer = (
-    <span className="flex items-center gap-3">
-      {category.confidence ? (
-        <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-ink-secondary">
-          <span
-            className="inline-block h-1.5 w-1.5 rounded-full"
-            style={{ background: CONFIDENCE_COLOR[category.confidence as Confidence] }}
-            aria-hidden="true"
-          />
-          {t("conf." + category.confidence) === "conf." + category.confidence
-            ? CONFIDENCE_LABEL[category.confidence as Confidence]
-            : t("conf." + category.confidence)}
-        </span>
-      ) : (
-        <span className="text-[10px] text-ink-muted">{t("common.noDataYet")}</span>
-      )}
-      {hasDetailPage && category.available && (
-        <Link
-          href={`/${slug}/${DETAIL_PATH[category.category]}`}
-          className="text-[10px] text-brand hover:underline"
-        >
-          {t("report.details")}
-        </Link>
-      )}
-    </span>
-  );
-
-  return (
-    <ExpandableCard className={cardClass} header={header} detail={detail} footer={footer} />
-  );
-}
-
-/**
- * Category name to URL segment.
- *
- * Explicit rather than derived from the category name. The internal name is
- * "infrastructure" and the page a reader sees is "connectivity" — the category
- * is scoped in docs/strategy.md to RERA and upcoming projects, while what we
- * actually ship is what is already built. Deriving the path would have produced
- * a link to a route that does not exist, silently, on the one category where
- * the two names disagree.
- */
-const DETAIL_PATH: Record<string, string> = {
-  air_quality: "air-quality",
-  schools: "schools",
-  infrastructure: "connectivity",
-};
 
 /**
  * "Seen something here?" — the only route a resident has into these categories.
