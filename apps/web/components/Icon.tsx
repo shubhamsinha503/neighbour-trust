@@ -21,7 +21,8 @@ export type IconName =
   | "home"
   | "map"
   | "bookmark"
-  | "user";
+  | "user"
+  | "compare";
 
 const PATHS: Record<IconName, { d: string; fill?: boolean }[]> = {
   heart: [{ d: "M12 20.5 4.5 13A4.6 4.6 0 0 1 12 7.8 4.6 4.6 0 0 1 19.5 13Z", fill: true }],
@@ -40,6 +41,7 @@ const PATHS: Record<IconName, { d: string; fill?: boolean }[]> = {
   map: [{ d: "M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z" }, { d: "M9 4v14m6-12v14" }],
   bookmark: [{ d: "M6 4h12v16l-6-4-6 4Z" }],
   user: [{ d: "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" }, { d: "M4.5 21a7.5 7.5 0 0 1 15 0" }],
+  compare: [{ d: "M5 4h5v16H5Z" }, { d: "M14 4h5v16h-5Z" }],
 };
 
 export function Icon({

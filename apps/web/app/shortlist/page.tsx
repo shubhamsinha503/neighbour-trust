@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { EmptyState } from "@/components/EmptyState";
 import { ShortlistView } from "@/components/ShortlistView";
 import { authConfigured } from "@/lib/auth";
 import { getServerT } from "@/lib/i18n-server";
@@ -25,7 +26,13 @@ export default async function ShortlistPage() {
       {authConfigured ? (
         <ShortlistView />
       ) : (
-        <p className="mt-3 text-[13px] text-ink-secondary">{t("shortlist.unavailable")}</p>
+        <EmptyState
+          icon="bookmark"
+          title="Nothing saved yet"
+          message={t("shortlist.unavailable")}
+          ctaLabel="Explore localities"
+          ctaHref="/localities"
+        />
       )}
     </main>
   );
