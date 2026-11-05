@@ -464,7 +464,7 @@ class OpenAICompatibleQaClient:
     # refused for arriving a few seconds too soon. The first live question after
     # deploy failed exactly that way and the next four succeeded. A visitor
     # should not have to be the retry.
-    RETRY_AFTER_SECONDS = 3.0
+    RETRY_AFTER_SECONDS = float(os.environ.get("QA_RETRY_SECONDS") or 1.5)
 
     def ask(self, *, question: str, sources: list[Source]) -> Optional[dict[str, Any]]:
         import time
@@ -485,7 +485,7 @@ class OpenAICompatibleQaClient:
                 # the same lesson the classifier learned at 1,024. This was 1,500
                 # and every refusal read to visitors as "Something went wrong".
                 # An answer is about 150 tokens; the rest is room to reason.
-                max_tokens=int(os.environ.get("QA_MAX_TOKENS") or 700),
+                max_tokens=int(os.environ.get("QA_MAX_TOKENS") or 400),
                 temperature=0,
                 response_format={"type": "json_object"},
                 messages=[
