@@ -40,7 +40,27 @@ export function ConsentBanner() {
     // "outdated" is a yes to an older banner that asked about preferences
     // only; history is a new ask, so it is asked again.
     const consent = readConsent();
-    setShow(consent === null || consent === "outdated");
+    if (!(consent === null || consent === "outdated")) return;
+    // Don't cover the first screen: reveal the ask once the visitor has
+    // scrolled past the hero, or after a short fallback delay — so the clean
+    // home lands first and the banner never blocks it on arrival.
+    let done = false;
+    const reveal = () => {
+      if (done) return;
+      done = true;
+      setShow(true);
+      cleanup();
+    };
+    const onScroll = () => {
+      if (window.scrollY > 160) reveal();
+    };
+    const timer = setTimeout(reveal, 7000);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    function cleanup() {
+      clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll);
+    }
+    return cleanup;
   }, []);
 
   async function answer(grant: boolean) {
