@@ -10,6 +10,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { EmptyState } from "@/components/EmptyState";
 import { categoryLabel } from "@/lib/i18n";
 import { getServerT } from "@/lib/i18n-server";
 
@@ -86,7 +87,13 @@ export default async function ComparePage({
       <h1 className="mt-3 text-[23px] font-bold tracking-[-0.01em]">{t("compare.title")}</h1>
 
       {error ? (
-        <p className="mt-4 text-[13px] text-ink-secondary">{error}</p>
+        <EmptyState
+          icon="compare"
+          title="Nothing to compare yet"
+          message={error}
+          ctaLabel="Browse localities"
+          ctaHref="/localities"
+        />
       ) : (
         <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-[560px] border-separate border-spacing-0 text-left text-[12.5px]">

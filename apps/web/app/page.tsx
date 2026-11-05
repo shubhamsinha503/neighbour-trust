@@ -2,12 +2,13 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { CityTile } from "@/components/CityTile";
+import { Icon } from "@/components/Icon";
 import { LocalitySearch } from "@/components/LocalitySearch";
 import { NearMe } from "@/components/NearMe";
+import { PopularCities } from "@/components/PopularCities";
+import { WhatMatters } from "@/components/WhatMatters";
 import { ShortlistShortcut } from "@/components/ShortlistShortcut";
 import { Bone, SkeletonRegion, SlowNotice } from "@/components/Skeleton";
-import { LogoMark } from "@/components/Logo";
 import { authConfigured } from "@/lib/auth";
 import {
   fetchLocalitySummaries,
@@ -22,59 +23,62 @@ import { readSavedCity } from "@/lib/serverPrefs";
 export const dynamic = "force-dynamic";
 
 /**
- * The front page: a search, not a directory.
+ * The front page, laid out to mirror the native app's home screen so the two
+ * products read as one: brand + tagline, the "live smarter, live safer" eyebrow,
+ * the search, a rail of popular cities, and the "what matters" category grid.
  *
- * It used to open on a column of all 159 localities under the search box,
- * which told a first-time visitor to scroll a list rather than ask about the
- * place they care about — and buried the one thing they most need to know
- * before typing anything, which is whether we cover their city at all.
- *
- * So the order is: where we are (the four launch cities, said before anything
- * else), then the box, with examples of the three kinds of thing it accepts,
- * then "near me". Results appear only once something is typed. The full list
- * still exists, one link away on /localities, which also keeps every locality
- * linked for search engines.
- *
- * The page streams: everything above the box is sent at once, and the search
- * (which needs the locality list) fills in behind a skeleton.
+ * The page streams: the masthead and eyebrow are sent at once, and the search +
+ * city rail + grid (which need the locality list) fill in behind a skeleton.
  */
 
-// A locality name, a pincode, a place — one of each kind the box understands.
-// The pincode is one no locality stores, so tapping it shows the place lookup.
-const EXAMPLES = ["Koramangala", "560092", "Cyber Hub"];
+const EXAMPLES = ["Koramangala", "Indiranagar", "Whitefield", "560001", "HSR Layout"];
 
 export default async function HomePage() {
-  const { t } = await getServerT();
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-10 pt-8 sm:pt-12">
-      <Masthead />
+    <main className="relative mx-auto max-w-3xl overflow-hidden px-4 pb-14 pt-7 sm:pt-10">
+      {/* Decorative pink blobs, matching the native home. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[320px]">
+        <div className="absolute -right-16 -top-20 h-60 w-60 rounded-full bg-brand-soft opacity-70" />
+        <div className="absolute -left-14 top-8 h-36 w-36 rounded-full opacity-70" style={{ background: "#FFE1EE" }} />
+      </div>
 
-      <section className="mt-8 sm:mt-12">
-        {/* Coverage is stated by the city tiles further down rather than a badge
-          * here, so the hero opens straight on the headline. */}
-        <h1 className="text-[30px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[38px]">
-          {t("home.hero1")}
-          <br />
-          {t("home.hero2")}
-        </h1>
+      <div className="relative">
+        <Masthead />
 
-        <p className="mt-3 max-w-xl text-[14.5px] leading-[1.6] text-ink-secondary">
-          {t("home.heroSub")}
-        </p>
+        <div className="mt-3.5 inline-flex rounded-full bg-brand-soft px-3 py-1.5">
+          <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-brand-deep">
+            Live smarter, live safer
+          </span>
+        </div>
+        <h1 className="sr-only">Nestra — honest neighbourhood data for Indian home buyers</h1>
 
-        <div className="mt-6">
+        <div className="mt-4">
           <Suspense fallback={<SearchSkeleton />}>
-            <SearchSection />
+            <HomeBody />
           </Suspense>
         </div>
-      </section>
+      </div>
 
       {authConfigured && <ShortlistShortcut />}
     </main>
   );
 }
 
-async function SearchSection() {
+function Masthead() {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-brand">
+        <Icon name="heart" size={17} color="#ffffff" filled />
+      </span>
+      <div>
+        <div className="font-display text-[19px] font-extrabold leading-none tracking-[-0.02em]">Nestra</div>
+        <div className="mt-0.5 text-[10.5px] text-ink-muted">know here you live</div>
+      </div>
+    </div>
+  );
+}
+
+async function HomeBody() {
   const { t } = await getServerT();
   let localities: LocalitySummary[];
   try {
@@ -87,11 +91,13 @@ async function SearchSection() {
     );
   }
 
-  // The city the visitor last chose, painted on the first frame so there is no
-  // flash from empty to filtered. Resolved by the shared helper so this and the
-  // localities list agree on what "your city" is. The recently-viewed strip is
-  // per consented visitor, so it needs the visitor id the helper hides — read it
-  // here and fetch the two in parallel.
+  const byCity = new Map<string, number>();
+  for (const l of localities) byCity.set(l.city, (byCity.get(l.city) ?? 0) + 1);
+  const cities = [...byCity.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([city, count]) => ({ city, count }));
+
   const knownCities = new Set(localities.map((l) => l.city));
   const visitorId = (await cookies()).get(VISITOR_COOKIE)?.value ?? null;
   const [initialCity, recent] = await Promise.all([
@@ -110,19 +116,15 @@ async function SearchSection() {
           <div className="mt-5">
             {recent.length > 0 && <RecentlyViewed views={recent} />}
             <NearMe key="near-me" localities={localities} />
-            <Coverage localities={localities} />
           </div>
         }
       />
+      <PopularCities cities={cities} />
+      <WhatMatters />
     </>
   );
 }
 
-/**
- * The localities this visitor opened lately — only ever present for someone who
- * accepted the banner, since history is recorded for no one else. Their own
- * record, shown back to them; "forget me" on the privacy page erases it.
- */
 async function RecentlyViewed({ views }: { views: RecentView[] }) {
   const { t } = await getServerT();
   return (
@@ -149,41 +151,6 @@ async function RecentlyViewed({ views }: { views: RecentView[] }) {
   );
 }
 
-/**
- * How much of each city is covered, with the way into the full list.
- *
- * Counts come from the same list the search runs over, so the number here and
- * the number of things you can find cannot disagree.
- */
-async function Coverage({ localities }: { localities: LocalitySummary[] }) {
-  const { t } = await getServerT();
-  const byCity = new Map<string, number>();
-  for (const locality of localities) {
-    byCity.set(locality.city, (byCity.get(locality.city) ?? 0) + 1);
-  }
-  const cities = [...byCity.entries()].sort((a, b) => b[1] - a[1]);
-
-  return (
-    <div className="mt-6 rounded-2xl border border-hairline bg-surface-1 p-4">
-      <div className="grid grid-cols-2 gap-3">
-        {cities.map(([city, count]) => (
-          <CityTile
-            key={city}
-            city={city}
-            count={count}
-            href={`/localities?city=${encodeURIComponent(city)}`}
-          />
-        ))}
-      </div>
-      <div className="mt-3 flex items-center justify-end px-0.5">
-        <Link href="/localities" className="text-[12px] font-semibold text-brand hover:underline">
-          {t("common.browseAll")}
-        </Link>
-      </div>
-    </div>
-  );
-}
-
 function SearchSkeleton() {
   return (
     <SkeletonRegion label="Loading search">
@@ -196,25 +163,7 @@ function SearchSkeleton() {
       </div>
       <SlowNotice />
       <Bone className="mt-5 h-[52px] w-full rounded-2xl" />
-      <Bone className="mt-6 h-[132px] w-full rounded-2xl" />
+      <Bone className="mt-8 h-[128px] w-full rounded-2xl" />
     </SkeletonRegion>
-  );
-}
-
-/**
- * The masthead, reduced to a masthead.
- *
- * This was a 140-pixel gradient panel with decorative map lines drawn across
- * it, and the only thing in it was the logo. On a phone that is a quarter of
- * the first screen spent on nothing.
- */
-function Masthead() {
-  return (
-    <div className="flex items-center gap-2.5">
-      <LogoMark />
-      <div className="font-display text-[20px] font-bold tracking-[-0.02em]">
-        Nestra
-      </div>
-    </div>
   );
 }

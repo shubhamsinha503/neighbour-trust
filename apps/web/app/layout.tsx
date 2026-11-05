@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Caveat, Hanken_Grotesk } from "next/font/google";
 
 import { AccountBar } from "@/components/AccountBar";
 import { AuthProvider } from "@/components/AuthProvider";
+import { BottomTabBar } from "@/components/BottomTabBar";
 import { ConsentBanner } from "@/components/ConsentBanner";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { RegisterServiceWorker } from "@/components/RegisterServiceWorker";
@@ -124,7 +125,7 @@ export default async function RootLayout({
       lang={locale === "en" ? "en-IN" : locale}
       className={`${hanken.variable} ${bricolage.variable} ${caveat.variable}`}
     >
-      <body className="min-h-screen bg-page-plane">
+      <body className="min-h-screen bg-page-plane pb-[calc(70px+env(safe-area-inset-bottom,0px))]">
         {/* Sign-in appears only once Google credentials are configured; until
           * then the site renders exactly as it did without accounts. */}
         <LanguageProvider locale={locale}>
@@ -134,6 +135,7 @@ export default async function RootLayout({
           </AuthProvider>
           <SiteFooter />
           <ConsentBanner />
+          <BottomTabBar />
           <RegisterServiceWorker />
           <WebAnalytics />
         </LanguageProvider>

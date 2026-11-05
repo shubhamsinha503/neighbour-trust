@@ -40,7 +40,27 @@ export function ConsentBanner() {
     // "outdated" is a yes to an older banner that asked about preferences
     // only; history is a new ask, so it is asked again.
     const consent = readConsent();
-    setShow(consent === null || consent === "outdated");
+    if (!(consent === null || consent === "outdated")) return;
+    // Don't cover the first screen: reveal the ask once the visitor has
+    // scrolled past the hero, or after a short fallback delay — so the clean
+    // home lands first and the banner never blocks it on arrival.
+    let done = false;
+    const reveal = () => {
+      if (done) return;
+      done = true;
+      setShow(true);
+      cleanup();
+    };
+    const onScroll = () => {
+      if (window.scrollY > 160) reveal();
+    };
+    const timer = setTimeout(reveal, 7000);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    function cleanup() {
+      clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll);
+    }
+    return cleanup;
   }, []);
 
   async function answer(grant: boolean) {
@@ -76,7 +96,7 @@ export function ConsentBanner() {
     <div
       role="dialog"
       aria-label={t("consent.title")}
-      className="fixed inset-x-0 bottom-0 z-50 px-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-2"
+      className="fixed inset-x-0 bottom-[calc(70px+env(safe-area-inset-bottom,0px))] z-50 px-4 pt-2"
     >
       <div className="mx-auto max-w-3xl rounded-2xl border border-hairline bg-surface-1 p-4 shadow-[0_6px_24px_rgba(0,0,0,0.12)]">
         <p className="text-[13px] leading-[1.6] text-ink-secondary">
