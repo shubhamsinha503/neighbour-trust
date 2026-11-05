@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * The air quality detail card.
  *
