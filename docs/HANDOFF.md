@@ -52,7 +52,7 @@ scripts/    icon/screenshot generators, classifier benchmark & diagnostic
 
 **Infra:**
 - Web: **Vercel** (auto-deploys from `main`), custom domain `neighbourtrust.com`
-- API: **Render** (`neighbour-trust.onrender.com`)
+- API: **Render** (`neighbour-trust.onrender.com`) — auto-deploys from `main`; the mobile app's built-in default and (per `infra/DEPLOY.md`) the host the web app's Vercel `NEXT_PUBLIC_API_BASE_URL` is set to. A **second deployment of the same API** also runs on **Google Cloud Run** (project `nestra-513709`, project number `910618450353`, region `asia-south1`, service `nestra-api`, URL `nestra-api-910618450353.asia-south1.run.app`). Unlike Render/Vercel it does **not** auto-deploy on merge — redeploy manually: `gcloud run deploy nestra-api --source . --region asia-south1 --allow-unauthenticated --min-instances 1`.
 - DB: **Neon** Postgres (PostGIS / H3 spatial keying)
 - CI: **GitHub Actions** (scheduled data ingest)
 - Mobile builds: **EAS** (preview = APK, production = AAB)
