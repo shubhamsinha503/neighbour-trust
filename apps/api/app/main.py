@@ -15,6 +15,7 @@ import logging
 import os
 import threading
 import time
+from collections import OrderedDict
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -1000,6 +1001,55 @@ _ask_recent: list[float] = []
 _ask_day: dict[str, Any] = {"date": None, "count": 0}
 _qa_client: Any = None
 
+# Grounded answers are a pure function of (locality data, question): the sources
+# are assembled deterministically and the model only phrases them, so the same
+# question about one locality has the same answer until that locality's data
+# changes. The model call is the slow part (~17s on the free tier), so caching
+# the finished answer is the latency fix that matters — a repeat of a question,
+# above all the app's small fixed set of suggested questions, returns in
+# milliseconds without touching the model. The TTL is short so a cached answer
+# never outlives a data refresh (ingestion runs at most a few times a day), and
+# a cache hit skips the rate limiter too, because it costs nothing to serve.
+_ANSWER_CACHE_TTL = float(os.environ.get("QA_CACHE_TTL_SECONDS") or 1800)
+_ANSWER_CACHE_MAX = int(os.environ.get("QA_CACHE_MAX") or 2000)
+_answer_cache: "OrderedDict[tuple[str, str], tuple[float, dict[str, Any]]]" = OrderedDict()
+_answer_cache_lock = threading.Lock()
+# A model timeout is not a stable fact about the locality, so its placeholder
+# answer must not be pinned for the whole TTL. Matched on the sentinel qa.validate
+# returns for a null model response.
+_QA_TRANSIENT_MARK = "went wrong answering"
+
+
+def _norm_question(question: str) -> str:
+    """A question's cache key: whitespace- and case-normalised, trailing
+    punctuation stripped, so "Is there a metro nearby?" and "is there a metro
+    nearby" share one cached answer."""
+    return " ".join((question or "").split()).lower().strip(" ?.!,")
+
+
+def _answer_cache_get(key: tuple[str, str]) -> Optional[dict[str, Any]]:
+    now = time.time()
+    with _answer_cache_lock:
+        hit = _answer_cache.get(key)
+        if hit is None:
+            return None
+        ts, value = hit
+        if now - ts > _ANSWER_CACHE_TTL:
+            _answer_cache.pop(key, None)
+            return None
+        _answer_cache.move_to_end(key)
+        return value
+
+
+def _answer_cache_put(key: tuple[str, str], value: dict[str, Any]) -> None:
+    if _QA_TRANSIENT_MARK in (value.get("answer") or "").lower():
+        return
+    with _answer_cache_lock:
+        _answer_cache[key] = (time.time(), value)
+        _answer_cache.move_to_end(key)
+        while len(_answer_cache) > _ANSWER_CACHE_MAX:
+            _answer_cache.popitem(last=False)
+
 
 def _ask_allowed(client_key: str) -> Optional[str]:
     """None when the request may proceed, otherwise the reason it may not.
@@ -1059,6 +1109,16 @@ def ask_question(slug: str, body: AskRequest, request: Request) -> dict[str, Any
     # is the only per-person key available. It is spoofable — which is why the
     # per-minute and per-day caps in _ask_allowed are global and do not depend
     # on this value; this key only sharpens throttling for an honest visitor.
+    # A cached answer is served before anything else: it costs nothing, so it
+    # neither spends the rate limit nor wakes the model. This is what turns a
+    # repeated or suggested question from a ~17s model round-trip into a
+    # millisecond response.
+    cache_key = (slug, _norm_question(body.question))
+    if cache_key[1]:
+        cached = _answer_cache_get(cache_key)
+        if cached is not None:
+            return cached
+
     forwarded = request.headers.get("x-forwarded-for", "")
     client_key = forwarded.split(",")[0].strip() or (
         request.client.host if request.client else "unknown"
@@ -1078,4 +1138,7 @@ def ask_question(slug: str, body: AskRequest, request: Request) -> dict[str, Any
             raise HTTPException(status_code=404, detail=f"unknown locality: {slug}")
         answer = qa.ask(conn, locality, body.question, client)
 
-    return answer.as_dict()
+    result = answer.as_dict()
+    if cache_key[1]:
+        _answer_cache_put(cache_key, result)
+    return result
