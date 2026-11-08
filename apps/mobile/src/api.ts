@@ -14,7 +14,8 @@
 // box (no env setup on device). Point EXPO_PUBLIC_API_BASE_URL at a LAN dev
 // server when working against a local backend.
 const API_BASE =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://neighbour-trust.onrender.com";
+  process.env.EXPO_PUBLIC_API_BASE_URL ??
+  "https://nestra-api-910618450353.asia-south1.run.app";
 
 export interface LocalitySummary {
   slug: string;

@@ -38,7 +38,7 @@ Monorepo (TypeScript + Python):
 apps/
   mobile/   Expo / React Native app (SDK 57, expo-router), Android → Google Play
   web/      Next.js (App Router) + Tailwind → Vercel
-  api/      FastAPI (Python, Pydantic) → Render
+  api/      FastAPI (Python, Pydantic) → Google Cloud Run
 agents/     Python ingestion + orchestration (air quality, schools, flood, news, Q&A)
 infra/      Postgres migrations, deploy config
 docs/       strategy.md, build-roadmap.md, this handoff
@@ -48,11 +48,11 @@ scripts/    icon/screenshot generators, classifier benchmark & diagnostic
 
 **Flow:** public sources → Python ingestion agents (scheduled via GitHub Actions)
 → orchestrator assembles a report (scores, reconciles, attaches source/date/confidence)
-→ PostgreSQL (Neon) → FastAPI (Render) → web (Vercel) + mobile (Expo).
+→ PostgreSQL (Neon) → FastAPI (Google Cloud Run) → web (Vercel) + mobile (Expo).
 
 **Infra:**
 - Web: **Vercel** (auto-deploys from `main`), custom domain `neighbourtrust.com`
-- API: **Render** (`neighbour-trust.onrender.com`) — auto-deploys from `main`; the mobile app's built-in default and (per `infra/DEPLOY.md`) the host the web app's Vercel `NEXT_PUBLIC_API_BASE_URL` is set to. A **second deployment of the same API** also runs on **Google Cloud Run** (project `nestra-513709`, project number `910618450353`, region `asia-south1`, service `nestra-api`, URL `nestra-api-910618450353.asia-south1.run.app`). Unlike Render/Vercel it does **not** auto-deploy on merge — redeploy manually: `gcloud run deploy nestra-api --source . --region asia-south1 --allow-unauthenticated --min-instances 1`.
+- API: **Google Cloud Run** (project `nestra-513709`, project number `910618450353`, region `asia-south1`, service `nestra-api`, URL `nestra-api-910618450353.asia-south1.run.app`) — the live API for web + mobile; runs Q&A on **Gemini** (`gemini-3.5-flash-lite`, `QA_PROVIDER=gemini`). It does **not** auto-deploy on merge — redeploy manually: `gcloud run deploy nestra-api --source . --region asia-south1 --allow-unauthenticated --min-instances 1`. The web app points here via Vercel `NEXT_PUBLIC_API_BASE_URL`; the mobile app defaults here (`apps/mobile/src/api.ts`). **Render is retired** — the old `neighbour-trust.onrender.com` ran a non-Gemini fallback (ScaleMax/Claude) and must stay suspended so nothing reaches it.
 - DB: **Neon** Postgres (PostGIS / H3 spatial keying)
 - CI: **GitHub Actions** (scheduled data ingest)
 - Mobile builds: **EAS** (preview = APK, production = AAB)
