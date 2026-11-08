@@ -52,7 +52,7 @@ scripts/    icon/screenshot generators, classifier benchmark & diagnostic
 
 **Infra:**
 - Web: **Vercel** (auto-deploys from `main`), custom domain `neighbourtrust.com`
-- API: **Google Cloud Run** (project `nestra-513709`, project number `910618450353`, region `asia-south1`, service `nestra-api`, URL `nestra-api-910618450353.asia-south1.run.app`) — the live API for web + mobile; runs Q&A on **Gemini** (`gemini-3.5-flash-lite`, `QA_PROVIDER=gemini`). It does **not** auto-deploy on merge — redeploy manually: `gcloud run deploy nestra-api --source . --region asia-south1 --allow-unauthenticated --min-instances 1`. The web app points here via Vercel `NEXT_PUBLIC_API_BASE_URL`; the mobile app defaults here (`apps/mobile/src/api.ts`). **Render is retired** — the old `neighbour-trust.onrender.com` ran a non-Gemini fallback (ScaleMax/Claude) and must stay suspended so nothing reaches it.
+- API: **Google Cloud Run** (project `nestra-513709`, project number `910618450353`, region `asia-south1`, service `nestra-api`, URL `nestra-api-910618450353.asia-south1.run.app`) — the live API for web + mobile; runs Q&A on **Gemini** (`gemini-3.5-flash-lite`, `QA_PROVIDER=gemini`). It does **not** auto-deploy on merge — redeploy manually: `gcloud run deploy nestra-api --source . --region asia-south1 --allow-unauthenticated --min-instances 1`. The web app points here via Vercel `NEXT_PUBLIC_API_BASE_URL`; the mobile app defaults here (`apps/mobile/src/api.ts`). (The earlier Render host has been retired and must stay suspended.)
 - DB: **Neon** Postgres (PostGIS / H3 spatial keying)
 - CI: **GitHub Actions** (scheduled data ingest)
 - Mobile builds: **EAS** (preview = APK, production = AAB)
@@ -113,7 +113,7 @@ Answers a buyer's free-text question about one locality, strictly from stored da
    - Rebuild AAB only if needed; the built AAB (EAS build `vdASBFU…`) is already signed with the registered key.
    - Play Console → Internal testing → remove rejected bundle → upload the AAB → **Review release → Start rollout**.
    - Fill App content: Data safety (no data collected off-device), content rating (expect Everyone), target audience 18+, **privacy policy URL** `https://neighbourtrust.com/privacy`.
-2. **Switch Q&A to Claude when credits land:** set `ANTHROPIC_API_KEY` in the API's env (Render) and `.env`; optionally set `QA_MODEL`. The Anthropic client in `agents/orchestrator/qa.py` is already wired.
+2. **Q&A provider:** the live API runs Q&A on **Gemini** (`QA_PROVIDER=gemini`, `gemini-3.5-flash-lite`) set in the Cloud Run env. The code is provider-agnostic — an Anthropic path exists (`agents/orchestrator/qa.py`), but keep Gemini for the Google-ecosystem positioning.
 3. **Claude Startups decision** pending (minutes to ~3 business days; email to shubham@neighbourtrust.com).
 4. **Entity registration** decision (Pvt Ltd / OPC if raising; Udyam/proprietorship if bootstrapping) — keep the application's incorporation date accurate.
 5. **Housekeeping:** update resume/README links to `neighbourtrust.com`; point Play privacy URL to the domain.
@@ -121,8 +121,8 @@ Answers a buyer's free-text question about one locality, strictly from stored da
 ## 8. Where secrets live (never commit these)
 
 - **EAS keystore + passwords:** downloaded `.jks` on the owner's machine; passwords kept privately (EAS also holds the managed copy).
-- **API keys** (Groq, Anthropic when issued): `.env` at repo root (gitignored) and the Render/Vercel env dashboards.
-- **Zoho email / Cloudflare / Play Console / Vercel / Render / Neon:** owner's accounts.
+- **API keys** (Gemini, Groq, Anthropic when issued): `.env` at repo root (gitignored) and the Google Cloud / Vercel env dashboards.
+- **Zoho email / Cloudflare / Play Console / Vercel / Google Cloud / Neon:** owner's accounts.
 
 ## 9. Useful commands
 

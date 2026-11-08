@@ -2,10 +2,10 @@
 
 Two supported paths. Both end with the same thing running.
 
-**Path A — free tier (recommended for launch).** Neon for Postgres+PostGIS,
-Render for the API, GitHub Actions for scheduled ingestion, Vercel for the
-frontend. Costs nothing. More providers to set up, and Render's free API sleeps
-after 15 minutes idle (~30s cold start on the next request).
+**Path A — recommended (what production runs).** Neon for Postgres+PostGIS,
+Google Cloud Run for the API, GitHub Actions for scheduled ingestion, Vercel for
+the frontend. Cloud Run is serverless and scale-to-zero; keep `--min-instances 1`
+for a demo so there is no cold start.
 
 **Path B — Railway (~$5/month).** What `docs/build-roadmap.md` originally
 specified. Fewer providers, an always-on scheduler, simpler to operate. Note
@@ -64,25 +64,33 @@ manual run is also your database setup — there is no separate migrate step.
 > days. A commit re-enables them. Not an issue during active development; worth
 > knowing if the project goes quiet.
 
-## A3. API: Render
+## A3. API: Google Cloud Run
 
-[render.com](https://render.com) → New → **Web Service** → connect the repo.
+[console.cloud.google.com](https://console.cloud.google.com) → create or select a
+project (production is `nestra-513709`) and enable Cloud Run + Cloud Build. From
+the repo root, with the `gcloud` CLI authenticated:
 
-- **Runtime**: Docker
-- **Dockerfile path**: `infra/Dockerfile`
-- **Instance type**: Free
-- **Environment variables**: `DATABASE_URL` (the Neon string), plus
-  `CORS_ALLOWED_ORIGINS` once you know the Vercel domain
+```bash
+gcloud run deploy nestra-api --source . --region asia-south1 \
+  --allow-unauthenticated --min-instances 1 \
+  --set-env-vars DATABASE_URL=<neon-pooled>,QA_PROVIDER=gemini,GEMINI_API_KEY=<key>,QA_MODEL=gemini-3.5-flash-lite,CORS_ALLOWED_ORIGINS=https://neighbourtrust.com
+```
 
-The free instance sleeps after 15 minutes idle and takes ~30 seconds to wake.
-Acceptable for launch; the fix when it stops being acceptable is Render's
-paid tier or a ping service, not an architecture change.
+- Builds the `Dockerfile` with Cloud Build and deploys the container; the service
+  URL is printed at the end (`https://nestra-api-....run.app`).
+- Does **not** auto-deploy on merge — rerun the command (or wire a Cloud Build
+  trigger) to ship a change.
+- `--min-instances 1` keeps one instance warm (no cold start, and the in-process
+  Q&A answer cache stays hot); drop it to scale to zero when idle.
+- Q&A runs on **Gemini** via `QA_PROVIDER=gemini` — without it the API falls back
+  to a non-Gemini provider, so always set it here.
 
 ## A4. Frontend: Vercel
 
 Import the repo → **Root Directory: `apps/web`** → set
-`NEXT_PUBLIC_API_BASE_URL` to the Render URL. Deploy, then put the Vercel domain
-into `CORS_ALLOWED_ORIGINS` on Render and redeploy that service.
+`NEXT_PUBLIC_API_BASE_URL` to the Cloud Run service URL
+(`https://nestra-api-...run.app`). Deploy, then put the Vercel domain into
+`CORS_ALLOWED_ORIGINS` on the Cloud Run service and redeploy it.
 
 ## A4b. Optional sign-in (shortlist, notes, compare)
 
@@ -94,7 +102,7 @@ Off until all of these are set; the site renders with no sign-in until then.
 | Vercel | `GOOGLE_CLIENT_SECRET` | Same client |
 | Vercel | `NEXTAUTH_SECRET` | Any 32+ random bytes, base64 — signs the session cookie |
 | Vercel | `NEXTAUTH_URL` | The production site URL, e.g. `https://neighbourtrust.com` |
-| Vercel **and** Render | `USER_TOKEN_SECRET` | The *same* 64-character random hex string on both — signs the two-minute tokens the site sends the API |
+| Vercel **and** Cloud Run | `USER_TOKEN_SECRET` | The *same* 64-character random hex string on both — signs the two-minute tokens the site sends the API |
 
 The Google OAuth client's **Authorised redirect URI** must be exactly
 `<site URL>/api/auth/callback/google`, and **Authorised JavaScript origin** the
@@ -109,17 +117,23 @@ safe.
 
 The API's `/debug/classification` and `/debug/report/{slug}` are gated by
 `DEBUG_TOKEN`. Leave it unset and both answer 404 (disabled), which is the safe
-default for a public service. To use them, set `DEBUG_TOKEN` on Render to a long
+default for a public service. To use them, set `DEBUG_TOKEN` on the Cloud Run service to a long
 random string and send it as the `x-debug-token` header.
 
 ## A5. Verify
 
-```powershell
-curl https://<your-render-service>.onrender.com/healthz
+Hit a real data endpoint — this also proves Q&A is on Gemini:
+
+```bash
+curl -X POST https://nestra-api-910618450353.asia-south1.run.app/api/v1/localities/btm-layout/ask \
+  -H "Content-Type: application/json" -d '{"question":"How is the air quality here?"}'
 ```
 
-First request may take ~30s while the instance wakes. You want `status: "ok"`
-and `stale: false` under `air_quality`.
+You want a JSON answer whose `"model"` is `gemini:gemini-3.5-flash-lite`. The
+API's own health route is `/healthz` (returns `status: "ok"` and per-category
+`stale` flags) — reachable when you hit the Cloud Run service directly; if a
+load balancer / API gateway fronts the service with an `/api/*`-only path rule,
+point monitors at an `/api/v1/...` endpoint instead.
 
 ---
 

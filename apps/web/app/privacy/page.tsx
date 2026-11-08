@@ -299,8 +299,8 @@ export default function PrivacyPage() {
             logs by us.
           </Bullet>
           <Bullet>
-            <strong className="font-semibold text-ink-primary">Render</strong>{" "}
-            runs the data API and does the same.
+            <strong className="font-semibold text-ink-primary">Google Cloud</strong>{" "}
+            (Cloud Run, Mumbai region) runs the data API and does the same.
           </Bullet>
           <Bullet>
             <strong className="font-semibold text-ink-primary">Neon</strong>{" "}
@@ -314,7 +314,7 @@ export default function PrivacyPage() {
             and receives it from our server rather than from your browser.
           </Bullet>
           <Bullet>
-            <strong className="font-semibold text-ink-primary">Groq</strong>{" "}
+            <strong className="font-semibold text-ink-primary">Google Gemini</strong>{" "}
             receives a question only when you ask one, with that locality&apos;s
             public data, and receives it from our server rather than from your
             browser.
@@ -371,7 +371,7 @@ export default function PrivacyPage() {
           Only requests for the public neighbourhood data you are looking at — the
           locality whose report you open, or the text you search. These carry no
           name, no account and no device identifier; like any internet request
-          they reach our hosting (Render) with an IP address, which sits in
+          they reach our hosting (Google Cloud) with an IP address, which sits in
           ordinary access logs and is not used to build a profile. The app sends
           no analytics or usage events.
         </p>

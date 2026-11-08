@@ -38,4 +38,4 @@ Currently on the free Groq fallback; set `ANTHROPIC_API_KEY` (+ optional
 - Commit messages end with the project's attribution trailers.
 - Before pushing mobile changes: `cd apps/mobile && npx tsc --noEmit`.
 - Production Android build: `eas build --profile production --platform android`.
-- Web auto-deploys from `main` (Vercel, `neighbourtrust.com`); API on Render; DB on Neon.
+- Web auto-deploys from `main` (Vercel, `neighbourtrust.com`); API on Google Cloud Run (`gcloud run deploy`, manual); DB on Neon.

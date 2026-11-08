@@ -16,7 +16,7 @@ engineer and quotable in a pitch.
 | Layer | Tech | Why this |
 |---|---|---|
 | Frontend | Next.js (React) on **Vercel** | Server-rendered pages → fast first paint + SEO (buyers Google "Koramangala safety"). Auto-deploys from `main`. |
-| API | FastAPI (Python) on **Render** | Same language as the data agents, so scoring logic is shared code, not reimplemented. |
+| API | FastAPI (Python) on **Google Cloud Run** | Same language as the data agents, so scoring logic is shared code, not reimplemented. Serverless, scale-to-zero. |
 | Database | Postgres + PostGIS on **Neon** | Geospatial joins + flexible payloads + serverless. See §2. |
 | Pipeline | Python agents on **GitHub Actions** | Cron-scheduled bursts. No always-on server to pay for. |
 
@@ -35,7 +35,7 @@ engineer and quotable in a pitch.
          └──────────┬───────────┘
                     │
          ┌──────────▼───────────┐
-         │   FastAPI (Python)    │  Render. Reads envelopes, computes the
+         │   FastAPI (Python)    │  Cloud Run. Reads envelopes, computes the
          │   (the "kitchen")     │  Trust Score, builds the report
          └──────────┬───────────┘
                     │
