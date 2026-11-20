@@ -80,7 +80,7 @@ function Masthead() {
       </span>
       <div>
         <div className="font-display text-[19px] font-extrabold leading-none tracking-[-0.02em]">Nestra</div>
-        <div className="mt-0.5 text-[10.5px] text-ink-muted">know here you live</div>
+        <div className="mt-0.5 text-[10.5px] text-ink-muted">know where you live</div>
       </div>
     </div>
   );

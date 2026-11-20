@@ -38,11 +38,15 @@ function compass(deg: number): string {
   return COMPASS_16[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
 }
 
-// A Hermes-safe 12-hour formatter. React Native's toLocaleTimeString with
-// options is unreliable on Android's engine, so the time is formatted by hand.
+// A Hermes-safe 12-hour formatter in India Standard Time. Every covered
+// locality is in India, so its sun times are shown in IST (UTC+5:30, no DST) on
+// every device — not the device's own zone, which would be wrong for a user
+// travelling or on a mis-set clock. React Native's toLocaleTimeString with a
+// timeZone is unreliable on Hermes, so IST wall-clock is derived from UTC by hand.
 function fmt(d: Date): string {
-  let h = d.getHours();
-  const m = d.getMinutes();
+  const istMin = d.getUTCHours() * 60 + d.getUTCMinutes() + 330;
+  let h = Math.floor(istMin / 60) % 24;
+  const m = istMin % 60;
   const ampm = h >= 12 ? "pm" : "am";
   h = h % 12;
   if (h === 0) h = 12;

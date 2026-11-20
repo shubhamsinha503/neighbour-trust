@@ -34,7 +34,7 @@ type Dict = Record<string, string>;
 
 const en: Dict = {
   brand: "Nestra",
-  "brand.tagline": "know here you live",
+  "brand.tagline": "know where you live",
   "home.title": "Know the neighbourhood before you commit to it.",
   "home.popularNear": "Popular near you",
   "home.viewAll": "View all",
