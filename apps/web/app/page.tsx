@@ -4,7 +4,6 @@ import { Suspense } from "react";
 
 import { Icon } from "@/components/Icon";
 import { LocalitySearch } from "@/components/LocalitySearch";
-import { Opening } from "@/components/Opening";
 import { NearMe } from "@/components/NearMe";
 import { PopularCities } from "@/components/PopularCities";
 import { WhatMatters } from "@/components/WhatMatters";
@@ -37,11 +36,14 @@ const EXAMPLES = ["Koramangala", "Indiranagar", "Whitefield", "560001", "HSR Lay
 export default async function HomePage() {
   return (
     <>
-      {/* The opening: a pinned, full-bleed scroll from afternoon to morning that
-        * shows how Nestra reads a neighbourhood. It renders ABOVE <main> (not
-        * inside it) because main is max-w-3xl + overflow-hidden, which would clip
-        * the 100vw bleed and break the sticky pin. */}
-      <Opening />
+      {/* The scroll-driven opening (components/Opening) is off the homepage:
+        * on iPhone Safari it crashed the page ("A problem repeatedly occurred")
+        * within minutes of shipping. Its pinned full-screen SVG of ~825 shapes,
+        * restyled on every scroll frame under a full-viewport mix-blend layer
+        * and drop-shadow filters, exhausts WebKit's graphics memory. Bring it
+        * back only after it has been run on a real iPhone. If it returns, it
+        * renders ABOVE <main> (not inside it): main is max-w-3xl +
+        * overflow-hidden, which would clip the 100vw bleed and break the pin. */}
       <main className="relative mx-auto max-w-3xl overflow-hidden px-4 pb-14 pt-7 sm:pt-10">
       {/* Decorative pink blobs, matching the native home. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[320px]">
