@@ -48,8 +48,11 @@ function scoreColor(score: number | null): string {
   return SCORE_BANDS.find(([floor]) => score >= floor)?.[1] ?? SCORE_BANDS[0][1];
 }
 
-function bandWord(category: string, score: number | null): string {
+function bandWord(category: string, score: number | null, isBaseline = false): string {
   if (score === null) return "Not scored";
+  // A baseline is "nothing was reported", not a rating — and it is not in the
+  // Trust Score. Calling it "Highly rated" would turn silence into a verdict.
+  if (isBaseline) return "No reports · baseline";
   if (category === "schools") {
     if (score >= 60) return "Plenty nearby";
     if (score >= 30) return "Some nearby";
@@ -99,7 +102,7 @@ export async function CategoryStrip({
               >
                 {c.score ?? "—"}
               </span>
-              <span className="text-[9.5px] text-ink-muted">{bandWord(c.category, c.score)}</span>
+              <span className="text-[9.5px] text-ink-muted">{bandWord(c.category, c.score, c.isBaseline)}</span>
             </div>
           );
           return detail ? (

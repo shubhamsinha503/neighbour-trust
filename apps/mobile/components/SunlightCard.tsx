@@ -43,6 +43,21 @@ function compass(deg: number): string {
 // every device — not the device's own zone, which would be wrong for a user
 // travelling or on a mis-set clock. React Native's toLocaleTimeString with a
 // timeZone is unreliable on Hermes, so IST wall-clock is derived from UTC by hand.
+const IST_MS = 330 * 60_000;
+const DAY_MS = 86_400_000;
+
+// Noon IST on the IST calendar day containing `at` — "today" for the locality,
+// whatever zone the device is set to.
+function istNoon(at: Date): Date {
+  const dayStart = Math.floor((at.getTime() + IST_MS) / DAY_MS) * DAY_MS - IST_MS;
+  return new Date(dayStart + 12 * 3_600_000);
+}
+
+// Noon IST on a calendar date (0-based month).
+function istNoonOn(year: number, month: number, day: number): Date {
+  return new Date(Date.UTC(year, month, day, 12) - IST_MS);
+}
+
 function fmt(d: Date): string {
   const istMin = d.getUTCHours() * 60 + d.getUTCMinutes() + 330;
   let h = Math.floor(istMin / 60) % 24;
@@ -87,7 +102,7 @@ export function SunlightCard({
   const { width: winW } = useWindowDimensions();
 
   const now = new Date();
-  const times = SunCalc.getTimes(now, lat, lon);
+  const times = SunCalc.getTimes(istNoon(now), lat, lon);
   const sunrise = times.sunrise;
   const sunset = times.sunset;
   const solarNoon = times.solarNoon;
@@ -109,13 +124,15 @@ export function SunlightCard({
   const noonAlt = SunCalc.getPosition(solarNoon, lat, lon).altitude;
 
   const dayMs = sunset.getTime() - sunrise.getTime();
-  const dayH = Math.floor(dayMs / 3_600_000);
-  const dayM = Math.round((dayMs % 3_600_000) / 60_000);
+  // Round the total first, so a 59.6-minute remainder never reads "11h 60m".
+  const dayTotalMin = Math.round(dayMs / 60_000);
+  const dayH = Math.floor(dayTotalMin / 60);
+  const dayM = dayTotalMin % 60;
 
   // The seasonal swing: where the sunrise sits at the two solstices.
-  const year = now.getFullYear();
-  const summerRiseAt = SunCalc.getTimes(new Date(year, 5, 21), lat, lon).sunrise ?? sunrise;
-  const winterRiseAt = SunCalc.getTimes(new Date(year, 11, 21), lat, lon).sunrise ?? sunrise;
+  const year = new Date(now.getTime() + IST_MS).getUTCFullYear();
+  const summerRiseAt = SunCalc.getTimes(istNoonOn(year, 5, 21), lat, lon).sunrise ?? sunrise;
+  const winterRiseAt = SunCalc.getTimes(istNoonOn(year, 11, 21), lat, lon).sunrise ?? sunrise;
   const summerRise = SunCalc.getPosition(summerRiseAt, lat, lon).azimuth;
   const winterRise = SunCalc.getPosition(winterRiseAt, lat, lon).azimuth;
 

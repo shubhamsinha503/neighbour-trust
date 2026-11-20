@@ -22,6 +22,7 @@ import { useT } from "@/components/LanguageProvider";
 import Link from "next/link";
 import { useState } from "react";
 import * as SunCalc from "suncalc";
+import { fmtIstTime, istNoon, istNoonOn, istYear, splitDuration } from "@/lib/ist";
 
 const COMPASS_16 = [
   "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
@@ -34,17 +35,10 @@ function compass(deg: number): string {
 
 // Every covered locality is in India, so sun times are shown in India Standard
 // Time regardless of where the viewer's device is — and, crucially, regardless
-// of the server's clock. Without an explicit timeZone this formats in the
-// render environment's zone: on the server (UTC) Bengaluru's ~06:00 sunrise came
-// out as "12:50 am" and its ~18:19 sunset as "12:19 pm". Pinning to Asia/Kolkata
-// makes the value correct and identical on server and client (no hydration drift).
-function fmt(d: Date): string {
-  return d.toLocaleTimeString("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "Asia/Kolkata",
-  });
-}
+// of the server's clock. Formatting in the render environment's zone showed
+// Bengaluru's ~06:00 sunrise as "12:50 am" on the server (UTC). lib/ist does the
+// conversion by fixed offset, so the value is identical on server and client.
+const fmt = fmtIstTime;
 
 const DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
 type Facing = (typeof DIRECTIONS)[number];
@@ -77,7 +71,9 @@ export function SunlightCard({
   const t = useT();
   const [facing, setFacing] = useState<Facing | null>(null);
   const now = new Date();
-  const times = SunCalc.getTimes(now, lat, lon);
+  // Anchored to noon IST of today's IST date, so "today" is the locality's day
+  // and not whichever day the server's UTC clock happens to be on.
+  const times = SunCalc.getTimes(istNoon(now), lat, lon);
   const sunrise = times.sunrise;
   const sunset = times.sunset;
   const solarNoon = times.solarNoon;
@@ -99,13 +95,12 @@ export function SunlightCard({
   const noonAlt = SunCalc.getPosition(solarNoon, lat, lon).altitude;
 
   const dayMs = sunset.getTime() - sunrise.getTime();
-  const dayH = Math.floor(dayMs / 3_600_000);
-  const dayM = Math.round((dayMs % 3_600_000) / 60_000);
+  const { h: dayH, m: dayM } = splitDuration(dayMs);
 
   // The seasonal swing: where the sunrise sits at the two solstices.
-  const year = now.getFullYear();
-  const summerRiseAt = SunCalc.getTimes(new Date(year, 5, 21), lat, lon).sunrise ?? sunrise;
-  const winterRiseAt = SunCalc.getTimes(new Date(year, 11, 21), lat, lon).sunrise ?? sunrise;
+  const year = istYear(now);
+  const summerRiseAt = SunCalc.getTimes(istNoonOn(year, 5, 21), lat, lon).sunrise ?? sunrise;
+  const winterRiseAt = SunCalc.getTimes(istNoonOn(year, 11, 21), lat, lon).sunrise ?? sunrise;
   const summerRise = SunCalc.getPosition(summerRiseAt, lat, lon).azimuth;
   const winterRise = SunCalc.getPosition(winterRiseAt, lat, lon).azimuth;
 

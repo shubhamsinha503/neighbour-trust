@@ -236,6 +236,102 @@ def _dated_if_historical(summary: str, envelope: Optional[dict[str, Any]]) -> st
     return f"Last measured {vintage.strftime('%d %b').lstrip('0')} · {summary}"
 
 
+# --- Provenance ---------------------------------------------------------------
+#
+# Every figure on the report must be traceable to where it came from, when, and
+# how far to trust it — not only on the category's own detail page. These
+# helpers attach that to each category tile and each flag, so the reader can
+# open the original source from the thing that worried them.
+
+PRESS_CATEGORIES = ("crime", "water", "power")
+EVIDENCE_LIMIT = 3
+
+
+def _iso(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
+def _evidence(
+    category: str, envelope: Optional[dict[str, Any]], limit: int = EVIDENCE_LIMIT
+) -> list[dict[str, Any]]:
+    """The press articles behind a press-derived category, newest first.
+
+    Only articles the classifier confirmed as an incident in this locality —
+    the same set the score and flags are read from. Unjudged or rejected
+    mentions are not evidence of anything and are never shown as such.
+    """
+    if envelope is None or category not in PRESS_CATEGORIES:
+        return []
+    news = (envelope.get("payload") or {}).get("news") or {}
+    items = [
+        i for i in (news.get("recent") or [])
+        if i.get("incident_type") and i.get("url")
+    ]
+    items.sort(key=lambda i: i.get("published_at") or "", reverse=True)
+    return [
+        {
+            "headline": i.get("title") or "",
+            "url": i.get("url"),
+            "source": i.get("domain") or i.get("source_name"),
+            "published_at": _iso(i.get("published_at")),
+            "kind": i.get("incident_type"),
+        }
+        for i in items[:limit]
+    ]
+
+
+def _provenance(
+    category: str, envelope: Optional[dict[str, Any]]
+) -> dict[str, Any]:
+    """Source, date and confidence for one category's stored envelope."""
+    if envelope is None:
+        return {
+            "source_name": None,
+            "source_url": None,
+            "as_of": None,
+            "fetched_at": None,
+            "confidence": None,
+            "evidence": [],
+        }
+    return {
+        "source_name": envelope.get("source_name"),
+        "source_url": envelope.get("source_url"),
+        "as_of": _iso(envelope.get("data_vintage")),
+        "fetched_at": _iso(envelope.get("fetched_at")),
+        "confidence": envelope.get("confidence"),
+        "evidence": _evidence(category, envelope),
+    }
+
+
+RESIDENT_SOURCE = "Resident reports, checked by Nestra before publishing"
+
+
+def _resident_provenance(reports: list[dict[str, Any]]) -> dict[str, Any]:
+    dates = [r.get("reviewed_at") or r.get("submitted_at") for r in reports]
+    dates = [d for d in dates if d is not None]
+    links = [
+        {
+            "headline": "Evidence link supplied with a resident report",
+            "url": r["evidence_url"],
+            "source": None,
+            "published_at": _iso(r.get("submitted_at")),
+            "kind": r.get("incident_type"),
+        }
+        for r in reports
+        if r.get("evidence_url")
+    ][:EVIDENCE_LIMIT]
+    return {
+        "source_name": RESIDENT_SOURCE,
+        "source_url": None,
+        "as_of": _iso(max(dates)) if dates else None,
+        "fetched_at": None,
+        "confidence": "community_estimated",
+        "evidence": links,
+    }
+
+
 def _category_summary(category: str, envelope: Optional[dict[str, Any]]) -> str:
     """One line per category tile, in the mockup's style."""
     if envelope is None:
@@ -387,6 +483,10 @@ def build_report(conn, locality: dict[str, Any]) -> LocalityReport:
                 "data_vintage": (
                     envelope["data_vintage"].isoformat() if envelope else None
                 ),
+                "source_url": (envelope or {}).get("source_url"),
+                "fetched_at": _iso((envelope or {}).get("fetched_at")),
+                "historical": result.historical,
+                "evidence": _evidence(result.category, envelope),
             }
         )
     # Present in the mockup's grid order rather than weight order.
@@ -412,7 +512,13 @@ def build_report(conn, locality: dict[str, Any]) -> LocalityReport:
     # residents in a second-class list below the automated findings would say
     # the opposite of what this product claims about them.
     found_flags = flags_mod.find(envelopes, categories)
-    found_flags.extend(reports_mod.to_flags(accepted))
+    # Each flag carries the source, date and confidence of the data it was read
+    # from, so the reader can open the original from the warning itself.
+    for flag in found_flags:
+        flag.update(_provenance(flag["category"], envelopes.get(flag["category"])))
+    for flag in reports_mod.to_flags(accepted):
+        flag.update(_resident_provenance(reports_by_category.get(flag["category"], [])))
+        found_flags.append(flag)
     found_flags.sort(key=lambda f: flags_mod.SEVERITY_ORDER.get(f["severity"], 9))
 
     return LocalityReport(

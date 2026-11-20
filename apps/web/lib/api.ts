@@ -275,6 +275,40 @@ function toSchoolsPayload(raw: Record<string, any>): SchoolsAreaPayload {
 // The locality report — composite Trust Score, categories, disagreements
 // ---------------------------------------------------------------------------
 
+/** One original item behind a figure — a press article or a resident's link. */
+export interface Evidence {
+  headline: string;
+  url: string;
+  source?: string;
+  publishedAt?: string;
+  kind?: string;
+}
+
+/** Where a figure came from, when, and how far to trust it. */
+export interface Provenance {
+  sourceName?: string;
+  sourceUrl?: string;
+  /** When the underlying data describes (the reading, article or survey date). */
+  asOf?: string;
+  /** When Nestra last fetched it. */
+  fetchedAt?: string;
+  confidence: Confidence | null;
+  evidence: Evidence[];
+}
+
+function toEvidence(raw: unknown): Evidence[] {
+  if (!Array.isArray(raw)) return [];
+  return (raw as Array<Record<string, any>>)
+    .filter((e) => e && typeof e.url === "string" && e.url)
+    .map((e) => ({
+      headline: e.headline ?? "",
+      url: e.url,
+      source: e.source ?? undefined,
+      publishedAt: e.published_at ?? undefined,
+      kind: e.kind ?? undefined,
+    }));
+}
+
 export interface ReportCategory {
   category: string;
   label: string;
@@ -293,9 +327,15 @@ export interface ReportCategory {
   summary: string;
   sourceName?: string;
   dataVintage?: string;
+  sourceUrl?: string;
+  fetchedAt?: string;
+  /** Shown with its date, but too old to count toward the Trust Score. */
+  historical: boolean;
+  /** The newest original articles behind a press-derived category. */
+  evidence: Evidence[];
 }
 
-export interface Flag {
+export interface Flag extends Partial<Provenance> {
   category: string;
   /** "serious" | "notable" — how much weight to give it, not a measurement. */
   severity: string;
@@ -317,6 +357,11 @@ export interface TrustScore {
   categoriesCounted: number;
   categoriesTotal: number;
   reasonUnavailable?: string;
+  /** Points taken off for reported power problems; always explained by a flag. */
+  powerPenalty: number;
+  powerPenaltyReason?: string;
+  /** Below this share of the total weight no score is published. */
+  minCoveragePct: number;
 }
 
 export interface LocalityReport {
@@ -385,10 +430,26 @@ export async function fetchReport(slug: string): Promise<LocalityReport> {
       categoriesCounted: raw.trust_score.categories_counted,
       categoriesTotal: raw.trust_score.categories_total,
       reasonUnavailable: raw.trust_score.reason_unavailable ?? undefined,
+      powerPenalty: raw.trust_score.power_penalty ?? 0,
+      powerPenaltyReason: raw.trust_score.power_penalty_reason ?? undefined,
+      minCoveragePct: raw.trust_score.min_coverage_pct ?? 35,
     },
     verdict: raw.verdict,
     biggestWatchout: raw.biggest_watchout ?? null,
-    flags: raw.flags ?? [],
+    flags: ((raw.flags ?? []) as Array<Record<string, any>>).map(
+      (f): Flag => ({
+        category: f.category,
+        severity: f.severity,
+        headline: f.headline,
+        detail: f.detail ?? "",
+        sourceName: f.source_name ?? undefined,
+        sourceUrl: f.source_url ?? undefined,
+        asOf: f.as_of ?? undefined,
+        fetchedAt: f.fetched_at ?? undefined,
+        confidence: (f.confidence ?? null) as Confidence | null,
+        evidence: toEvidence(f.evidence),
+      }),
+    ),
     disagreements: raw.disagreements ?? [],
     categories: ((raw.categories ?? []) as Array<Record<string, any>>).map(
       (c): ReportCategory => ({
@@ -404,6 +465,10 @@ export async function fetchReport(slug: string): Promise<LocalityReport> {
         summary: c.summary ?? "",
         sourceName: c.source_name ?? undefined,
         dataVintage: c.data_vintage ?? undefined,
+        sourceUrl: c.source_url ?? undefined,
+        fetchedAt: c.fetched_at ?? undefined,
+        historical: c.historical === true,
+        evidence: toEvidence(c.evidence),
       }),
     ),
     upcoming: ((raw.upcoming ?? []) as Array<Record<string, any>>).map(

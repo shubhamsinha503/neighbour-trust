@@ -20,6 +20,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as SunCalc from "suncalc";
+import { fmtClockMinutes, istAt, istMinutes } from "@/lib/ist";
 import transformTranslate from "@turf/transform-translate";
 import convex from "@turf/convex";
 import { featureCollection, polygon } from "@turf/helpers";
@@ -60,13 +61,10 @@ function loadMaplibre(): Promise<MapLibre> {
   return loadPromise;
 }
 
-function fmtClock(mins: number): string {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  const ampm = h < 12 ? "am" : "pm";
-  const h12 = ((h + 11) % 12) + 1;
-  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
-}
+// The slider is a clock in India Standard Time, not the viewer's device zone: a
+// visitor abroad dragging to "4 pm" must see the locality's 4 pm shadows, not
+// the shadows at their own 4 pm (the middle of the Indian night).
+const fmtClock = (mins: number) => `${fmtClockMinutes(mins)} IST`;
 
 export function ShadowMap({
   name,
@@ -90,13 +88,9 @@ export function ShadowMap({
   // parse — which is what keeps dragging the slider smooth.
   const footprintsRef = useRef<{ ring: Position[][]; h: number }[]>([]);
 
-  const [mins, setMins] = useState(() => {
-    const d = new Date();
-    return d.getHours() * 60 + d.getMinutes();
-  });
+  const [mins, setMins] = useState(() => istMinutes());
 
-  const date = new Date();
-  date.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+  const date = istAt(mins);
   const sun = SunCalc.getPosition(date, lat, lon);
   const altitude = sun.altitude; // degrees in this suncalc build
   const azimuth = sun.azimuth; // compass bearing, degrees from north

@@ -94,17 +94,26 @@ export default function AboutPage() {
         <p>
           Both come from local news coverage, read and classified per locality.
           They are the two categories where official Indian data is weakest:
-          NCRB publishes crime at district level, a year or more late.
+          NCRB publishes crime at district level, a year or more late. Both are
+          always tagged community-estimated.
         </p>
         <p>
-          <strong className="font-semibold text-ink-primary">
-            Neither is ever turned into a score.
-          </strong>{" "}
           How often a place appears in the press tracks how much media attention
           it gets, not how often things happen there — a well-covered
           neighbourhood would look dangerous next to an identical one nobody
-          writes about. So we describe the <em>kind</em> of incident reported,
-          which survives that bias, and leave the ranking alone.
+          writes about. So these scores are built mainly from the{" "}
+          <em>kind</em> of incident reported, which survives that bias: for
+          safety, the share of reported incidents involving violence; for water,
+          whether flooding, supply failures or contamination recur. The raw count
+          enters only as a small, capped adjustment, so being written about more
+          can move a score a little and never dominate it.
+        </p>
+        <p>
+          A score needs at least three confirmed incidents in the last 12 months;
+          below that the card describes what was reported and gives no number.
+          A locality with nothing reported shows a baseline on its card, labelled
+          as one, and that baseline is never counted in the Trust Score —
+          silence in the press is not evidence that nothing happened.
         </p>
         <p>
           Every headline is judged individually for whether it describes an
@@ -144,19 +153,68 @@ export default function AboutPage() {
         </p>
       </Section>
 
-      <Section title="The Trust Score">
+      <Section title="The Trust Score" id="trust-score">
         <p>
-          A weighted composite of the categories that can currently be scored,
-          renormalised over what is actually present. Missing data never counts
-          as a bad result — a locality with no air quality reading is not scored
-          as though its air were poor.
+          A weighted average of up to five categories, each scored 0–100. The
+          weights are a judgement about what matters to a typical buyer, not a
+          measurement, and they are published so they can be argued with:
+        </p>
+        <ul className="space-y-1">
+          <Bullet>Air quality — 24%</Bullet>
+          <Bullet>Schools (access, not quality) — 24%</Bullet>
+          <Bullet>Safety — 24%</Bullet>
+          <Bullet>Water — 17%</Bullet>
+          <Bullet>Connectivity — 11%</Bullet>
+        </ul>
+        <p>
+          <strong className="font-semibold text-ink-primary">Missing data.</strong>{" "}
+          A category with no data is left out and the remaining weights are
+          scaled up to fill 100%. It is never scored as zero (that would call a
+          locality bad because we have not measured it) or as average (that
+          would invent a number and make every locality look alike). A reading
+          too old to describe today is shown with its date and also left out.
         </p>
         <p>
-          The score names what it is based on, because it rarely rests on all
-          five categories. Below that threshold no number is published at all,
-          and the page shows the individual cards instead. A single measurement
-          wearing the words &ldquo;Trust Score&rdquo; would be worse than no
-          score.
+          <strong className="font-semibold text-ink-primary">
+            Why that matters when you read one.
+          </strong>{" "}
+          A score averaged over two categories looks exactly as complete as one
+          averaged over five. So every report shows what share of the full
+          weight its score rests on, names the categories that are not in it,
+          and opens to the full breakdown: each category&apos;s score, its share
+          of the number and its confidence. Read a missing category as unknown,
+          not as fine. A high score with low coverage says the things we could
+          measure look good — it is not an overall verdict on the neighbourhood.
+        </p>
+        <p>
+          <strong className="font-semibold text-ink-primary">Minimum coverage.</strong>{" "}
+          Below 35% of the total weight no score is published at all, and the
+          page shows the individual cards instead. A single measurement wearing
+          the words &ldquo;Trust Score&rdquo; would be worse than no score.
+        </p>
+        <p>
+          <strong className="font-semibold text-ink-primary">Power.</strong>{" "}
+          No source publishes power supply at locality level, so power has no
+          weight. Repeated reported outages or equipment failures can take 3 or 6
+          points off, and only when a warning on the same page says why.
+        </p>
+        <p>
+          <strong className="font-semibold text-ink-primary">
+            Never in the score.
+          </strong>{" "}
+          Modelled flood risk, sunlight, &ldquo;reported as coming&rdquo; projects
+          and resident reports are shown separately and never move the number.
+        </p>
+      </Section>
+
+      <Section title="Checking a figure yourself">
+        <p>
+          Every report has a &ldquo;Where each figure comes from&rdquo; section,
+          and every warning carries the same line: the source (linked), the date
+          the data was measured or published, and its confidence tag. For safety,
+          water and power, the most recent original news articles behind the
+          figure are listed and linked, so you can read what was actually
+          reported rather than our summary of it.
         </p>
       </Section>
 
@@ -167,29 +225,46 @@ export default function AboutPage() {
           when fetched degrades on its own as it ages, and is withheld entirely
           once too old to be meaningful.
         </p>
-        <p>
-          <strong className="font-semibold text-ink-primary">
-            Community-estimated
-          </strong>{" "}
-          means there is no reliable official source and the figure leans on
-          press coverage or community sensors. It is never dressed up as
-          official data.
-        </p>
+        <ul className="space-y-2">
+          <Bullet>
+            <strong className="font-semibold text-ink-primary">High</strong> — recent,
+            from an official or regulatory source close to the locality.
+          </Bullet>
+          <Bullet>
+            <strong className="font-semibold text-ink-primary">Medium</strong> — a real
+            measurement, but older, further away or from a weaker source. An air
+            reading more than 3 hours old can be no better than medium.
+          </Bullet>
+          <Bullet>
+            <strong className="font-semibold text-ink-primary">Low</strong> — an
+            indication only: old, distant, partial or modelled. An air reading more
+            than 24 hours old is low; after 7 days it is shown with its date and
+            left out of the score.
+          </Bullet>
+          <Bullet>
+            <strong className="font-semibold text-ink-primary">
+              Community-estimated
+            </strong>{" "}
+            — there is no reliable official source and the figure leans on press
+            coverage or community sensors. It is never dressed up as official data.
+          </Bullet>
+        </ul>
       </Section>
 
       <Section title="What we refuse to do">
         <ul className="space-y-2">
           <Bullet>
-            Publish a safety score from press coverage. The bias runs the wrong
-            way and we have no way to correct for it yet.
+            Rank localities by how often they are in the news. Safety and water
+            scores read the kind of incident reported, with the count capped,
+            because volume tracks media attention rather than what happens.
           </Bullet>
           <Bullet>
             Dress a school count up as a quality ranking, or report a figure from
             too few samples.
           </Bullet>
           <Bullet>
-            Fill an empty category with an estimate. Power and infrastructure
-            have no data, and their cards say so.
+            Fill an empty category with an estimate or an average. A category
+            with no data is left out of the score, and the report names it.
           </Bullet>
           <Bullet>
             Average away a disagreement between sources. Where two sources
@@ -226,13 +301,15 @@ export default function AboutPage() {
 
 function Section({
   title,
+  id,
   children,
 }: {
   title: string;
+  id?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-7">
+    <section id={id} className="mt-7 scroll-mt-6">
       <h2 className="mb-2 text-[11.5px] font-bold uppercase tracking-[0.05em] text-ink-secondary">
         {title}
       </h2>
