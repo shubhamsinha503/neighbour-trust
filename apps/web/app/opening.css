@@ -1,0 +1,692 @@
+/* Design tokens for the opening, scoped to .op so they never touch the rest of
+   the app. Fonts reuse the site's self-hosted next/font faces (--font-hanken,
+   --font-bricolage from layout.tsx), falling back to the family names. */
+.op{
+  --color-surface-1:#ffffff; --color-page-plane:#fbfbfa;
+  --color-ink-primary:#0c0a09; --color-ink-secondary:#57534e; --color-ink-muted:#a8a29e;
+  --color-hairline:rgba(12,10,9,.08);
+  --color-brand:#f72575; --color-brand-soft:rgba(247,37,117,.1);
+  --color-brand-deep:#d91361; --color-brand-bright:#ff5c9b;
+  --font-sans:var(--font-hanken),"Hanken Grotesk",system-ui,-apple-system,sans-serif;
+  --font-display:var(--font-bricolage),"Bricolage Grotesque","Hanken Grotesk",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.op *{box-sizing:border-box}
+/* ─────────────────────────────────────────────────────────────────────────
+   The homepage opening (components/Opening.tsx, lib/opening/*).
+
+   A miniature neighbourhood, pinned, that the scroll takes from afternoon to
+   night to morning. The driver writes plain numbers onto the section and
+   these rules decide what they look like:
+
+     --n                 how far night has fallen (0 day → 1 night → 0 dawn)
+     --metro … --water   each signal's arrival, 0 → 1, and it stays
+     --cap-*             each signal's one-word caption
+     --ls --lb --lf      how strongly the student, business, family reading
+                         is lighting the place
+     --res               the answer
+
+   Every colour in the diorama is mixed by --n, so the light changes the
+   whole place at once. Every emissive thing (windows, lamps, pools of light,
+   the metro, haze, flood) multiplies its own arrival by --lk, the current
+   reading's interest in it, so each person's neighbourhood is the same
+   place with different things lit.
+   ───────────────────────────────────────────────────────────────────────── */
+.op {
+  --p: 0;
+  --q: 1;
+  --look: 0;
+  --n: 0;
+  --dk: 0;
+  --metro: 0;
+  --school: 0;
+  --green: 0;
+  --air: 0;
+  --ppl: 0;
+  --dark: 0;
+  --water: 0;
+  --cap-metro: 0;
+  --cap-school: 0;
+  --cap-green: 0;
+  --cap-air: 0;
+  --cap-ppl: 0;
+  --cap-dark: 0;
+  --cap-water: 0;
+  --same: 0;
+  --ls: 0;
+  --lb: 0;
+  --lf: 0;
+  --res: 0;
+
+  position: relative;
+  height: 560vh;
+  /* The pin paints to the viewport edges while the page body stays narrow. */
+  margin-inline: calc(50% - 50vw);
+  width: 100vw;
+}
+
+.op-pin {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  /* Day, through a mauve dusk (--dk peaks halfway), to night. A straight
+     day-to-night mix passes through flat grey, which reads as a fault. */
+  background: color-mix(
+    in oklab,
+    #0a0d16 calc(var(--n) * 100%),
+    color-mix(in oklab, #d98aa0 calc(var(--dk) * 100%), var(--color-page-plane))
+  );
+}
+
+/* The sunset grade: a warm multiply over the whole scene while the light is
+   changing, so buildings go gold-rose on the way to night instead of grey. */
+.op-grade {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(170deg, #ffb36b, #d4688f 55%, #6a4fb0);
+  mix-blend-mode: multiply;
+  opacity: calc(var(--dk) * 0.55);
+}
+
+/* A soft sky behind the diorama: warm by day, indigo by night. */
+.op-sky {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 55% at 58% 55%,
+      color-mix(in oklab, rgba(76, 64, 160, 0.45) calc(var(--n) * 100%), rgba(255, 214, 170, 0.5)),
+      transparent 70%);
+}
+
+.op-world {
+  position: absolute;
+  inset: 0;
+}
+.op-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── the lens: how much the current reading cares about a thing ───────── */
+.lx {
+  --lk: max(
+    0.07,
+    1 - var(--lf) * (1 - var(--rf, 1)) - var(--ls) * (1 - var(--rs, 1)) - var(--lb) * (1 - var(--rb, 1))
+  );
+}
+.e-metro { --rf: 0.3; --rs: 1; --rb: 1; }
+.e-school { --rf: 1; --rs: 0.08; --rb: 0.08; }
+.e-green { --rf: 1; --rs: 0.4; --rb: 0.12; }
+.e-air { --rf: 1; --rs: 0.45; --rb: 0.55; }
+.e-dark { --rf: 1; --rs: 1; --rb: 0.4; }
+.e-water { --rf: 1; --rs: 0.3; --rb: 0.85; }
+.e-college { --rf: 0.08; --rs: 1; --rb: 0.15; }
+.e-shop { --rf: 0.2; --rs: 0.35; --rb: 1; }
+.e-car { --rf: 0.25; --rs: 0.25; --rb: 1; }
+.e-home { --rf: 1; --rs: 1; --rb: 1; }
+
+/* ── ground ────────────────────────────────────────────────────────────── */
+.slab-shadow { opacity: calc(1 - var(--n) * 0.7); }
+.g-side-l { fill: color-mix(in oklab, #0f131c calc(var(--n) * 100%), #c4ad8c); }
+.g-side-r { fill: color-mix(in oklab, #0b0e15 calc(var(--n) * 100%), #a99272); }
+.g-grass { fill: color-mix(in oklab, #121a17 calc(var(--n) * 100%), #cfe2b3); }
+.g-pave { fill: color-mix(in oklab, #181e2a calc(var(--n) * 100%), #efe8dc); }
+.g-road { fill: color-mix(in oklab, #1c2231 calc(var(--n) * 100%), #d8d3cb); }
+.g-art { fill: color-mix(in oklab, #171c29 calc(var(--n) * 100%), #c9c3b8); }
+.g-mark {
+  stroke: color-mix(in oklab, #2f3549 calc(var(--n) * 100%), #ffffff);
+  stroke-width: 1.4;
+  stroke-dasharray: 6 7;
+}
+.g-water { fill: color-mix(in oklab, #0f2a3f calc(var(--n) * 100%), #9fd2e8); }
+.g-bank { fill: color-mix(in oklab, #10161f calc(var(--n) * 100%), #b9a98d); }
+.ripple-w {
+  stroke: color-mix(in oklab, rgba(120, 190, 240, 0.5) calc(var(--n) * 100%), rgba(255, 255, 255, 0.8));
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+.g-lawn {
+  fill: color-mix(in oklab, #14301f calc(var(--n) * 100%),
+    color-mix(in oklab, #94cf72 calc(var(--green) * 100%), #bcd9a0));
+}
+.g-path { fill: color-mix(in oklab, #232836 calc(var(--n) * 100%), #f1e8d4); }
+.g-field { fill: color-mix(in oklab, #16301f calc(var(--n) * 100%), #a8d48b); }
+.g-field-line {
+  stroke: color-mix(in oklab, #2c4a36 calc(var(--n) * 100%), #ffffff);
+  stroke-width: 1.2;
+  fill: none;
+}
+
+/* ── buildings ─────────────────────────────────────────────────────────── */
+/* Each style names its daylight walls; night is one shared palette. */
+.b-house { --wt: #f7efe1; --wl: #f2e5cf; --wr: #dccab0; }
+.b-mid { --wt: #f5f2ec; --wl: #ece6dc; --wr: #d6cdbf; }
+.b-home { --wt: #ffffff; --wl: #ffffff; --wr: #eceef3; }
+.b-tower { --wt: #f4f6f9; --wl: #e6ebf2; --wr: #ccd4e0; }
+.b-office { --wt: #f6f4f9; --wl: #e9e5f0; --wr: #d2cddc; }
+.b-shop { --wt: #f8efdf; --wl: #f3e2c6; --wr: #dfc9a5; }
+.b-pg { --wt: #f7f1fb; --wl: #eee4f6; --wr: #d9cce8; }
+.b-college { --wt: #f3ebdf; --wl: #eadcc9; --wr: #d5c2a9; }
+.b-school { --wt: #fbeee2; --wl: #f2d8c2; --wr: #e0bea2; }
+.b-station { --wt: #ffffff; --wl: #f4f4f7; --wr: #dcdee6; }
+.b-deck { --wt: #eef0f4; --wl: #dfe2e8; --wr: #c6ccd6; }
+.b-pillar { --wt: #e2e5eb; --wl: #d6dae2; --wr: #bcc3ce; }
+.b-train { --wt: #ffffff; --wl: #f7f7fa; --wr: #dfe1e8; }
+
+.bf-t { fill: color-mix(in oklab, #222a3c calc(var(--n) * 100%), var(--wt)); }
+.bf-l { fill: color-mix(in oklab, #1a2131 calc(var(--n) * 100%), var(--wl)); }
+.bf-r { fill: color-mix(in oklab, #131926 calc(var(--n) * 100%), var(--wr)); }
+.rf-f { fill: color-mix(in oklab, #2a1f27 calc(var(--n) * 100%), #db8d6a); }
+.rf-b { fill: color-mix(in oklab, #211920 calc(var(--n) * 100%), #c67556); }
+.bf { stroke: color-mix(in oklab, rgba(255, 255, 255, 0.03) calc(var(--n) * 100%), rgba(80, 60, 40, 0.08)); stroke-width: 0.6; }
+
+/* The home: brand-trimmed, and the one thing that glows from the start. */
+.b-home .bf-t { fill: color-mix(in oklab, #3a1730 calc(var(--n) * 100%), #ffe4ef); }
+.b-home .bf { stroke: var(--color-brand); stroke-width: 1.2; }
+
+/* Windows: glass by day; by night each comes on in the colour of who lives
+   there — amber for families, violet for students and PGs, cool white for
+   working professionals — in a random order, as the place is read. */
+.w {
+  --glass: color-mix(in oklab, #0d1320 calc(var(--n) * 100%), #a9bccd);
+  --lit: calc(clamp(0, (var(--ppl) - var(--t) * 0.75) * 6, 1) * var(--n));
+  fill: color-mix(in oklab, var(--wc) calc(var(--lit) * var(--lk) * 100%), var(--glass));
+}
+.w-fam { --wc: #ffc66e; --rf: 1; --rs: 0.12; --rb: 0.2; }
+.w-stu { --wc: #b69cff; --rf: 0.1; --rs: 1; --rb: 0.2; }
+.w-pro { --wc: #d4e5ff; --rf: 0.25; --rs: 0.25; --rb: 0.9; }
+.w {
+  --lk: max(
+    0.07,
+    1 - var(--lf) * (1 - var(--rf, 1)) - var(--ls) * (1 - var(--rs, 1)) - var(--lb) * (1 - var(--rb, 1))
+  );
+}
+
+/* Awnings on the shops: bright by day, lit by night for a business. */
+.awning {
+  fill: color-mix(in oklab, #ff8a4c calc(var(--n) * var(--lk) * 100%), #f72575);
+  opacity: calc(0.85 + var(--n) * 0.15 * var(--lk));
+}
+
+/* ── trees ─────────────────────────────────────────────────────────────── */
+.trunk { stroke: color-mix(in oklab, #2a231d calc(var(--n) * 100%), #8b6b4e); stroke-width: 2.2; stroke-linecap: round; }
+.cn-a { fill: color-mix(in oklab, #173523 calc(var(--n) * 100%), #7fbf63); }
+.cn-b { fill: color-mix(in oklab, #1f4630 calc(var(--n) * 100%), #a6d98a); }
+.tree-sh { fill: rgba(30, 40, 20, calc(0.18 * (1 - var(--n)))); }
+/* Street trees grow as green space is read. */
+.tree.sprout {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: scale(clamp(0, calc((var(--green) - var(--t) * 0.5) * 2.2), 1));
+}
+
+/* ── signals on the ground ─────────────────────────────────────────────── */
+/* Daylight washes ground light out, so pools are strongest at night. */
+.pool { --day-k: calc(0.3 + 0.7 * var(--n)); }
+.pool-metro { opacity: calc(var(--metro) * var(--lk) * var(--day-k)); }
+.pool-school { opacity: calc(var(--school) * var(--lk) * var(--day-k)); }
+.pool-green { opacity: calc(var(--green) * var(--lk) * var(--day-k)); }
+.pool-ppl { opacity: calc(var(--ppl) * var(--lk) * var(--day-k)); }
+
+/* Connectivity: the streets fill with light outward from the station. */
+.flow {
+  fill: none;
+  stroke: var(--color-brand-bright);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: calc(1 - clamp(0, var(--metro) * 1.7 - var(--o, 0), 1));
+  opacity: calc(var(--lk) * (0.35 + 0.65 * var(--n)));
+  filter: drop-shadow(0 0 4px rgba(247, 37, 117, 0.9));
+}
+.track {
+  stroke: var(--color-brand-bright);
+  stroke-width: 2;
+  opacity: calc(var(--metro) * var(--lk));
+}
+
+/* Schools: the catchment ripples outward, ring after ring. */
+.ripple {
+  fill: none;
+  stroke: #ffb547;
+  stroke-width: 1.6;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(clamp(0, calc(var(--school) * 1.6 - var(--i) * 0.25), 1));
+  opacity: calc(var(--school) * var(--lk) * (0.75 - var(--i) * 0.18) * (0.4 + 0.6 * var(--n)));
+}
+
+/* Lived experience: lamps come on in their own order — except the dark
+   stretch, which stays dark. */
+.lamp {
+  --lit: calc(clamp(0, (var(--dark) - var(--t) * 0.6) * 5, 1) * var(--n));
+}
+.post { stroke: color-mix(in oklab, #3b4152 calc(var(--n) * 100%), #8f8a83); stroke-width: 1.4; }
+.bulb { fill: color-mix(in oklab, #ffe6a6 calc(var(--lit) * var(--lk) * 100%), #a7acb6); }
+.lamp.out .bulb { fill: color-mix(in oklab, #2b3040 calc(var(--n) * 100%), #a7acb6); }
+.pool-lamp {
+  --lit: calc(clamp(0, (var(--dark) - var(--t) * 0.6) * 5, 1) * var(--n));
+  opacity: calc(var(--lit) * var(--lk));
+}
+
+/* Water: the low streets by the river, flooding — rising into place. */
+.flood {
+  fill: color-mix(in oklab, rgba(60, 150, 230, 0.5) calc(var(--n) * 100%), rgba(80, 170, 220, 0.42));
+  opacity: calc(var(--water) * var(--lk));
+  transform: translateY(calc((1 - var(--water)) * 10px));
+}
+.flood-edge {
+  stroke: #7cc8ff;
+  stroke-width: 1.6;
+  stroke-dasharray: 4 5;
+  stroke-dashoffset: calc(var(--p) * -120);
+  opacity: calc(var(--water) * var(--lk));
+  transform: translateY(calc((1 - var(--water)) * 10px));
+}
+
+/* ── the sky layer ─────────────────────────────────────────────────────── */
+/* Cars: plain in daylight, headlights by night (a business reads them). */
+.car-base, .car-top { stroke: rgba(0, 0, 0, 0.12); stroke-width: 0.5; }
+.car-top { filter: brightness(1.15); }
+.op-car { opacity: calc(1 - var(--n) * 0.35 * (1 - var(--lk))); }
+.headlight { fill: #fff6d6; opacity: calc(var(--n) * var(--lk)); }
+
+/* The train arrives with connectivity. */
+#op-train { opacity: calc(var(--metro) * (0.25 + 0.75 * var(--lk))); }
+.train-win { stroke: #ffd5e5; stroke-width: 3; opacity: calc(0.4 + var(--n) * 0.6); }
+
+/* Air: haze settles over the busy road, drifting. */
+.haze {
+  /* Clears with the morning, so it never sits behind the answer's words. */
+  opacity: calc(var(--air) * var(--lk) * 0.95 * (1 - var(--res) * 0.85));
+  transform: translateX(calc(var(--p) * 60px));
+}
+
+/* The answer gathers into the home. */
+.thread {
+  fill: none;
+  stroke: #ffb547;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: calc(1 - clamp(0, var(--res) * 1.4 - var(--o, 0), 1));
+  opacity: var(--res);
+  filter: drop-shadow(0 0 5px rgba(255, 181, 71, 0.8));
+}
+.halo { opacity: calc(0.35 + var(--n) * 0.25 + var(--res) * 0.6); }
+.beacon {
+  transform-box: fill-box;
+}
+.beacon-b { fill: var(--color-brand); }
+.beacon-f { fill: var(--color-brand-bright); }
+
+/* ── words ─────────────────────────────────────────────────────────────── */
+.op-q,
+.op-look,
+.op-caps,
+.op-who,
+.op-answer {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+}
+.op-q {
+  left: 7vw;
+  top: 14vh;
+  margin: 0;
+  max-width: 12ch;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(38px, 4.8vw, 70px);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  color: var(--color-ink-primary);
+  opacity: var(--q);
+  transform: translateY(calc((1 - var(--q)) * -20px));
+}
+.op-look {
+  left: 7vw;
+  top: 14vh;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(22px, 2vw, 30px);
+  letter-spacing: -0.02em;
+  color: color-mix(in oklab, #ffffff calc(var(--n) * 100%), var(--color-ink-primary));
+  opacity: var(--look);
+}
+
+/* One quiet word naming what the place is showing, with nothing else. */
+.op-caps {
+  left: 7vw;
+  bottom: calc(12vh + 40px);
+  display: grid;
+}
+.op-cap {
+  grid-area: 1 / 1;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(24px, 2.4vw, 36px);
+  letter-spacing: -0.025em;
+  color: #ffffff;
+  opacity: var(--cv);
+  transform: translateY(calc((1 - var(--cv)) * 12px));
+}
+.op-cap[data-k="metro"] { --cv: var(--cap-metro); }
+.op-cap[data-k="school"] { --cv: var(--cap-school); }
+.op-cap[data-k="green"] { --cv: var(--cap-green); }
+.op-cap[data-k="air"] { --cv: var(--cap-air); }
+.op-cap[data-k="ppl"] { --cv: var(--cap-ppl); }
+.op-cap[data-k="dark"] { --cv: var(--cap-dark); }
+.op-cap[data-k="water"] { --cv: var(--cap-water); }
+
+/* The same place, for three people. */
+.op-who {
+  left: 7vw;
+  top: 14vh;
+  opacity: var(--same);
+}
+.op-same {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+.op-who-lines {
+  display: grid;
+}
+.op-who-lines p {
+  grid-area: 1 / 1;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(38px, 4.6vw, 66px);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  color: #ffffff;
+  opacity: var(--wv);
+  transform: translateY(calc((1 - var(--wv)) * 16px));
+}
+.op-who-lines [data-k="ls"] { --wv: var(--ls); }
+.op-who-lines [data-k="lb"] { --wv: var(--lb); }
+.op-who-lines [data-k="lf"] { --wv: var(--lf); }
+
+/* ── the answer: the hand-over into Nestra ─────────────────────────────
+   Brand, a short rule, the promise, what it means for you, and the field to
+   ask in — one block on desktop beside the morning diorama; on a phone the
+   words take the top of the frame, the diorama the middle, and the field
+   the bottom, under the thumb. */
+.op-answer {
+  right: 5vw;
+  top: 50%;
+  translate: 0 -50%;
+  width: min(500px, 35vw);
+  opacity: var(--res);
+  transform: translateY(calc((1 - var(--res)) * 24px));
+}
+.op-brand {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(32px, 3vw, 44px);
+  letter-spacing: -0.035em;
+  line-height: 1;
+  color: var(--color-ink-primary);
+}
+.op-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.12em;
+  height: 1.12em;
+  border-radius: 0.3em;
+  background: var(--color-brand);
+}
+.op-mark svg {
+  width: 66%;
+  height: 66%;
+  fill: #ffffff;
+}
+.op-mark-check {
+  fill: none;
+  stroke: var(--color-brand);
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.op-rule {
+  display: block;
+  width: 56px;
+  height: 3px;
+  margin: 26px 0 26px;
+  border-radius: 3px;
+  background: var(--color-brand);
+}
+.op-ans-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(32px, 3.1vw, 46px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: var(--color-ink-primary);
+}
+.op-ans-sub {
+  margin: 14px 0 0;
+  font-size: clamp(16px, 1.35vw, 19px);
+  line-height: 1.45;
+  color: var(--color-ink-secondary);
+}
+
+/* The field: one white pill with a place marker and a round search button. */
+.op-find {
+  position: relative;
+  margin: 36px 0 0;
+  display: flex;
+  align-items: center;
+  height: 66px;
+  padding: 7px 7px 7px 20px;
+  border-radius: 999px;
+  background: var(--color-surface-1);
+  border: 1.5px solid transparent;
+  box-shadow: 0 14px 40px rgba(12, 10, 9, 0.1), 0 2px 6px rgba(12, 10, 9, 0.04);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.op-find:focus-within {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 4px var(--color-brand-soft), 0 14px 40px rgba(12, 10, 9, 0.1);
+}
+.op-find-pin {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--color-ink-secondary);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+.op-find input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  margin: 0 10px 0 12px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: 500 15.5px var(--font-sans);
+  color: var(--color-ink-primary);
+  /* A long placeholder on a narrow phone ends in "…" instead of mid-word. */
+  text-overflow: ellipsis;
+}
+.op-find input::placeholder {
+  color: var(--color-ink-muted);
+  text-overflow: ellipsis;
+}
+/* The pill already says "search"; the browser's own clear cross doubles it. */
+.op-find input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+.op-find button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-brand);
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(247, 37, 117, 0.35);
+  transition: background 150ms ease, transform 150ms ease;
+}
+.op-find button:hover {
+  background: var(--color-brand-deep);
+  transform: scale(1.04);
+}
+.op-find button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+/* Only usable once it is on screen: before the answer it is invisible but
+   would otherwise catch clicks meant for the scene. */
+.op[data-stage="3"] .op-answer {
+  pointer-events: auto;
+}
+
+/* ── chrome ────────────────────────────────────────────────────────────── */
+.op-rail {
+  position: absolute;
+  z-index: 5;
+  left: max(18px, 2.2vw);
+  top: 50%;
+  translate: 0 -50%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 9px;
+}
+.op-rail li {
+  width: 2px;
+  height: 20px;
+  border-radius: 2px;
+  background: color-mix(in oklab, rgba(255, 255, 255, 0.28) calc(var(--n) * 100%), rgba(12, 10, 9, 0.18));
+  transition: height 300ms ease;
+}
+.op[data-stage="0"] .op-rail li:nth-child(1),
+.op[data-stage="1"] .op-rail li:nth-child(2),
+.op[data-stage="2"] .op-rail li:nth-child(3),
+.op[data-stage="3"] .op-rail li:nth-child(4) {
+  background: var(--color-brand);
+  height: 32px;
+}
+/* ── phone: its own composition ────────────────────────────────────────── */
+/* The camera travels to each signal instead of showing the whole place
+   (lib/opening/scene.ts, CAM.phone); words sit top and bottom of the frame;
+   the answer rises as a sheet under the morning diorama. */
+@media (max-width: 820px) {
+  .op { height: 520vh; }
+
+  .op-q {
+    left: 22px;
+    right: 22px;
+    top: 7.5vh;
+    max-width: 13ch;
+    font-size: clamp(32px, 9vw, 44px);
+  }
+  .op-look {
+    left: 22px;
+    top: 8vh;
+    font-size: 24px;
+  }
+  .op-caps {
+    left: 22px;
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+  }
+  .op-cap { font-size: 30px; }
+  .op-who {
+    left: 22px;
+    right: 22px;
+    top: 7vh;
+  }
+  .op-same { font-size: 11.5px; }
+  .op-who-lines p { font-size: clamp(34px, 10vw, 46px); }
+
+  /* Words at the top, the morning diorama in the middle (CAM.phone), the
+     field at the bottom above the tab bar. The block spans the frame but
+     only its children take taps, so the diorama between stays visible. */
+  .op-answer {
+    inset: 0;
+    translate: none;
+    width: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 62px 22px calc(84px + env(safe-area-inset-bottom, 0px));
+    transform: translateY(calc((1 - var(--res)) * 24px));
+  }
+  .op[data-stage="3"] .op-answer { pointer-events: none; }
+  .op[data-stage="3"] .op-ans-head,
+  .op[data-stage="3"] .op-find { pointer-events: auto; }
+  .op-brand { font-size: 30px; gap: 11px; }
+  .op-rule { width: 44px; margin: 18px 0; }
+  .op-ans-title { font-size: clamp(27px, 7.6vw, 34px); }
+  .op-ans-sub { margin-top: 10px; font-size: 15.5px; }
+  .op-find {
+    margin: 0;
+    height: 60px;
+    padding: 6px 6px 6px 16px;
+  }
+  .op-find input { margin: 0 6px 0 8px; }
+  .op-find input::placeholder { font-size: 13.5px; }
+  .op-find button { width: 48px; height: 48px; }
+
+  .op-rail {
+    left: 22px;
+    right: 22px;
+    top: 16px;
+    translate: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 5px;
+  }
+  .op-rail li { width: auto; height: 3px; }
+  .op[data-stage="0"] .op-rail li:nth-child(1),
+  .op[data-stage="1"] .op-rail li:nth-child(2),
+  .op[data-stage="2"] .op-rail li:nth-child(3),
+  .op[data-stage="3"] .op-rail li:nth-child(4) { height: 3px; }
+}
+
+@media (max-width: 820px) and (max-height: 700px) {
+  .op-rule { margin: 12px 0; }
+  .op-ans-title { font-size: 25px; }
+  .op-ans-sub { display: none; }
+}
+
+/* ── reduced motion ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .op { height: 100svh; }
+  .op-pin { position: static; }
+  .op-rail, .op-q, .op-look, .op-caps, .op-who { display: none; }
+}
+
+/* This copy has no bottom tab bar, so the phone layout sits lower. */
+@media (max-width:820px){
+  .op-caps{bottom:calc(36px + env(safe-area-inset-bottom,0px))}
+  .op-answer{padding-bottom:calc(30px + env(safe-area-inset-bottom,0px))}
+}

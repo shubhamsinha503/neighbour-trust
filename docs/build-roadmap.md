@@ -14,7 +14,7 @@
 
 **Scheduling** — each agent runs on its own cadence (hourly for AQI, weekly for RERA, continuous ingestion for resident reports and news) via a job scheduler (APScheduler to start; move to a managed queue if fetch volume grows).
 
-**Hosting** — frontend on Vercel; API + scheduled agent jobs + Postgres on a single managed provider (Railway or Render is enough at MVP scale — no need for Kubernetes-grade infrastructure yet).
+**Hosting** — frontend on Vercel; API on Google Cloud Run (serverless, scale-to-zero); scheduled agent jobs on GitHub Actions; Postgres on Neon. No need for Kubernetes-grade infrastructure at MVP scale.
 
 ## Repo structure
 

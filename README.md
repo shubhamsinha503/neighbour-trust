@@ -89,8 +89,8 @@ flowchart LR
   Sources --> Agents
   CI[GitHub Actions<br/>scheduled ingest] --> Agents
   Agents --> DB[(PostgreSQL · Neon)]
-  DB --> API[FastAPI service · Render]
-  API --> Groq[LLM Q&A · Groq]
+  DB --> API[FastAPI service · Google Cloud Run]
+  API --> Gemini[LLM Q&A · Gemini]
 
   API --> Web[Next.js web · Vercel]
   API --> Mobile[React Native app · Expo / Play]
@@ -168,9 +168,9 @@ the same standard the product holds its data to.
 | **Mobile** | React Native, Expo (SDK 57), Expo Router, TypeScript, EAS Build, i18n |
 | **Web** | Next.js (App Router), React, TypeScript, Tailwind CSS |
 | **Backend** | Python, FastAPI, Pydantic, REST |
-| **Data / agents** | Python, OpenStreetMap / Nominatim, GDAL (geospatial rasters), news classification, Groq LLM |
+| **Data / agents** | Python, OpenStreetMap / Nominatim, GDAL (geospatial rasters), Gemini (grounded Q&A), news classification |
 | **Data store** | PostgreSQL (Neon), PostGIS / H3 spatial keying |
-| **Infra / DevOps** | Vercel (web), Render (API), GitHub Actions (CI/CD + scheduled ingest), monorepo |
+| **Infra / DevOps** | Vercel (web), Google Cloud Run (API), GitHub Actions (CI/CD + scheduled ingest), monorepo |
 
 ## Engineering highlights
 
@@ -196,7 +196,7 @@ the same standard the product holds its data to.
 apps/
   mobile/   Expo / React Native app (Android, Google Play)
   web/      Next.js web app (Vercel)
-  api/      FastAPI service (Render)
+  api/      FastAPI service (Google Cloud Run)
 agents/     Python ingestion + orchestration (air quality, schools, flood, …)
 infra/      Postgres migrations, deploy config
 docs/       Strategy, build roadmap, architecture decisions

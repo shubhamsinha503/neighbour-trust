@@ -4,6 +4,7 @@ import { Suspense } from "react";
 
 import { Icon } from "@/components/Icon";
 import { LocalitySearch } from "@/components/LocalitySearch";
+import { Opening } from "@/components/Opening";
 import { NearMe } from "@/components/NearMe";
 import { PopularCities } from "@/components/PopularCities";
 import { WhatMatters } from "@/components/WhatMatters";
@@ -35,7 +36,13 @@ const EXAMPLES = ["Koramangala", "Indiranagar", "Whitefield", "560001", "HSR Lay
 
 export default async function HomePage() {
   return (
-    <main className="relative mx-auto max-w-3xl overflow-hidden px-4 pb-14 pt-7 sm:pt-10">
+    <>
+      {/* The opening: a pinned, full-bleed scroll from afternoon to morning that
+        * shows how Nestra reads a neighbourhood. It renders ABOVE <main> (not
+        * inside it) because main is max-w-3xl + overflow-hidden, which would clip
+        * the 100vw bleed and break the sticky pin. */}
+      <Opening />
+      <main className="relative mx-auto max-w-3xl overflow-hidden px-4 pb-14 pt-7 sm:pt-10">
       {/* Decorative pink blobs, matching the native home. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[320px]">
         <div className="absolute -right-16 -top-20 h-60 w-60 rounded-full bg-brand-soft opacity-70" />
@@ -52,15 +59,16 @@ export default async function HomePage() {
         </div>
         <h1 className="sr-only">Nestra — honest neighbourhood data for Indian home buyers</h1>
 
-        <div className="mt-4">
+        <div id="nestra-search" className="mt-4 scroll-mt-4">
           <Suspense fallback={<SearchSkeleton />}>
             <HomeBody />
           </Suspense>
         </div>
       </div>
 
-      {authConfigured && <ShortlistShortcut />}
-    </main>
+        {authConfigured && <ShortlistShortcut />}
+      </main>
+    </>
   );
 }
 

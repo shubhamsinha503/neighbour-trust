@@ -414,7 +414,7 @@ def _build_locality_summaries() -> list[dict[str, Any]]:
     return out
 
 
-# In-process cache for the summary. One Render instance, one worker, so a module
+# In-process cache for the summary. One Cloud Run instance, one worker, so a module
 # global is the whole story — no Redis for a value that is the same for everyone
 # and cheap to rebuild. A background thread keeps it warm; the request path only
 # reads it. Stale-while-revalidate: an expired cache is still served while a
