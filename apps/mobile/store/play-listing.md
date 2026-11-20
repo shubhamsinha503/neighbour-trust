@@ -74,7 +74,7 @@ about that on every card.
 
 Available in English, Hindi, Kannada, Telugu and Marathi.
 
-Nestra — know here you live.
+Nestra — know where you live.
 ```
 
 ---

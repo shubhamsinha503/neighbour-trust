@@ -32,8 +32,18 @@ function compass(deg: number): string {
   return COMPASS_16[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
 }
 
+// Every covered locality is in India, so sun times are shown in India Standard
+// Time regardless of where the viewer's device is — and, crucially, regardless
+// of the server's clock. Without an explicit timeZone this formats in the
+// render environment's zone: on the server (UTC) Bengaluru's ~06:00 sunrise came
+// out as "12:50 am" and its ~18:19 sunset as "12:19 pm". Pinning to Asia/Kolkata
+// makes the value correct and identical on server and client (no hydration drift).
 function fmt(d: Date): string {
-  return d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+  return d.toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "Asia/Kolkata",
+  });
 }
 
 const DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
