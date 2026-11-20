@@ -25,6 +25,9 @@ import { CategoryStrip } from "@/components/CategoryStrip";
 import { SunlightCard } from "@/components/SunlightCard";
 import { UpcomingCard } from "@/components/UpcomingCard";
 import { FloodCard } from "@/components/FloodCard";
+import { Provenance } from "@/components/Provenance";
+import { ScoreBasis } from "@/components/ScoreBasis";
+import { SourcesList } from "@/components/SourcesList";
 import type {
   ConnectivityFeature,
   ConnectivityView,
@@ -84,6 +87,11 @@ export async function TrustReport({
           </div>
         </div>
 
+        {/* 1b — what the number covers. A score averaged over two categories
+          * looks as complete as one over five; this says which it is, names the
+          * gaps, and opens to the full arithmetic. */}
+        <ScoreBasis report={report} />
+
         {/* 2 — flags: what was actually found here.
           *
           * Replaces the single "biggest watch-out", which could only fire for a
@@ -136,6 +144,10 @@ export async function TrustReport({
         * app; the honest count of what fed the overall score stays on the score
         * chip above. */}
       <CategoryStrip categories={report.categories} slug={locality.slug} />
+
+      {/* 4a — every figure traceable: source, date, confidence and the original
+        * articles, one row per indicator. */}
+      <SourcesList categories={report.categories} flood={report.flood} />
 
       {/* One route in per page, whatever the categories hold. The per-card link
         * only appears on a card with nothing measured, and a category with
@@ -192,6 +204,8 @@ function countedLabels(
 }
 
 
+const PRESS_FLAG = new Set(["crime", "water", "power"]);
+
 /** One thing found in this locality, raised out of the category grid. */
 function FlagCard({ flag }: { flag: Flag }) {
   const serious = flag.severity === "serious";
@@ -225,6 +239,17 @@ function FlagCard({ flag }: { flag: Flag }) {
           * but it is the same on every locality and belongs in the policy page,
           * not repeated under every flag. */}
         <b className="text-[12.5px] leading-[1.4]">{flag.headline}</b>
+        {/* Where this warning was read from — checkable at the warning itself,
+          * not three sections further down. */}
+        <Provenance
+          sourceName={flag.sourceName}
+          sourceUrl={flag.sourceUrl}
+          asOf={flag.asOf}
+          asOfLabel={PRESS_FLAG.has(flag.category) ? "Latest report" : "Data from"}
+          confidence={flag.confidence}
+          evidence={flag.evidence}
+          evidenceLabel={(flag.evidence?.length ?? 0) === 1 ? "original source" : "original sources"}
+        />
       </div>
     </div>
   );

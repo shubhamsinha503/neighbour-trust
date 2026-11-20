@@ -401,8 +401,12 @@ export function LocalitySearch({
       {(showBrowseList || searching) && results.length > 0 && (
         <p className="mt-3 px-1 text-[11px] leading-[1.5] text-ink-muted">
           The score is out of 100, built from up to five categories — schools,
-          safety, air quality, water and connectivity — using whichever a
-          locality has data for.
+          safety, air quality, water and connectivity. It averages only the ones
+          a locality has data for, so a score built on fewer categories is a
+          partial picture: each report says what it covers and what is missing.{" "}
+          <Link href="/about#trust-score" className="font-semibold text-brand underline decoration-dotted underline-offset-2">
+            How scores work
+          </Link>
         </p>
       )}
 

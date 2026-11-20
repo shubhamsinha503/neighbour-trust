@@ -747,6 +747,16 @@ def get_connectivity(slug: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+class Evidence(BaseModel):
+    """One original item behind a figure — a press article or a resident's link."""
+
+    headline: str
+    url: str
+    source: Optional[str] = None
+    published_at: Optional[str] = None
+    kind: Optional[str] = None
+
+
 class ReportCategory(BaseModel):
     category: str
     label: str
@@ -767,6 +777,16 @@ class ReportCategory(BaseModel):
     summary: str = ""
     source_name: Optional[str] = None
     data_vintage: Optional[str] = None
+    source_url: Optional[str] = None
+    fetched_at: Optional[str] = None
+    historical: bool = Field(
+        False,
+        description="Shown with its date but too old to count toward the score.",
+    )
+    evidence: list[Evidence] = Field(
+        default_factory=list,
+        description="The newest original articles behind a press-derived category.",
+    )
 
 
 class ReportDisagreement(BaseModel):
@@ -791,6 +811,13 @@ class Flag(BaseModel):
     )
     headline: str
     detail: str
+    # Where the flag was read from, so the reader can check it at the warning.
+    source_name: Optional[str] = None
+    source_url: Optional[str] = None
+    as_of: Optional[str] = None
+    fetched_at: Optional[str] = None
+    confidence: Optional[str] = None
+    evidence: list[Evidence] = Field(default_factory=list)
 
 
 class TrustScoreOut(BaseModel):
@@ -808,6 +835,9 @@ class TrustScoreOut(BaseModel):
     # non-zero there is also a power flag saying the same thing in words.
     power_penalty: int = 0
     power_penalty_reason: Optional[str] = None
+    min_coverage_pct: int = Field(
+        round(score_mod.MIN_WEIGHT_COVERAGE * 100), description="Below this share of the weight, no score is published."
+    )
 
 
 class ReportResponse(BaseModel):
@@ -875,6 +905,7 @@ def debug_report(slug: str, request: Request) -> dict[str, Any]:
                 "reason_unavailable": report.trust_score.reason_unavailable,
                 "power_penalty": report.trust_score.power_penalty,
                 "power_penalty_reason": report.trust_score.power_penalty_reason,
+                "min_coverage_pct": round(score_mod.MIN_WEIGHT_COVERAGE * 100),
             },
             verdict=report.verdict,
             biggest_watchout=report.biggest_watchout,
@@ -925,6 +956,11 @@ def get_report(slug: str) -> dict[str, Any]:
             "categories_counted": trust.categories_counted,
             "categories_total": trust.categories_total,
             "reason_unavailable": trust.reason_unavailable,
+            # Exposed so the page can explain every point of the number: a
+            # deduction nobody can see would break the product's one promise.
+            "power_penalty": trust.power_penalty,
+            "power_penalty_reason": trust.power_penalty_reason,
+            "min_coverage_pct": round(score_mod.MIN_WEIGHT_COVERAGE * 100),
         },
         "verdict": report.verdict,
         "biggest_watchout": report.biggest_watchout,

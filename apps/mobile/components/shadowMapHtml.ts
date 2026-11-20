@@ -86,14 +86,21 @@ export function shadowMapHtml({
     var h = Math.floor(mins / 60), m = mins % 60;
     var ampm = h < 12 ? 'am' : 'pm';
     var h12 = ((h + 11) % 12) + 1;
-    return h12 + ':' + String(m).padStart(2, '0') + ' ' + ampm;
+    return h12 + ':' + String(m).padStart(2, '0') + ' ' + ampm + ' IST';
+  }
+
+  // The slider is a clock in India Standard Time (UTC+5:30, no DST), not the
+  // device's zone: a phone set to another zone must still see the locality's
+  // shadows for the time shown.
+  var IST_MS = 330 * 60000, DAY_MS = 86400000;
+  function istDayStart() {
+    return Math.floor((Date.now() + IST_MS) / DAY_MS) * DAY_MS - IST_MS;
   }
 
   // suncalc 1.9.0: altitude in radians, azimuth in radians measured from south.
   // Convert to degrees and a compass bearing from north to match the app.
   function sunAt(mins) {
-    var d = new Date();
-    d.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+    var d = new Date(istDayStart() + mins * 60000);
     var p = SunCalc.getPosition(d, LAT, LON);
     var altitude = p.altitude * 180 / Math.PI;
     var azimuth = (p.azimuth * 180 / Math.PI + 180) % 360;
@@ -101,7 +108,7 @@ export function shadowMapHtml({
   }
 
   var now = new Date();
-  var mins = now.getHours() * 60 + now.getMinutes();
+  var mins = Math.floor((now.getTime() - istDayStart()) / 60000) % 1440;
   slider.value = String(mins);
 
   var footprints = [];
