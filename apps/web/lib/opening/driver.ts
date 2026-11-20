@@ -96,8 +96,21 @@ function camera(keys: Key[], p: number) {
   };
 }
 
+// Last value written per property, per host. Every custom property set on the
+// host restyles the ~1,000 shapes beneath it, so a value that has not changed
+// is not written again — on most frames only a handful actually move.
+const written = new WeakMap<HTMLElement, Map<string, string>>();
+
 function paintOpening(host: HTMLElement, p: number) {
-  const set = (k: string, v: number) => host.style.setProperty(k, v.toFixed(4));
+  let last = written.get(host);
+  if (!last) written.set(host, (last = new Map()));
+  const cache = last;
+  const set = (k: string, v: number) => {
+    const s = v.toFixed(3);
+    if (cache.get(k) === s) return;
+    cache.set(k, s);
+    host.style.setProperty(k, s);
+  };
   set("--p", p);
   // What you see: a sunny afternoon, the question, then dusk.
   set("--q", 1 - win(p, 0.075, 0.13));
@@ -120,7 +133,33 @@ function paintOpening(host: HTMLElement, p: number) {
   set("--lf", win(p, 0.76, 0.79));
   // Nestra's answer.
   set("--res", win(p, 0.86, 0.95));
-  host.dataset.stage = String(p < 0.13 ? 0 : p < 0.62 ? 1 : p < 0.85 ? 2 : 3);
+  const stage = String(p < 0.13 ? 0 : p < 0.62 ? 1 : p < 0.85 ? 2 : 3);
+  if (host.dataset.stage !== stage) host.dataset.stage = stage;
+}
+
+// Crash-loop guard. If the page's process is killed while the opening runs,
+// Safari reloads the tab and would run straight into the same crash, which is
+// what "A problem repeatedly occurred" means. A marker is set in this tab's
+// sessionStorage while the opening is animating and cleared once it has run
+// for a while; finding it already set at mount means the last load died, so
+// this one shows the finished frame, held still.
+const GUARD_KEY = "nestra-opening-guard";
+const GUARD_CLEAR_MS = 15_000;
+
+function previousLoadDied(): boolean {
+  try {
+    return window.sessionStorage.getItem(GUARD_KEY) === "running";
+  } catch {
+    return false;
+  }
+}
+function setGuard(on: boolean) {
+  try {
+    if (on) window.sessionStorage.setItem(GUARD_KEY, "running");
+    else window.sessionStorage.removeItem(GUARD_KEY);
+  } catch {
+    /* storage unavailable: no guard, no harm */
+  }
 }
 
 /**
@@ -163,7 +202,10 @@ export function mountOpening(host: HTMLElement): () => void {
     frame(p);
   };
 
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  const still =
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches || previousLoadDied();
+  if (still) {
+    host.classList.add("op-still");
     // The finished frame, held still.
     draw(1);
     for (const s of SIGNALS) host.style.setProperty(`--${s.k}`, "1");
@@ -172,22 +214,54 @@ export function mountOpening(host: HTMLElement): () => void {
     return () => window.removeEventListener("resize", onResize);
   }
 
+  setGuard(true);
+  const guardTimer = window.setTimeout(() => setGuard(false), GUARD_CLEAR_MS);
+
+  // Only work while the opening is on screen, and only when the scroll has
+  // actually moved it: progress is quantised so sub-pixel jitter and momentum
+  // tails do not restyle the whole scene for an invisible change.
+  let visible = true;
+  const io =
+    "IntersectionObserver" in window
+      ? new IntersectionObserver((entries) => {
+          visible = entries.some((e) => e.isIntersecting);
+          if (visible) onScroll();
+        })
+      : null;
+  io?.observe(host);
+
   let raf = 0;
+  let lastP = -1;
+  let lastW = -1;
   const read = () => {
     raf = 0;
+    if (!visible) return;
     const span = host.offsetHeight - window.innerHeight;
     if (span <= 0) return;
-    draw(Math.min(1, Math.max(0, -host.getBoundingClientRect().top / span)));
+    const raw = Math.min(1, Math.max(0, -host.getBoundingClientRect().top / span));
+    const p = Math.round(raw * 1000) / 1000;
+    const w = window.innerWidth;
+    if (p === lastP && w === lastW) return;
+    lastP = p;
+    lastW = w;
+    draw(p);
   };
-  const onScroll = () => {
+  function onScroll() {
     if (!raf) raf = requestAnimationFrame(read);
-  };
+  }
   read();
   window.addEventListener("scroll", onScroll, { passive: true });
   window.addEventListener("resize", onScroll);
+  // A tab sent to the background mid-animation is not a crash.
+  const onHide = () => setGuard(false);
+  window.addEventListener("pagehide", onHide);
   return () => {
     if (raf) cancelAnimationFrame(raf);
+    window.clearTimeout(guardTimer);
+    setGuard(false);
+    io?.disconnect();
     window.removeEventListener("scroll", onScroll);
     window.removeEventListener("resize", onScroll);
+    window.removeEventListener("pagehide", onHide);
   };
 }

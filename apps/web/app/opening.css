@@ -71,6 +71,8 @@
   height: 100svh;
   overflow: hidden;
   isolation: isolate;
+  /* Keep the per-frame repaint inside the pinned frame. */
+  contain: layout paint;
   /* Day, through a mauve dusk (--dk peaks halfway), to night. A straight
      day-to-night mix passes through flat grey, which reads as a fault. */
   background: color-mix(
@@ -80,16 +82,18 @@
   );
 }
 
-/* The sunset grade: a warm multiply over the whole scene while the light is
-   changing, so buildings go gold-rose on the way to night instead of grey. */
+/* The sunset grade: a warm wash over the whole scene while the light is
+   changing, so buildings go gold-rose on the way to night instead of grey.
+   A plain translucent layer, not mix-blend-mode: a full-viewport blend over a
+   pinned, constantly repainting SVG made iPhone Safari run out of graphics
+   memory and kill the page ("A problem repeatedly occurred"). */
 .op-grade {
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
   background: linear-gradient(170deg, #ffb36b, #d4688f 55%, #6a4fb0);
-  mix-blend-mode: multiply;
-  opacity: calc(var(--dk) * 0.55);
+  opacity: calc(var(--dk) * 0.24);
 }
 
 /* A soft sky behind the diorama: warm by day, indigo by night. */
@@ -237,12 +241,13 @@
 .flow {
   fill: none;
   stroke: var(--color-brand-bright);
-  stroke-width: 4;
+  stroke-width: 5;
   stroke-linecap: round;
   stroke-dasharray: 1;
   stroke-dashoffset: calc(1 - clamp(0, var(--metro) * 1.7 - var(--o, 0), 1));
   opacity: calc(var(--lk) * (0.35 + 0.65 * var(--n)));
-  filter: drop-shadow(0 0 4px rgba(247, 37, 117, 0.9));
+  /* No drop-shadow filter: on iPhone each filtered element gets its own
+     offscreen buffer, redrawn every scroll frame. */
 }
 .track {
   stroke: var(--color-brand-bright);
@@ -292,7 +297,7 @@
 /* ── the sky layer ─────────────────────────────────────────────────────── */
 /* Cars: plain in daylight, headlights by night (a business reads them). */
 .car-base, .car-top { stroke: rgba(0, 0, 0, 0.12); stroke-width: 0.5; }
-.car-top { filter: brightness(1.15); }
+.car-top { opacity: 0.92; }
 .op-car { opacity: calc(1 - var(--n) * 0.35 * (1 - var(--lk))); }
 .headlight { fill: #fff6d6; opacity: calc(var(--n) * var(--lk)); }
 
@@ -316,7 +321,6 @@
   stroke-dasharray: 1;
   stroke-dashoffset: calc(1 - clamp(0, var(--res) * 1.4 - var(--o, 0), 1));
   opacity: var(--res);
-  filter: drop-shadow(0 0 5px rgba(255, 181, 71, 0.8));
 }
 .halo { opacity: calc(0.35 + var(--n) * 0.25 + var(--res) * 0.6); }
 .beacon {
@@ -678,12 +682,18 @@
   .op-ans-sub { display: none; }
 }
 
-/* ── reduced motion ────────────────────────────────────────────────────── */
+/* ── reduced motion, and the still fallback ──────────────────────────── */
+/* .op-still is set by the driver when a previous load in this tab died while
+   the opening was running: the finished frame is shown, held still, instead
+   of risking the same crash again. */
 @media (prefers-reduced-motion: reduce) {
   .op { height: 100svh; }
   .op-pin { position: static; }
   .op-rail, .op-q, .op-look, .op-caps, .op-who { display: none; }
 }
+.op.op-still { height: 100svh; }
+.op.op-still .op-pin { position: static; }
+.op.op-still :is(.op-rail, .op-q, .op-look, .op-caps, .op-who) { display: none; }
 
 /* This copy has no bottom tab bar, so the phone layout sits lower. */
 @media (max-width:820px){
