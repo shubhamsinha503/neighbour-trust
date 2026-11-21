@@ -16,10 +16,10 @@
 
 import { useT } from "@/components/LanguageProvider";
 import { useState } from "react";
-import type { Confidence } from "@schema/envelope";
-import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
+import { formatIst } from "@/lib/aqi";
 import type { SchoolsView } from "@/lib/api";
 import { MeasureFrom, haversineKm, type Origin } from "@/components/MeasureFrom";
+import { SourceLine } from "@/components/SourceLine";
 
 export function SchoolsCard({ view }: { view: SchoolsView }) {
   const t = useT();
@@ -138,20 +138,27 @@ export function SchoolsCard({ view }: { view: SchoolsView }) {
         </section>
       )}
 
-      {/* 5 — sources and confidence */}
+      {/* 5 — sources and confidence. Openable primary source with its date and
+          confidence; the chips list the upstreams it was combined from. */}
       <footer className="mt-4 border-t border-dashed border-gridline pt-3">
-        <div className="mb-2 text-[9.5px] text-ink-muted">{t("report.dataPulledFrom")}</div>
-        <div className="flex flex-wrap items-center gap-2">
-          {payload.sourcesUsed.map((source) => (
-            <span
-              key={source}
-              className="rounded-md bg-page-plane px-1.5 py-1 text-[10px] font-bold text-ink-secondary"
-            >
-              {source}
-            </span>
-          ))}
-          <ConfidenceChip confidence={view.confidence} />
-        </div>
+        <SourceLine
+          name={view.sourceName}
+          url={view.sourceUrl}
+          date={formatIst(view.dataVintage)}
+          confidence={view.confidence}
+        />
+        {payload.sourcesUsed.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {payload.sourcesUsed.map((source) => (
+              <span
+                key={source}
+                className="rounded-md bg-page-plane px-1.5 py-1 text-[10px] font-bold text-ink-secondary"
+              >
+                {source}
+              </span>
+            ))}
+          </div>
+        )}
       </footer>
     </article>
   );
@@ -230,15 +237,3 @@ function StatTile({
   );
 }
 
-function ConfidenceChip({ confidence }: { confidence: Confidence }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-ink-secondary">
-      <span
-        className="inline-block h-1.5 w-1.5 rounded-full"
-        style={{ background: CONFIDENCE_COLOR[confidence] }}
-        aria-hidden="true"
-      />
-      {CONFIDENCE_LABEL[confidence]}
-    </span>
-  );
-}

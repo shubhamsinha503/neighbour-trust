@@ -28,9 +28,10 @@
 
 import { useT } from "@/components/LanguageProvider";
 import { useState } from "react";
-import { CONFIDENCE_COLOR, CONFIDENCE_LABEL } from "@/lib/aqi";
+import { formatIst } from "@/lib/aqi";
 import { MeasureFrom, haversineKm, type Origin } from "@/components/MeasureFrom";
 import type { ConnectivityFeature, ConnectivityView } from "@/lib/api";
+import { SourceLine } from "@/components/SourceLine";
 
 function distanceText(km: number): string {
   const m = km * 1000;
@@ -174,15 +175,13 @@ export function ConnectivityCard({ view }: { view: ConnectivityView }) {
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-gridline pt-3">
-        <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-ink-secondary">
-          <span
-            className="inline-block h-1.5 w-1.5 rounded-full"
-            style={{ background: CONFIDENCE_COLOR[view.confidence] }}
-            aria-hidden="true"
-          />
-          {CONFIDENCE_LABEL[view.confidence]}
-        </span>
+      <div className="mt-3 border-t border-dashed border-gridline pt-3">
+        <SourceLine
+          name={view.sourceName}
+          url={view.sourceUrl}
+          date={formatIst(view.dataVintage)}
+          confidence={view.confidence}
+        />
       </div>
     </article>
   );

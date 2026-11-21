@@ -12,6 +12,7 @@
 
 import { getServerT } from "@/lib/i18n-server";
 import type { FloodInfo } from "@/lib/api";
+import { SourceLine } from "@/components/SourceLine";
 
 export async function FloodCard({ flood }: { flood: FloodInfo }) {
   const { t } = await getServerT();
@@ -28,18 +29,13 @@ export async function FloodCard({ flood }: { flood: FloodInfo }) {
         {t("flood.line").replace("{depth}", depth)}
       </p>
       <p className="mt-1.5 text-[11px] leading-[1.5] text-ink-muted">{t("flood.caveat")}</p>
-      {flood.sourceUrl ? (
-        <a
-          href={flood.sourceUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-2 inline-block text-[11px] font-semibold text-brand underline decoration-dotted underline-offset-2"
-        >
-          {flood.source} ↗
-        </a>
-      ) : (
-        <span className="mt-2 inline-block text-[11px] text-ink-muted">{flood.source}</span>
-      )}
+      <div className="mt-2.5">
+        <SourceLine
+          name={flood.source}
+          url={flood.sourceUrl || undefined}
+          date={flood.vintage || undefined}
+        />
+      </div>
     </section>
   );
 }
