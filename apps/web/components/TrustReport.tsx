@@ -22,6 +22,7 @@ import { categoryLabel } from "@/lib/i18n";
 import { getServerT } from "@/lib/i18n-server";
 import Link from "next/link";
 import { CategoryStrip } from "@/components/CategoryStrip";
+import { ScoringNote } from "@/components/ScoringNote";
 import { SunlightCard } from "@/components/SunlightCard";
 import { UpcomingCard } from "@/components/UpcomingCard";
 import { FloodCard } from "@/components/FloodCard";
@@ -130,6 +131,16 @@ export async function TrustReport({
           </div>
         )}
       </section>
+
+      {/* How the number is made — so a score resting on two or three categories
+        * is never read as a verdict on the whole neighbourhood. Only shown once
+        * there is a score to explain. */}
+      {trust.score !== null && (
+        <ScoringNote
+          counted={report.categories.filter((c) => c.counted).length}
+          total={report.categories.length}
+        />
+      )}
 
       {/* 4 — category scores, shown as the native app's horizontal strip so the
         * two products read as one. Only scored categories appear, matching the
